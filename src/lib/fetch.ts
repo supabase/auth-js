@@ -22,7 +22,7 @@ export async function post(url: string, body: object, options?: FetchOptions) {
     fetch(url, {
       method: 'POST',
       headers: options?.headers || {},
-      body: JSON.stringify({ body }),
+      body: JSON.stringify(body),
     })
       .then((r) => r.json())
       .then((data) => resolve(data))

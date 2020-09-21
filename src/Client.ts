@@ -1,5 +1,6 @@
-import { ClientConfig, Subscription } from './Client.types'
 import { uuid } from './lib/helpers'
+import { post } from './lib/fetch'
+import { ClientConfig, UserCredentials, Subscription, UserEvents } from './Client.types'
 
 export default class Client {
   url: string
@@ -22,14 +23,53 @@ export default class Client {
   /**
    * Creates a new user account for your business or project.
    */
-  signup() {
-    return null
+  async signUp(credentials: UserCredentials) {
+    try {
+      let data: any = await post(
+        `${this.url}/signup`,
+        { email: credentials.email, password: credentials.password },
+        { headers: this.headers }
+      )
+
+      if (!data.id) {
+          console.log('data', data)
+        return { data: null, error: data.msg || data.message }
+      }
+
+      handleEventChanged(UserEvents.SIGN_UP, this.stateChangeEmitters)
+      return { data, error: null }
+    } catch (error) {
+      return { data: null, error: error.toString() }
+    }
   }
 
   /**
    * Allows existing users to log into your system.
    */
-  login() {
+  async signIn(credentials: UserCredentials) {
+    try {
+      let data: any = await post(
+        `${this.url}/token?grant_type=password`,
+        { email: credentials.email, password: credentials.password },
+        { headers: this.headers }
+      )
+
+      if (!data.access_token) {
+        return { data: null, error: data.msg || data.message }
+      }
+
+      handleEventChanged(UserEvents.SIGN_UP, this.stateChangeEmitters)
+      return { data, error: null }
+    } catch (error) {
+      return { data: null, error: error.toString() }
+    }
+  }
+
+  /**
+   * Allows existing users to log into your system.
+   */
+  signOut() {
+    handleEventChanged(UserEvents.SIGN_OUT, this.stateChangeEmitters)
     return null
   }
 
@@ -54,5 +94,14 @@ export default class Client {
     }
     this.stateChangeEmitters.set(id, subscription)
     return subscription
+  }
+}
+
+const handleEventChanged = (
+  eventType: UserEvents,
+  stateChangeEmitters: Map<string, Subscription>
+) => {
+  for (let subscription of stateChangeEmitters.values()) {
+    subscription.callback(eventType)
   }
 }

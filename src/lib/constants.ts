@@ -1,1 +1,1 @@
-export const GOTRUE_URL = 'http://localhost:8081'
+export const GOTRUE_URL = process.env.GOTRUE_URL || 'http://localhost:9999'

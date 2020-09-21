@@ -1,3 +1,4 @@
+import { get } from './lib/fetch'
 import { AdminConfig } from './Admin.types'
 
 export default class Admin {
@@ -14,6 +15,23 @@ export default class Admin {
     this.url = url
     if (options?.headers) {
       this.headers = { ...this.headers, ...options.headers }
+    }
+  }
+
+  /**
+   * Creates a new user account for your business or project.
+   */
+  async settings() {
+    try {
+      let data: any = await get(`${this.url}/settings`, { headers: this.headers })
+
+      if (!data.external) {
+        return { data: null, error: data.msg }
+      }
+
+      return { data, error: null }
+    } catch (error) {
+      return { data: null, error: error.toString() }
     }
   }
 }
