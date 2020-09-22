@@ -1,7 +1,6 @@
 import { Client } from '../src/index'
-const faker = require('faker')
 
-const GOTRUE_URL = 'http://localhost:3000'
+const GOTRUE_URL = 'http://localhost:9999'
 
 const auth = new Client({
   url: GOTRUE_URL,
@@ -9,52 +8,94 @@ const auth = new Client({
   persistSession: true,
 })
 
-const email = faker.internet.email()
+const email = 'fake@email.com'
 const password = 'secret'
 
 test('signUp()', async () => {
-  let user = await auth.signUp({
+  let { error, data } = await auth.signUp({
     email,
     password,
   })
-  expect(user).toMatchSnapshot()
+  expect(error).toBeNull()
+  expect(data).toMatchSnapshot({
+    access_token: expect.any(String),
+    expires_in: expect.any(Number),
+    user: {
+      id: expect.any(String),
+      aud: expect.any(String),
+      updated_at: expect.any(String),
+      app_metadata: {
+        provider: 'email',
+      },
+    },
+  })
 })
 
-
 test('signIn()', async () => {
-  let user = await auth.signIn({
+  let { error, data } = await auth.signIn({
     email,
     password,
   })
-  expect(user).toMatchSnapshot()
+  expect(error).toBeNull()
+  expect(data).toMatchSnapshot({
+    access_token: expect.any(String),
+    expires_in: expect.any(Number),
+    user: {
+      id: expect.any(String),
+      aud: expect.any(String),
+      updated_at: expect.any(String),
+      app_metadata: {
+        provider: 'email',
+      },
+    },
+  })
 })
 
 test('Get user', async () => {
-  let user = await auth.user()
-
-  expect(user).toMatchSnapshot()
+  let { error, data } = await auth.user()
+  expect(error).toBeNull()
+  expect(data).toMatchSnapshot({
+    id: expect.any(String),
+    aud: expect.any(String),
+    updated_at: expect.any(String),
+    app_metadata: {
+      provider: 'email',
+    },
+  })
 })
 
 test('Update user', async () => {
-  let user = await auth.update({ data: { hello: 'world' }, password: 'lolz' })
-
-  expect(user).toMatchSnapshot()
+  let { error, data } = await auth.update({ data: { hello: 'world' } })
+  expect(error).toBeNull()
+  expect(data).toMatchSnapshot({
+    id: expect.any(String),
+    aud: expect.any(String),
+    updated_at: expect.any(String),
+    user_metadata: {
+      hello: 'world',
+    },
+  })
 })
 
 test('Get user after updating', async () => {
-  let user = await auth.user()
-
-  expect(user).toMatchSnapshot()
+  let { error, data } = await auth.user()
+  expect(error).toBeNull()
+  expect(data).toMatchSnapshot({
+    id: expect.any(String),
+    aud: expect.any(String),
+    updated_at: expect.any(String),
+    user_metadata: {
+      hello: 'world',
+    },
+  })
 })
 
 test('signOut', async () => {
-  let user = await auth.signOut()
-
-  expect(user).toMatchSnapshot()
+  let res = await auth.signOut()
+  expect(res).toMatchSnapshot()
 })
 
 test('Get user after logging out', async () => {
-  let user = await auth.user()
-
-  expect(user).toMatchSnapshot()
+  let res = await auth.user()
+  expect(res).toMatchSnapshot()
 })

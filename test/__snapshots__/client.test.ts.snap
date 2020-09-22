@@ -2,20 +2,17 @@
 
 exports[`Get user 1`] = `
 Object {
-  "data": Object {
-    "app_metadata": Object {
-      "provider": "email",
-    },
-    "aud": "authenticated",
-    "confirmed_at": "2020-09-22T10:28:01.860349Z",
-    "created_at": "2020-09-22T10:28:01.8576Z",
-    "email": "Mckenna8@hotmail.com",
-    "id": "e02d78a9-e9a6-43c9-b707-681be85fa4b7",
-    "role": "authenticated",
-    "updated_at": "2020-09-22T10:28:01.857605Z",
-    "user_metadata": Object {},
+  "app_metadata": Object {
+    "provider": "email",
   },
-  "error": null,
+  "aud": Any<String>,
+  "confirmed_at": "2020-09-22T11:11:48.811209Z",
+  "created_at": "2020-09-22T11:11:48.807848Z",
+  "email": "fake@email.com",
+  "id": Any<String>,
+  "role": "",
+  "updated_at": Any<String>,
+  "user_metadata": Object {},
 }
 `;
 
@@ -28,69 +25,60 @@ Object {
 
 exports[`Get user after updating 1`] = `
 Object {
-  "data": Object {
-    "app_metadata": Object {
-      "provider": "email",
-    },
-    "aud": "authenticated",
-    "confirmed_at": "2020-09-22T10:28:01.860349Z",
-    "created_at": "2020-09-22T10:28:01.8576Z",
-    "email": "Mckenna8@hotmail.com",
-    "id": "e02d78a9-e9a6-43c9-b707-681be85fa4b7",
-    "role": "authenticated",
-    "updated_at": "2020-09-22T10:28:01.857605Z",
-    "user_metadata": Object {
-      "hello": "world",
-    },
+  "app_metadata": Object {
+    "provider": "email",
   },
-  "error": null,
+  "aud": Any<String>,
+  "confirmed_at": "2020-09-22T11:11:48.811209Z",
+  "created_at": "2020-09-22T11:11:48.807848Z",
+  "email": "fake@email.com",
+  "id": Any<String>,
+  "role": "",
+  "updated_at": Any<String>,
+  "user_metadata": Object {
+    "hello": "world",
+  },
 }
 `;
 
 exports[`Update user 1`] = `
 Object {
-  "data": Object {
-    "app_metadata": Object {
-      "provider": "email",
-    },
-    "aud": "authenticated",
-    "confirmed_at": "2020-09-22T10:28:01.860349Z",
-    "created_at": "2020-09-22T10:28:01.8576Z",
-    "email": "Mckenna8@hotmail.com",
-    "id": "e02d78a9-e9a6-43c9-b707-681be85fa4b7",
-    "role": "authenticated",
-    "updated_at": "2020-09-22T10:28:02.238854Z",
-    "user_metadata": Object {
-      "hello": "world",
-    },
+  "app_metadata": Object {
+    "provider": "email",
   },
-  "error": null,
+  "aud": Any<String>,
+  "confirmed_at": "2020-09-22T11:11:48.811209Z",
+  "created_at": "2020-09-22T11:11:48.807848Z",
+  "email": "fake@email.com",
+  "id": Any<String>,
+  "role": "",
+  "updated_at": Any<String>,
+  "user_metadata": Object {
+    "hello": "world",
+  },
 }
 `;
 
 exports[`signIn() 1`] = `
 Object {
-  "data": Object {
-    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNjAwNzc0MDgyLCJzdWIiOiJlMDJkNzhhOS1lOWE2LTQzYzktYjcwNy02ODFiZTg1ZmE0YjciLCJlbWFpbCI6Ik1ja2VubmE4QGhvdG1haWwuY29tIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwifSwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.vH2AXDRH_le8JuEJq4EcvbrTVubOdKytjpKopGD3mLg",
-    "expires_in": 3600,
-    "refresh_token": "a7Q1k0p1u8dEWQp4AkLu_w",
-    "token_type": "bearer",
-    "user": Object {
-      "app_metadata": Object {
-        "provider": "email",
-      },
-      "aud": "authenticated",
-      "confirmed_at": "2020-09-22T10:28:01.860349Z",
-      "created_at": "2020-09-22T10:28:01.8576Z",
-      "email": "Mckenna8@hotmail.com",
-      "id": "e02d78a9-e9a6-43c9-b707-681be85fa4b7",
-      "last_sign_in_at": "2020-09-22T10:28:02.026898381Z",
-      "role": "authenticated",
-      "updated_at": "2020-09-22T10:28:01.857605Z",
-      "user_metadata": Object {},
+  "access_token": Any<String>,
+  "expires_in": Any<Number>,
+  "refresh_token": "2XeSL-nTVOZCsG6PKfKhVg",
+  "token_type": "bearer",
+  "user": Object {
+    "app_metadata": Object {
+      "provider": "email",
     },
+    "aud": Any<String>,
+    "confirmed_at": "2020-09-22T11:11:48.811209Z",
+    "created_at": "2020-09-22T11:11:48.807848Z",
+    "email": "fake@email.com",
+    "id": Any<String>,
+    "last_sign_in_at": "2020-09-22T11:11:48.9022814Z",
+    "role": "",
+    "updated_at": Any<String>,
+    "user_metadata": Object {},
   },
-  "error": null,
 }
 `;
 
@@ -98,26 +86,23 @@ exports[`signOut 1`] = `true`;
 
 exports[`signUp() 1`] = `
 Object {
-  "data": Object {
-    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNjAwNzc0MDgxLCJzdWIiOiJlMDJkNzhhOS1lOWE2LTQzYzktYjcwNy02ODFiZTg1ZmE0YjciLCJlbWFpbCI6Ik1ja2VubmE4QGhvdG1haWwuY29tIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwifSwidXNlcl9tZXRhZGF0YSI6bnVsbCwicm9sZSI6ImF1dGhlbnRpY2F0ZWQifQ.uBqsWLP-1p3BCNSCSPCpglWDved_CX7Tm8LLhMHsiNM",
-    "expires_in": 3600,
-    "refresh_token": "3mT6hOJiNX8nOQ8miD0s2A",
-    "token_type": "bearer",
-    "user": Object {
-      "app_metadata": Object {
-        "provider": "email",
-      },
-      "aud": "authenticated",
-      "confirmed_at": "2020-09-22T10:28:01.860348919Z",
-      "created_at": "2020-09-22T10:28:01.8576Z",
-      "email": "Mckenna8@hotmail.com",
-      "id": "e02d78a9-e9a6-43c9-b707-681be85fa4b7",
-      "last_sign_in_at": "2020-09-22T10:28:01.865578044Z",
-      "role": "authenticated",
-      "updated_at": "2020-09-22T10:28:01.86048Z",
-      "user_metadata": null,
+  "access_token": Any<String>,
+  "expires_in": Any<Number>,
+  "refresh_token": "GSiVzIcREbjs9mGn6knGeA",
+  "token_type": "bearer",
+  "user": Object {
+    "app_metadata": Object {
+      "provider": "email",
     },
+    "aud": Any<String>,
+    "confirmed_at": "2020-09-22T11:11:48.8112086Z",
+    "created_at": "2020-09-22T11:11:48.807848Z",
+    "email": "fake@email.com",
+    "id": Any<String>,
+    "last_sign_in_at": "2020-09-22T11:11:48.8142114Z",
+    "role": "",
+    "updated_at": Any<String>,
+    "user_metadata": null,
   },
-  "error": null,
 }
 `;

@@ -22,7 +22,7 @@
     "build": "run-s clean format build:*",
     "build:main": "tsc -p tsconfig.json",
     "build:module": "tsc -p tsconfig.module.json",
-    "test": "run-s test:db && jest --runInBand && test:clean",
+    "test": "run-s test:db && jest --runInBand",
     "test:db": "cd test/db && docker-compose down && docker-compose up -d && sleep 5",
     "test:clean": "cd test/db && docker-compose down",
     "docs": "typedoc --mode file --target ES6 --theme minimal",

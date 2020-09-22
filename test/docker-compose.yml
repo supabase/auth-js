@@ -26,7 +26,7 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - ./db/gotrue-schema.sql:/docker-entrypoint-initdb.d/gotrue-schema.sql
+      - ./db:/docker-entrypoint-initdb.d/
     environment:
       POSTGRES_DB: postgres
       POSTGRES_USER: postgres
