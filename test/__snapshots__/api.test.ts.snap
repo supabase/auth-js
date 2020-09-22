@@ -1,0 +1,18 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`settings() should return the current GoTrue config 1`] = `
+Object {
+  "autoconfirm": true,
+  "disable_signup": false,
+  "external": Object {
+    "bitbucket": false,
+    "email": true,
+    "facebook": false,
+    "github": false,
+    "gitlab": false,
+    "google": false,
+    "saml": false,
+  },
+  "external_labels": Object {},
+}
+`;

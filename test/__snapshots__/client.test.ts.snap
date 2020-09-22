@@ -1,0 +1,30 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Get user 1`] = `
+Object {
+  "data": null,
+  "error": "User not found",
+}
+`;
+
+exports[`signIn() 1`] = `
+Object {
+  "data": Object {
+    "code": 500,
+    "error_id": "ef25e635-516c-421d-902f-1e5e22f7bded",
+    "msg": "Database error finding user",
+  },
+  "error": null,
+}
+`;
+
+exports[`signUp() 1`] = `
+Object {
+  "data": Object {
+    "code": 500,
+    "error_id": "5257528b-7aec-4b1f-9702-adce8396e378",
+    "msg": "Database error finding user",
+  },
+  "error": null,
+}
+`;
