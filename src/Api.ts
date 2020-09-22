@@ -1,4 +1,5 @@
-import { get, post } from './lib/fetch'
+import { get, post, put } from './lib/fetch'
+import { Session, UserAttributes } from './lib/types'
 
 export default class Api {
   url: string
@@ -27,10 +28,12 @@ export default class Api {
     return post(`${this.url}/forgotPassword`, { email }, { headers: this.headers })
   }
 
-  signOut(jwt: string) {
+  async signOut(jwt: string) {
     let headers = { ...this.headers }
     headers['Authorization'] = `Bearer ${jwt}`
-    return get(`${this.url}/logout`, { headers })
+    console.log('headers', headers)
+    let data = await post(`${this.url}/logout`, {}, { headers, noResolveJson: true })
+    return data
   }
 
   getUser(jwt: string) {
@@ -39,15 +42,17 @@ export default class Api {
     return get(`${this.url}/user`, { headers })
   }
 
-  refreshToken(refreshToken: string) {
+  updateUser(jwt: string, attributes: UserAttributes) {
+    let headers = { ...this.headers }
+    headers['Authorization'] = `Bearer ${jwt}`
+    return put(`${this.url}/user`, attributes, { headers })
+  }
+
+  refreshAccessToken(refreshToken: string) {
     return post(
       `${this.url}/token?grant_type=refresh_token`,
       { refresh_token: refreshToken },
       { headers: this.headers }
     )
-  }
-
-  settings() {
-    return get(`${this.url}/settings`, { headers: this.headers })
   }
 }
