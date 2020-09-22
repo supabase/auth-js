@@ -25,7 +25,7 @@ export async function post(url: string, body: object, options?: FetchOptions) {
       headers: options?.headers || {},
       body: JSON.stringify(body),
     })
-      .then((r) => !options?.noResolveJson ? r.json() : null)
+      .then((r) => (!options?.noResolveJson ? r.json() : null))
       .then((data) => resolve(data))
       .catch((error) => reject(error))
   })
