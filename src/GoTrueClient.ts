@@ -353,8 +353,6 @@ export default class GoTrueClient {
             if (error) {
               console.log(error.message)
               await this._removeSession()
-            } else {
-              this._notifyAllSubscribers('SIGNED_IN')
             }
           } else {
             this._removeSession()
@@ -385,6 +383,7 @@ export default class GoTrueClient {
         if (data?.access_token) {
           this.currentSession = data as Session
           this.currentUser = this.currentSession.user
+          this._notifyAllSubscribers('SIGNED_IN')
           const tokenExpirySeconds = data.expires_in
 
           if (this.autoRefreshToken && tokenExpirySeconds) {
