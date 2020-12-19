@@ -218,7 +218,7 @@ export default class GoTrueApi {
     try {
       if (!req.cookies)
         throw new Error(
-          'This type of request object is not yet supported. Please open a feature request for it: https://github.com/supabase/supabase/issues/new/choose'
+          'Not able to parse cookies! When using Express make sure the cookie-parser middleware is in use!'
         )
       if (!req.cookies[this.cookieOptions.name!]) throw new Error('No cookie found!')
       const token = req.cookies[this.cookieOptions.name!]

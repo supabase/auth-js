@@ -110,7 +110,6 @@ function serialize(
  * Based on the environment and the request we know if a secure cookie can be set.
  */
 function isSecureEnvironment(req: any) {
-  // TODO: type for express and next
   if (!req || !req.headers || !req.headers.host) {
     throw new Error('The "host" request header is not available')
   }

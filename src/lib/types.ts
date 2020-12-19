@@ -63,9 +63,8 @@ export interface Subscription {
 }
 
 export interface CookieOptions {
+  // (Optional) The name of the cookie. Defaults to `sb:token`.
   name?: string
-  // The secret used to encrypt the cookie.
-  // secret?: string // TODO encrypt cookie?
   // (Optional) The cookie lifetime (expiration) in seconds. Set to 8 hours by default.
   lifetime?: number
   // (Optional) The cookie domain this should run on. Leave it blank to restrict it to your domain.
