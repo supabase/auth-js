@@ -183,20 +183,23 @@ export default class GoTrueApi {
 
   /**
    * Handle server-side auth events and set/delete cookies.
+   * Works for Next.js & Express (requires cookie-parser middleware).
    */
   handleAuthEvent(req: any, res: any) {
     if (req.method === 'POST') {
-      // TODO: handle errors
       const { event, session } = req.body
-      if (event === 'SIGNED_IN')
+      if (!event) throw new Error('Auth event missing!')
+      if (event === 'SIGNED_IN') {
+        if (!session) throw new Error('Auth session missing!')
         setCookie(req, res, {
           name: this.cookieOptions.name!,
-          value: JSON.stringify(session),
+          value: session.access_token,
           domain: this.cookieOptions.domain,
           maxAge: this.cookieOptions.lifetime!,
           path: this.cookieOptions.path,
           sameSite: this.cookieOptions.sameSite,
         })
+      }
       if (event === 'SIGNED_OUT') deleteCookie(req, res, this.cookieOptions.name!)
       res.status(200).json({})
     } else {
@@ -207,15 +210,23 @@ export default class GoTrueApi {
 
   /**
    * Get user by reading the cookie from the request.
+   * Works for Next.js & Express (requires cookie-parser middleware).
    */
   async getUserByCookie(
     req: any
   ): Promise<{ user: User | null; data: User | null; error: Error | null }> {
-    // TODO: handle expired session
-    // TODO: handle errors
-    const { user } = await this.getUser(
-      JSON.parse(req.cookies[this.cookieOptions.name!]).access_token
-    )
-    return { user, data: user, error: null }
+    try {
+      if (!req.cookies)
+        throw new Error(
+          'This type of request object is not yet supported. Please open a feature request for it: https://github.com/supabase/supabase/issues/new/choose'
+        )
+      if (!req.cookies[this.cookieOptions.name!]) throw new Error('No cookie found!')
+      const token = req.cookies[this.cookieOptions.name!]
+      const { user, error } = await this.getUser(token)
+      if (error) throw error
+      return { user, data: user, error: null }
+    } catch (error) {
+      return { user: null, data: null, error }
+    }
   }
 }
