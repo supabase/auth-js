@@ -29,7 +29,7 @@ app.get('/', (req, res) => {
 })
 
 app.post('/api/auth', (req, res) => {
-  supabase.auth.api.handleAuthEvent(req, res)
+  supabase.auth.api.setAuthCookie(req, res)
 })
 
 app.get('/profile', async (req, res) => {

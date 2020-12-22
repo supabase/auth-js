@@ -2,20 +2,6 @@
 
 This example shows how to use Supabase auth both on the client (`useAuth` hook) and server in [API routes](https://nextjs.org/docs/api-routes/introduction) and when using [`getServerSideProps` (Server-side Rendering)](https://nextjs.org/docs/basic-features/data-fetching#getserversideprops-server-side-rendering).
 
-## Demo
-
-- See it in action on [CodeSandbox](https://codesandbox.io/s/github/thorwebdev/nextjs-with-supabase-auth).
-
-## How to use
-
-Execute [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) with [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/) or [npx](https://github.com/zkat/npx#readme) to bootstrap the example:
-
-```bash
-npx create-next-app --example with-supabase-auth with-supabase-auth-app
-# or
-yarn create next-app --example with-supabase-auth with-supabase-auth-app
-```
-
 ## Configuration
 
 ### 1. Create new project

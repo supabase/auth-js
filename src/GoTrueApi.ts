@@ -182,10 +182,10 @@ export default class GoTrueApi {
   }
 
   /**
-   * Handle server-side auth events and set/delete cookies.
+   * Set/delete the auth cookie based on the AuthChangeEvent.
    * Works for Next.js & Express (requires cookie-parser middleware).
    */
-  handleAuthEvent(req: any, res: any) {
+  setAuthCookie(req: any, res: any) {
     if (req.method === 'POST') {
       const { event, session } = req.body
       if (!event) throw new Error('Auth event missing!')
