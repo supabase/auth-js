@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from './initSupabase'
+import { auth } from './initSupabase'
 
 const postData = (url, data = {}) =>
   fetch(url, {
@@ -14,10 +14,10 @@ const useAuth = () => {
   const [user, setUser] = useState(null)
 
   useEffect(() => {
-    const supabaseAuthSession = supabase.auth.session()
+    const supabaseAuthSession = auth.session()
     setSession(supabaseAuthSession)
     setUser(supabaseAuthSession?.user ?? null)
-    const { data: authListener } = supabase.auth.onAuthStateChange(
+    const { data: authListener } = auth.onAuthStateChange(
       async (event, supabaseAuthSession) => {
         console.log(`Supbase auth event: ${event}`)
 

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { supabase } from '../utils/initSupabase'
+import { auth } from '../utils/initSupabase'
 
 export default function Profile({ user }) {
   return (
@@ -13,7 +13,7 @@ export default function Profile({ user }) {
 }
 
 export async function getServerSideProps({ req }) {
-  const { user } = await supabase.auth.api.getUserByCookie(req)
+  const { user } = await auth.api.getUserByCookie(req)
 
   if (!user) {
     // If no user, redirect to index.

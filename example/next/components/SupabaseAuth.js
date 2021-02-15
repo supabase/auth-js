@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../utils/initSupabase';
+import { auth } from '../utils/initSupabase';
 
 export default function SupabaseAuth() {
   const [email, setEmail] = useState('');
@@ -8,14 +8,14 @@ export default function SupabaseAuth() {
   const handleLogin = async (type, email, password) => {
     const { error, user } =
       type === 'LOGIN'
-        ? await supabase.auth.signIn({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        ? await auth.signIn({ email, password })
+        : await auth.signUp({ email, password });
     if (!error && !user) alert('Check your email for the login link!');
     if (error) alert(error.message);
   };
 
   async function handleOAuthLogin(provider) {
-    let { error } = await supabase.auth.signIn({ provider });
+    let { error } = await auth.signIn({ provider });
     if (error) alert(error.message);
   }
 
@@ -24,7 +24,7 @@ export default function SupabaseAuth() {
     if (email === null || email === '')
       return alert('You must enter your email.');
 
-    const { error } = await supabase.auth.api.resetPasswordForEmail(email);
+    const { error } = await auth.api.resetPasswordForEmail(email);
     if (error) return alert(error.message);
     alert('Password recovery email has been sent.');
   }

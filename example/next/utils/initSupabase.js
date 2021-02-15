@@ -1,16 +1,7 @@
 import { GoTrueClient } from '@supabase/gotrue-js'
 
-const supabaseURL = 'https://evuqlpfsuimdzxurpcgn.supabase.co'
-const supabaseAnon =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTYwNDIzODk3MywiZXhwIjoxOTE5ODE0OTczfQ.ud4NW5ZFc0Zky-ARnOzbzxqvLcYwVIyvk3GwW3aKC3Y'
-
-const auth = new GoTrueClient({
-  url: `${supabaseURL}/auth/v1`,
-  headers: {
-    accept: 'json',
-    apikey: supabaseAnon,
-  },
-  // cookieOptions: { path: '/', name: 'meowncookie',  }, // Optional
+const gotrue = 'http://localhost:9998' // No email confirmation required
+export const auth = new GoTrueClient({
+  url: gotrue,
 })
 
-export const supabase = { auth }

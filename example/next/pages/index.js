@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import useSWR from 'swr';
 import { useAuth } from '../utils/useAuth';
-import { supabase } from '../utils/initSupabase';
+import { auth } from '../utils/initSupabase';
 import SupabaseAuth from '../components/SupabaseAuth';
 
 const fetcher = (url) =>
@@ -35,7 +35,7 @@ const Index = () => {
           textDecoration: 'underline',
           cursor: 'pointer',
         }}
-        onClick={() => supabase.auth.signOut()}
+        onClick={() => auth.signOut()}
       >
         Log out
       </p>
