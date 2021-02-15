@@ -36,6 +36,48 @@ Object {
 }
 `;
 
+exports[`Get user after updating email 1`] = `
+Object {
+  "app_metadata": Object {
+    "provider": "email",
+  },
+  "aud": Any<String>,
+  "confirmed_at": Any<String>,
+  "created_at": Any<String>,
+  "email": "client_ac_enabled_Lou23@hotmail.com",
+  "email_change_sent_at": "2021-02-15T07:41:15.8564305Z",
+  "id": Any<String>,
+  "last_sign_in_at": Any<String>,
+  "new_email": "updated_client_ac_enabled_Lou23@hotmail.com",
+  "role": "",
+  "updated_at": Any<String>,
+  "user_metadata": Object {
+    "hello": "world",
+  },
+}
+`;
+
+exports[`Get user after updating email twice 1`] = `
+Object {
+  "app_metadata": Object {
+    "provider": "email",
+  },
+  "aud": Any<String>,
+  "confirmed_at": Any<String>,
+  "created_at": Any<String>,
+  "email": "client_ac_enabled_Lou23@hotmail.com",
+  "email_change_sent_at": "2021-02-15T07:41:15.8699128Z",
+  "id": Any<String>,
+  "last_sign_in_at": Any<String>,
+  "new_email": "twice_client_ac_enabled_Lou23@hotmail.com",
+  "role": "",
+  "updated_at": Any<String>,
+  "user_metadata": Object {
+    "hello": "world",
+  },
+}
+`;
+
 exports[`Update user 1`] = `
 Object {
   "app_metadata": Object {
@@ -47,6 +89,48 @@ Object {
   "email": Any<String>,
   "id": Any<String>,
   "last_sign_in_at": Any<String>,
+  "role": "",
+  "updated_at": Any<String>,
+  "user_metadata": Object {
+    "hello": "world",
+  },
+}
+`;
+
+exports[`User changes email 1`] = `
+Object {
+  "app_metadata": Object {
+    "provider": "email",
+  },
+  "aud": Any<String>,
+  "confirmed_at": Any<String>,
+  "created_at": Any<String>,
+  "email": Any<String>,
+  "email_change_sent_at": "2021-02-15T07:41:15.8564305Z",
+  "id": Any<String>,
+  "last_sign_in_at": Any<String>,
+  "new_email": "updated_client_ac_enabled_Lou23@hotmail.com",
+  "role": "",
+  "updated_at": Any<String>,
+  "user_metadata": Object {
+    "hello": "world",
+  },
+}
+`;
+
+exports[`User changes email twice 1`] = `
+Object {
+  "app_metadata": Object {
+    "provider": "email",
+  },
+  "aud": Any<String>,
+  "confirmed_at": Any<String>,
+  "created_at": Any<String>,
+  "email": Any<String>,
+  "email_change_sent_at": "2021-02-15T07:41:15.8699128Z",
+  "id": Any<String>,
+  "last_sign_in_at": Any<String>,
+  "new_email": "twice_client_ac_enabled_Lou23@hotmail.com",
   "role": "",
   "updated_at": Any<String>,
   "user_metadata": Object {

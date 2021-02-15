@@ -10,6 +10,8 @@ const auth = new GoTrueClient({
 })
 
 const email = `client_ac_enabled_${faker.internet.email()}`
+const updatedEmail = `updated_${email}`
+const updatedEmailTwice = `twice_${email}`
 const password = faker.internet.password()
 
 test('signUp()', async () => {
@@ -148,6 +150,82 @@ test('Get user after updating', async () => {
     },
   })
   expect(user?.email).toBe(email)
+})
+
+test('User changes email', async () => {
+  let { error, user } = await auth.update({ email: updatedEmail })
+  expect(error).toBeNull()
+  expect(user?.email).toBe(email)
+  // expect(user?.new_email).toBe(updatedEmail)
+  expect(user).toMatchSnapshot({
+    id: expect.any(String),
+    aud: expect.any(String),
+    email: expect.any(String),
+    updated_at: expect.any(String),
+    last_sign_in_at: expect.any(String),
+    confirmed_at: expect.any(String),
+    created_at: expect.any(String),
+    user_metadata: {
+      hello: 'world',
+    },
+  })
+})
+
+test('Get user after updating email', async () => {
+  let user = auth.user()
+  expect(user?.email).toBe(email)
+  // expect(user?.new_email).toBe(updatedEmail)
+
+  expect(user).toMatchSnapshot({
+    id: expect.any(String),
+    aud: expect.any(String),
+    email: email,
+    updated_at: expect.any(String),
+    last_sign_in_at: expect.any(String),
+    confirmed_at: expect.any(String),
+    created_at: expect.any(String),
+    user_metadata: {
+      hello: 'world',
+    },
+  })
+})
+
+test('User changes email twice', async () => {
+  let { error, user } = await auth.update({ email: updatedEmailTwice })
+  expect(error).toBeNull()
+  expect(user?.email).toBe(email)
+  // expect(user?.new_email).toBe(updatedEmail)
+  expect(user).toMatchSnapshot({
+    id: expect.any(String),
+    aud: expect.any(String),
+    email,
+    updated_at: expect.any(String),
+    last_sign_in_at: expect.any(String),
+    confirmed_at: expect.any(String),
+    created_at: expect.any(String),
+    user_metadata: {
+      hello: 'world',
+    },
+  })
+})
+
+test('Get user after updating email twice', async () => {
+  let user = auth.user()
+  expect(user?.email).toBe(email)
+  // expect(user?.new_email).toBe(updatedEmail)
+
+  expect(user).toMatchSnapshot({
+    id: expect.any(String),
+    aud: expect.any(String),
+    email: email,
+    updated_at: expect.any(String),
+    last_sign_in_at: expect.any(String),
+    confirmed_at: expect.any(String),
+    created_at: expect.any(String),
+    user_metadata: {
+      hello: 'world',
+    },
+  })
 })
 
 test('signOut', async () => {
