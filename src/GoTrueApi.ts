@@ -151,7 +151,9 @@ export default class GoTrueApi {
   ): Promise<{ user: User | null; data: User | null; error: Error | null }> {
     try {
       const data: any = await get(`${this.url}/user`, { headers: this._createRequestHeaders(jwt) })
-      return { user: data, data, error: null }
+      let user = data 
+      if (data.new_email) user.email = data.new_email
+      return { user, data, error: null }
     } catch (error) {
       return { user: null, data: null, error }
     }
