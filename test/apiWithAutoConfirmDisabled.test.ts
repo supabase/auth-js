@@ -11,6 +11,7 @@ const email = `api_ac_disabled_${faker.internet.email()}`
 const password = faker.internet.password()
 
 test('signUpWithEmail()', async () => {
+  console.log(email)
   let { error, data } = await api.signUpWithEmail(email, password, {
     redirectTo: 'https://localhost:9999/welcome',
   })

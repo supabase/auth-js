@@ -40,7 +40,7 @@ test('signUp() the same user twice should throw an error', async () => {
     email,
     password,
   })
-  expect(error?.message).toBe('Error sending confirmation mail')
+  expect(error?.message).toMatchSnapshot()
   // expect(error?.message).toBe('A user with this email address has already been registered')
   expect(session).toBeNull()
   expect(user).toBeNull()
@@ -51,7 +51,7 @@ test('signIn()', async () => {
     email,
     password,
   })
-  expect(error?.message).toBe('Email not confirmed')
+  expect(error?.message).toMatchSnapshot()
   expect(session).toBeNull()
   expect(user).toBeNull()
 })
@@ -61,6 +61,6 @@ test('signIn() with the wrong password', async () => {
     email,
     password: password + '2',
   })
-  expect(error!.message).toBe('Email not confirmed')
+  expect(error!.message).toMatchSnapshot()
   expect(user).toBeNull()
 })

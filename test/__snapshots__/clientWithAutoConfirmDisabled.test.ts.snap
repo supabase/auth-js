@@ -1,5 +1,9 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`signIn() 1`] = `"Email not confirmed"`;
+
+exports[`signIn() with the wrong password 1`] = `"Email not confirmed"`;
+
 exports[`signUp() 1`] = `
 Object {
   "app_metadata": Object {
@@ -15,3 +19,5 @@ Object {
   "user_metadata": null,
 }
 `;
+
+exports[`signUp() the same user twice should throw an error 1`] = `"Error sending confirmation mail"`;
