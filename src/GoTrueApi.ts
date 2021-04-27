@@ -310,4 +310,15 @@ export default class GoTrueApi {
       return { user: null, data: null, error }
     }
   }
+
+  /**
+   * Permanently deletes an existing user.
+   * @param userId The ID of the user that you want to delete.
+   */
+  delete(userId: string): { error: any } | PromiseLike<{ error: any }> {
+    if (typeof userId !== 'string') {
+      throw new Error('userId must be a valid UUID.')
+    }
+    throw new Error('Method not implemented.')
+  }
 }

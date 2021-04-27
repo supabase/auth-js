@@ -170,3 +170,12 @@ test('signIn() with the wrong password', async () => {
   expect(error!.message).not.toBeNull()
   expect(data).toBeNull()
 })
+
+test('delete()', async () => {
+  let { user } = await auth.signIn({
+    email,
+    password,
+  })
+  let { error } = await auth.api.delete(user.id)
+  expect(error!.message).not.toBeNull()
+}
