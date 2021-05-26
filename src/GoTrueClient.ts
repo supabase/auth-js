@@ -96,7 +96,8 @@ export default class GoTrueClient {
   async signUp(
     { email, password }: UserCredentials,
     options: {
-      redirectTo?: string
+      redirectTo?: string,
+      user_metadata?: object
     } = {}
   ): Promise<{
     user: User | null
@@ -109,6 +110,7 @@ export default class GoTrueClient {
 
       const { data, error } = await this.api.signUpWithEmail(email!, password!, {
         redirectTo: options.redirectTo,
+        user_metadata: options.user_metadata,
       })
 
       if (error) {
