@@ -23,6 +23,27 @@ export function getParameterByName(name: string, url?: string) {
   return decodeURIComponent(results[2].replace(/\+/g, ' '))
 }
 
+// #107 Only remove Gotrue parameters from url hash.
+export function clearGotrueHashParameters() {
+  window.location.hash = removeParamsFromUrl(window.location.hash, [
+    'error_description',
+    'provider_token',
+    'access_token',
+    'expires_in',
+    'refresh_token',
+    'token_type'
+  ]);
+}
+
+export function removeParamsFromUrl(url: string, params: string[]) {
+  let result = url;
+  params.forEach(param => {
+    const regexp = new RegExp("(&|#|\\?)" + param + "((\\=.*?(?=&|$))|(?=&|#))");
+    result = result.replace(regexp, '');
+  });
+  return result;
+}
+
 export class LocalStorage implements Storage {
   localStorage: Storage;
   [name: string]: any

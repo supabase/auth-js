@@ -1,5 +1,5 @@
 import GoTrueApi from './GoTrueApi'
-import { isBrowser, getParameterByName, uuid, LocalStorage } from './lib/helpers'
+import {isBrowser, getParameterByName, uuid, LocalStorage, clearGotrueHashParameters} from './lib/helpers'
 import { GOTRUE_URL, DEFAULT_HEADERS, STORAGE_KEY } from './lib/constants'
 import {
   Session,
@@ -355,7 +355,7 @@ export default class GoTrueClient {
         }
       }
       // Remove tokens from URL
-      window.location.hash = ''
+      clearGotrueHashParameters();
 
       return { data: session, error: null }
     } catch (error) {
