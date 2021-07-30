@@ -355,7 +355,7 @@ export default class GoTrueClient {
         }
       }
       // Remove tokens from URL
-      clearGotrueHashParameters();
+      clearGotrueHashParameters(session);
 
       return { data: session, error: null }
     } catch (error) {

@@ -1,3 +1,5 @@
+import {Session} from "./types";
+
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
   return timeNow + expiresIn
@@ -23,22 +25,14 @@ export function getParameterByName(name: string, url?: string) {
   return decodeURIComponent(results[2].replace(/\+/g, ' '))
 }
 
-// #107 Only remove Gotrue parameters from url hash.
-export function clearGotrueHashParameters() {
-  window.location.hash = removeParamsFromUrl(window.location.hash, [
-    'error_description',
-    'provider_token',
-    'access_token',
-    'expires_in',
-    'refresh_token',
-    'token_type'
-  ]);
+export function clearGotrueHashParameters(session: Session) {
+  window.location.hash = removeParamsFromUrl(window.location.hash, Object.keys(session));
 }
 
 export function removeParamsFromUrl(url: string, params: string[]) {
   let result = url;
   params.forEach(param => {
-    const regexp = new RegExp("(&|#|\\?)" + param + "((\\=.*?(?=&|$))|(?=&|#))");
+    const regexp = new RegExp("(&|#|\\?)" + param + "((\\=.*?(?=&|$))|(?=&|#))", "i");
     result = result.replace(regexp, '');
   });
   return result;
