@@ -3,10 +3,12 @@ import faker from 'faker'
 
 const GOTRUE_URL = 'http://localhost:9999'
 
+const GOTRUE_JWT_SECRET=`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicm9sZSI6InN1cGFiYXNlX2FkbWluIiwiaWF0IjoxNTE2MjM5MDIyfQ.0sOtTSTfPv5oPZxsjvBO249FI4S4p0ymHoIZ6H6z9Y8`
+
 const api = new GoTrueApi({
   url: GOTRUE_URL,
   headers: {
-    Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicm9sZSI6InN1cGFiYXNlX2FkbWluIiwiaWF0IjoxNTE2MjM5MDIyfQ.0sOtTSTfPv5oPZxsjvBO249FI4S4p0ymHoIZ6H6z9Y8`,
+    Authorization: `Bearer ${GOTRUE_JWT_SECRET}`,
   },
 })
 
@@ -119,5 +121,32 @@ test('generateRecoveryLink()', async () => {
     recovery_sent_at: expect.any(String),
     updated_at: expect.any(String),
     user_metadata: expect.any(Object),
+  })
+})
+
+describe('createUser()', () => {
+  it('should successfully create a user given an email address', async () => {
+    const testEmail = `api_ac_disabled_create_user_${faker.internet.email().toLowerCase()}`
+    const response  = await api.createUser(GOTRUE_JWT_SECRET, {email:testEmail})
+    expect(response.error).toBeNull()
+    expect(response.data).toMatchObject({
+      id: expect.any(String),
+      aud: "",
+      role: "",
+      email: expect.any(String),
+      created_at: expect.any(String),
+      updated_at: expect.any(String),
+      app_metadata: {
+        provider: 'email',
+      },
+    })
+  });
+
+  it('should return an error when trying to create a user with an existing email address', async () =>{
+    const testEmail = `api_ac_disabled_create_user_${faker.internet.email().toLowerCase()}`
+    await api.createUser(GOTRUE_JWT_SECRET, {email:testEmail})
+    const response =  await api.createUser(GOTRUE_JWT_SECRET, {email})
+    expect(response.data).toBeNull()
+    expect(response.error).toMatchObject({message: "Email address already registered by another user", status: 422})
   })
 })

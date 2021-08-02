@@ -250,6 +250,25 @@ export default class GoTrueApi {
     return headers
   }
 
+    /**
+   * Creates a new user.
+   * @param jwt A valid JWT. Must be a full-access API key (e.g. service_role key).
+   * @param attributes The data you want to create the user with.
+   */
+     async createUser(
+      jwt: string,
+      attributes: UserAttributes
+    ): Promise<{ data: null; error: Error  } | { data: User; error:  null }> {
+      try {
+        const data: any = await post(`${this.url}/admin/users`, attributes, {
+          headers: this._createRequestHeaders(jwt),
+        })
+        return {  data, error: null }
+      } catch (error) {
+        return { data: null, error }
+      }
+    }
+
   /**
    * Removes a logged-in session.
    * @param jwt A valid, logged-in JWT.
