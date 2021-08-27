@@ -18,11 +18,21 @@ test('removeParamsFromUrl() should remove Gotrue params from hash, ignoring case
         .toBe('/some/path&p2');
 });
 
-
 test('removeParamsFromUrl() should not remove path information', async () => {
     expect(removeParamsFromUrl('/some/path?p1=value&p2&p3=value', ['some']))
         .toBe('/some/path?p1=value&p2&p3=value');
 
     expect(removeParamsFromUrl('/some/path?p1=value&p2&p3=value', ['path']))
         .toBe('/some/path?p1=value&p2&p3=value');
+});
+
+test('removeParamsFromUrl() should not remove hash', async () => {
+    expect(removeParamsFromUrl('/some/path#somehash#p1=value&p2&p3=value', ['p1',]))
+        .toBe('/some/path#somehash&p2&p3=value');
+
+    expect(removeParamsFromUrl('/some/path#somehash#p1=value&p2&p3=value', ['p1', 'p2', 'p3']))
+        .toBe('/some/path#somehash');
+
+    expect(removeParamsFromUrl('/some/path#somehash#p1=value&p2&p3=value', ['p2', 'p3']))
+        .toBe('/some/path#somehash#p1=value');
 });
