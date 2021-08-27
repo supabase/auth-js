@@ -85,6 +85,20 @@ export default class GoTrueClient {
     } catch (error) {
       console.log('Error getting session from URL.')
     }
+    if (isBrowser()) {
+      window.onstorage = (e: StorageEvent) => {
+        if (e.key === 'supabase.auth.token') {
+          const newSession = JSON.parse(String(e.newValue))
+          if (newSession?.currentSession?.access_token) {
+            this._recoverAndRefresh()
+            this._notifyAllSubscribers('SIGNED_IN')
+          } else {
+            this._removeSession()
+            this._notifyAllSubscribers('SIGNED_OUT')
+          }
+        }
+      }
+    }
   }
 
   /**
