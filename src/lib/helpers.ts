@@ -26,7 +26,7 @@ export function getParameterByName(name: string, url?: string) {
 }
 
 export function clearGotrueHashParameters(session: Session) {
-  window.location.hash = removeParamsFromUrl(window.location.hash, Object.keys(session));
+  window.location.hash = removeHashStartingWithAnyOf(window.location.hash, Object.keys(session));
 }
 
 export function removeParamsFromUrl(url: string, params: string[]) {
@@ -36,6 +36,27 @@ export function removeParamsFromUrl(url: string, params: string[]) {
     result = result.replace(regexp, '');
   });
   return result;
+}
+
+export function removeHashStartingWith(url: string, hashStart: string) {
+  if(hashStart && hashStart.trim().length) {
+    const regexp = new RegExp("#" + hashStart + ".*$", "i");
+    return url.replace(regexp, '');
+  }
+  return url;
+}
+
+export function removeHashStartingWithAnyOf(url: string, starts: string[]) {
+  let shortestUrl = url;
+  if(starts && starts.length) {
+    for(let start in starts) {
+      const newUrl = removeHashStartingWith(url, starts[start]);
+      if(shortestUrl.length > newUrl.length) {
+        shortestUrl = newUrl;
+      }
+    }
+  }
+  return shortestUrl;
 }
 
 export class LocalStorage implements Storage {
