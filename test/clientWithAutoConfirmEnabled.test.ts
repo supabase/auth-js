@@ -15,22 +15,25 @@ let authWithSession = new GoTrueClient({
   persistSession: false,
 })
 
-const email = `client_ac_enabled_${faker.internet.email()}`
-const setSessionEmail = `client_ac_session_${faker.internet.email()}`
-const refreshTokenEmail = `client_refresh_token_signin_${faker.internet.email()}`
+const email = `client_ac_enabled_${faker.internet.email().toLowerCase()}`
+const setSessionEmail = `client_ac_session_${faker.internet.email().toLowerCase()}`
+const refreshTokenEmail = `client_refresh_token_signin_${faker.internet.email().toLowerCase()}`
 const password = faker.internet.password()
 var access_token: string | null = null
 
 test('signUp()', async () => {
-  let { error, user, session } = await auth.signUp({
-    email,
-    password,
-  })
+  let { error, user, session } = await auth.signUp(
+    {
+      email,
+      password,
+    },
+    { data: { status: 'alpha' } }
+  )
   access_token = session?.access_token || null
   expect(error).toBeNull()
   expect(error).toBeNull()
 
-  expect(session).toMatchSnapshot({
+  expect(session).toMatchObject({
     access_token: expect.any(String),
     refresh_token: expect.any(String),
     expires_in: expect.any(Number),
@@ -38,7 +41,8 @@ test('signUp()', async () => {
     user: {
       id: expect.any(String),
       email: expect.any(String),
-      confirmed_at: expect.any(String),
+      phone: expect.anything(),
+      email_confirmed_at: expect.any(String),
       last_sign_in_at: expect.any(String),
       created_at: expect.any(String),
       aud: expect.any(String),
@@ -46,12 +50,16 @@ test('signUp()', async () => {
       app_metadata: {
         provider: 'email',
       },
+      user_metadata: {
+        status: 'alpha',
+      },
     },
   })
-  expect(user).toMatchSnapshot({
+  expect(user).toMatchObject({
     id: expect.any(String),
-    confirmed_at: expect.any(String),
+    email_confirmed_at: expect.any(String),
     email: expect.any(String),
+    phone: expect.any(String),
     last_sign_in_at: expect.any(String),
     created_at: expect.any(String),
     aud: expect.any(String),
@@ -86,8 +94,6 @@ test('signUp() the same user twice should throw an error', async () => {
 })
 
 test('setAuth() should set the Auth headers on a new client', async () => {
-  expect(access_token).toBeTruthy()
-
   const newClient = new GoTrueClient({
     url: GOTRUE_URL,
     autoRefreshToken: false,
@@ -106,7 +112,7 @@ test('signIn()', async () => {
     password,
   })
   expect(error).toBeNull()
-  expect(session).toMatchSnapshot({
+  expect(session).toMatchObject({
     access_token: expect.any(String),
     refresh_token: expect.any(String),
     expires_in: expect.any(Number),
@@ -114,8 +120,9 @@ test('signIn()', async () => {
     user: {
       id: expect.any(String),
       email: expect.any(String),
+      phone: expect.any(String),
       aud: expect.any(String),
-      confirmed_at: expect.any(String),
+      email_confirmed_at: expect.any(String),
       last_sign_in_at: expect.any(String),
       created_at: expect.any(String),
       updated_at: expect.any(String),
@@ -124,11 +131,12 @@ test('signIn()', async () => {
       },
     },
   })
-  expect(user).toMatchSnapshot({
+  expect(user).toMatchObject({
     id: expect.any(String),
     email: expect.any(String),
+    phone: expect.any(String),
     aud: expect.any(String),
-    confirmed_at: expect.any(String),
+    email_confirmed_at: expect.any(String),
     last_sign_in_at: expect.any(String),
     created_at: expect.any(String),
     updated_at: expect.any(String),
@@ -150,7 +158,7 @@ test('signIn() with refreshToken', async () => {
   const { error, user, session } = await authWithSession.signIn({ refreshToken })
 
   expect(error).toBeNull()
-  expect(session).toMatchSnapshot({
+  expect(session).toMatchObject({
     access_token: expect.any(String),
     refresh_token: expect.any(String),
     expires_in: expect.any(Number),
@@ -158,8 +166,9 @@ test('signIn() with refreshToken', async () => {
     user: {
       id: expect.any(String),
       email: expect.any(String),
+      phone: expect.any(String),
       aud: expect.any(String),
-      confirmed_at: expect.any(String),
+      email_confirmed_at: expect.any(String),
       last_sign_in_at: expect.any(String),
       created_at: expect.any(String),
       updated_at: expect.any(String),
@@ -168,11 +177,12 @@ test('signIn() with refreshToken', async () => {
       },
     },
   })
-  expect(user).toMatchSnapshot({
+  expect(user).toMatchObject({
     id: expect.any(String),
     email: expect.any(String),
+    phone: expect.any(String),
     aud: expect.any(String),
-    confirmed_at: expect.any(String),
+    email_confirmed_at: expect.any(String),
     last_sign_in_at: expect.any(String),
     created_at: expect.any(String),
     updated_at: expect.any(String),
@@ -185,11 +195,12 @@ test('signIn() with refreshToken', async () => {
 
 test('Get user', async () => {
   let user = auth.user()
-  expect(user).toMatchSnapshot({
+  expect(user).toMatchObject({
     id: expect.any(String),
     email: expect.any(String),
+    phone: expect.any(String),
     aud: expect.any(String),
-    confirmed_at: expect.any(String),
+    email_confirmed_at: expect.any(String),
     last_sign_in_at: expect.any(String),
     created_at: expect.any(String),
     updated_at: expect.any(String),
@@ -203,13 +214,14 @@ test('Get user', async () => {
 test('Update user', async () => {
   let { error, user } = await auth.update({ data: { hello: 'world' } })
   expect(error).toBeNull()
-  expect(user).toMatchSnapshot({
+  expect(user).toMatchObject({
     id: expect.any(String),
     aud: expect.any(String),
     email: expect.any(String),
+    phone: expect.any(String),
     updated_at: expect.any(String),
     last_sign_in_at: expect.any(String),
-    confirmed_at: expect.any(String),
+    email_confirmed_at: expect.any(String),
     created_at: expect.any(String),
     user_metadata: {
       hello: 'world',
@@ -220,13 +232,14 @@ test('Update user', async () => {
 
 test('Get user after updating', async () => {
   let user = auth.user()
-  expect(user).toMatchSnapshot({
+  expect(user).toMatchObject({
     id: expect.any(String),
     aud: expect.any(String),
     email: expect.any(String),
+    phone: expect.any(String),
     updated_at: expect.any(String),
     last_sign_in_at: expect.any(String),
-    confirmed_at: expect.any(String),
+    email_confirmed_at: expect.any(String),
     created_at: expect.any(String),
     user_metadata: {
       hello: 'world',
@@ -237,7 +250,7 @@ test('Get user after updating', async () => {
 
 test('signOut', async () => {
   let res = await auth.signOut()
-  expect(res).toMatchSnapshot()
+  expect(res).toBeTruthy()
 })
 
 test('Get user after logging out', async () => {
