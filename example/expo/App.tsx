@@ -3,11 +3,11 @@ import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { GoTrueClient } from '@supabase/gotrue-js'
 import { Styles } from './lib/Constants'
-import AsyncStorage from '@react-native-community/async-storage'
+import * as SecureStore from 'expo-secure-store';
 import Button from './components/Button'
 import TextField from './components/TextField'
 
-const auth = new GoTrueClient({ localStorage: AsyncStorage })
+const auth = new GoTrueClient({ localStorage: SecureStore })
 
 export default function App() {
   const [email, setEmail] = React.useState('')

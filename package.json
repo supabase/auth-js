@@ -31,7 +31,8 @@
     "docs:json": "typedoc --json docs/spec.json --mode modules --includeDeclarations --excludeExternals"
   },
   "dependencies": {
-    "cross-fetch": "^3.0.6"
+    "cross-fetch": "^3.0.6",
+    "expo-secure-store": "^10.2.0"
   },
   "devDependencies": {
     "@types/faker": "^5.1.6",
