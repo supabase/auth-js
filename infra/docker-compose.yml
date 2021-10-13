@@ -1,6 +1,21 @@
 # docker-compose.yml
 version: '3'
 services:
+  kong:
+    container_name: supabase-kong
+    image: kong:2.1
+    restart: unless-stopped
+    ports:
+      - 8000:8000/tcp
+      - 8443:8443/tcp
+    volumes:
+      - ./kong.yml:/var/lib/kong/kong.yml
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      # https://github.com/supabase/cli/issues/14
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth
   gotrue: # Signup enabled, autoconfirm off
     image: supabase/gotrue:latest
     ports:

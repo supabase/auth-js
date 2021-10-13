@@ -1,0 +1,12 @@
+_format_version: "1.1"
+services:
+  - name: autoconfirm
+    _comment: "GoTrue: /autoconfirm/* -> http://auth:9998/*"
+    url: http://autoconfirm:9998/
+    routes:
+      - name: auth-v1-all
+        strip_path: true
+        paths:
+          - /autoconfirm/
+    plugins:
+      - name: cors
