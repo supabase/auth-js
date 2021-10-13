@@ -13,13 +13,6 @@ export default function Index ({ user }) {
     console.log('user', user)
   }, [])
 
-  async function handleOAuthLogin(provider) {
-    let { error } = await auth.signIn(
-      { provider },
-      { redirectTo: 'http://localhost:3000/api/auth' }
-    )
-    if (error) console.log('Error: ', error.message)
-  }
   async function handleEmailSignIn() {
     let { error, user } = await auth.signIn(
       { email, password },
