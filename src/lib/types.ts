@@ -11,6 +11,7 @@ export type Provider =
   | 'twitch'
 
 export type AuthChangeEvent =
+  | 'INITIAL'
   | 'SIGNED_IN'
   | 'SIGNED_OUT'
   | 'USER_UPDATED'
