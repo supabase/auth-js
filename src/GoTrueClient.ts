@@ -86,17 +86,27 @@ export default class GoTrueClient {
       headers: settings.headers,
       cookieOptions: settings.cookieOptions,
     })
+
+    // an array of promises which load the current user
+    let initPromises: Array<Promise<any>> = []
+
     this._recoverSession()
-    this._recoverAndRefresh()
+    const recoverAndRefresh = this._recoverAndRefresh()
+    initPromises.push(recoverAndRefresh)
 
     // Handle the OAuth redirect
     if (settings.detectSessionInUrl && isBrowser() && !!getParameterByName('access_token')) {
-      this.getSessionFromUrl({ storeSession: true }).then(({ error }) => {
+      const getSessionFromUrl = this.getSessionFromUrl({ storeSession: true }).then(({ error }) => {
         if (error) {
           console.error('Error getting session from URL.', error)
         }
       })
+      initPromises.push(getSessionFromUrl)
     }
+
+    Promise.all(initPromises).then(() => {
+      this._notifyAllSubscribers('INITIAL')
+    })
   }
 
   /**
