@@ -532,7 +532,7 @@ export default class GoTrueClient {
     try {
       // try to open on the browser
       if (isBrowser()) {
-        window.location.href = url
+        window.location.assign(url)
       }
       return { provider, url, data: null, session: null, user: null, error: null }
     } catch (error) {
