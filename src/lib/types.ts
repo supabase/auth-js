@@ -69,6 +69,7 @@ export interface User {
   action_link?: string
   email?: string
   phone?: string
+  wallet_address?: string
   created_at: string
   confirmed_at?: string
   email_confirmed_at?: string
@@ -77,6 +78,13 @@ export interface User {
   role?: string
   updated_at?: string
   identities?: UserIdentity[]
+}
+
+export interface Nonce {
+  id: string
+  nonce: string
+  expires_at: string
+  created_at: string
 }
 
 export interface UserAttributes {
@@ -133,6 +141,12 @@ export interface UserCredentials {
   refreshToken?: string
   // (Optional) The name of the provider.
   provider?: Provider
+  // (Optional) The web3/eth info
+  web3?: {
+    nonce: string
+    wallet_address: string
+    signature: string
+  }
 }
 
 export interface VerifyOTPParams {

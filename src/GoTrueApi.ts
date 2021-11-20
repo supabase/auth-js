@@ -1,5 +1,5 @@
 import { Fetch, get, post, put, remove } from './lib/fetch'
-import { Session, Provider, UserAttributes, CookieOptions, User } from './lib/types'
+import { Session, Provider, UserAttributes, CookieOptions, User, Nonce } from './lib/types'
 import { COOKIE_OPTIONS } from './lib/constants'
 import { setCookie, deleteCookie } from './lib/cookies'
 import { expiresAt } from './lib/helpers'
@@ -194,6 +194,35 @@ export default class GoTrueApi {
       return { data: null, error: e as ApiError }
     }
   }
+
+  /**
+   * Logs in a user with an ETH wallet.
+   * @param wallet_address The ETH wallet address hex encoded
+   * @param nonce The nonce from the GoTrue server
+   * @param signature The nonce that has been signed with the wallet
+  */
+  async signInWithWallet(
+    wallet_address: string,
+    nonce: string,
+    signature: string,
+  ): Promise<{ data: Session | null; error: ApiError | null }> {
+    try {
+      const headers = { ...this.headers }
+      const data = await post(
+        this.fetch,
+        `${this.url}/web3`,
+        { wallet_address, nonce, signature },
+        { headers }
+      )
+      // TODO (HarryET): Check if this is the correct data sent back and if not change in GoTrue
+      const session = { ...data }
+      if (session.expires_in) session.expires_at = expiresAt(data.expires_in)
+      return { data: session, error: null }
+    } catch (e) {
+      return { data: null, error: e as ApiError }
+    }
+  }
+
 
   /**
    * Sends a magic login link to an email address.
@@ -547,6 +576,32 @@ export default class GoTrueApi {
         { headers: this.headers }
       )
       return { data, error: null }
+    } catch (e) {
+      return { data: null, error: e as ApiError }
+    }
+  }
+
+  async getNonce(): Promise<{ data: Nonce | null; error: ApiError | null }> {
+    try {
+      const data: any = await get(
+        this.fetch,
+        `${this.url}/nonce`,
+        { headers: this.headers }
+      )
+      return { data: data as Nonce, error: null }
+    } catch (e) {
+      return { data: null, error: e as ApiError }
+    }
+  }
+
+  async getNonceById(id: string): Promise<{ data: Nonce | null; error: ApiError | null }> {
+    try {
+      const data: any = await get(
+        this.fetch,
+        `${this.url}/nonce/${id}`,
+        { headers: this.headers }
+      )
+      return { data: data as Nonce, error: null }
     } catch (e) {
       return { data: null, error: e as ApiError }
     }

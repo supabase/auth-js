@@ -15,6 +15,7 @@ import type {
   CookieOptions,
   UserCredentials,
   VerifyOTPParams,
+  Nonce,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -183,7 +184,7 @@ export default class GoTrueClient {
    * @param scopes A space-separated list of scopes granted to the OAuth application.
    */
   async signIn(
-    { email, phone, password, refreshToken, provider }: UserCredentials,
+    { email, phone, password, refreshToken, provider, web3 }: UserCredentials,
     options: {
       redirectTo?: string
       scopes?: string
@@ -215,6 +216,9 @@ export default class GoTrueClient {
       }
       if (phone && password) {
         return this._handlePhoneSignIn(phone, password)
+      }
+      if (web3) {
+        return this._handleWeb3SignIn(web3.wallet_address, web3.nonce, web3.signature)
       }
       if (refreshToken) {
         // currentSession and currentUser will be updated to latest on _callRefreshToken using the passed refreshToken
@@ -286,6 +290,11 @@ export default class GoTrueClient {
     } catch (e) {
       return { user: null, session: null, error: e as ApiError }
     }
+  }
+
+  async getNonce(): Promise<{data: Nonce | null; error: ApiError | null}> {
+    const {data, error} = await this.api.getNonce();
+    return {data: data, error: error};
   }
 
   /**
@@ -524,6 +533,18 @@ export default class GoTrueClient {
     } catch (e) {
       return { data: null, user: null, session: null, error: e as ApiError }
     }
+  }
+
+  private async _handleWeb3SignIn(wallet_address: string, nonce: string, signature: string): Promise<{
+    session: Session | null
+    user: User | null
+    provider?: Provider
+    url?: string | null
+    error: ApiError | null
+  }> {
+    // TODO (HarryET): Improve
+    const {data, error} = await this.api.signInWithWallet(wallet_address, nonce, signature);
+    return {user: null, session: data, error: error}
   }
 
   private _handleProviderSignIn(
