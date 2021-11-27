@@ -1,5 +1,14 @@
 import { Fetch, get, post, put, remove } from './lib/fetch'
-import { Session, Provider, UserAttributes, CookieOptions, User, Nonce, NonceParams, EthCredentials } from './lib/types'
+import {
+  Session,
+  Provider,
+  UserAttributes,
+  CookieOptions,
+  User,
+  Nonce,
+  NonceParams,
+  EthCredentials,
+} from './lib/types'
 import { COOKIE_OPTIONS } from './lib/constants'
 import { setCookie, deleteCookie } from './lib/cookies'
 import { expiresAt } from './lib/helpers'
@@ -200,10 +209,12 @@ export default class GoTrueApi {
    * @param wallet_address The ETH wallet address hex encoded
    * @param nonce The nonce from the GoTrue server
    * @param signature The nonce that has been signed with the wallet
-  */
-  async signInWithEth(
-    {wallet_address, nonce, signature}: EthCredentials
-  ): Promise<{ data: Session | null; error: ApiError | null }> {
+   */
+  async signInWithEth({
+    wallet_address,
+    nonce,
+    signature,
+  }: EthCredentials): Promise<{ data: Session | null; error: ApiError | null }> {
     try {
       const headers = { ...this.headers }
       const data = await post(
@@ -220,7 +231,6 @@ export default class GoTrueApi {
       return { data: null, error: e as ApiError }
     }
   }
-
 
   /**
    * Sends a magic login link to an email address.
@@ -584,7 +594,7 @@ export default class GoTrueApi {
       const data: any = await post(
         this.fetch,
         `${this.url}/nonce`,
-        {...params},
+        { ...params },
         { headers: this.headers }
       )
       return { data: data as Nonce, error: null }
@@ -595,11 +605,7 @@ export default class GoTrueApi {
 
   async getNonceById(id: string): Promise<{ data: Nonce | null; error: ApiError | null }> {
     try {
-      const data: any = await get(
-        this.fetch,
-        `${this.url}/nonce/${id}`,
-        { headers: this.headers }
-      )
+      const data: any = await get(this.fetch, `${this.url}/nonce/${id}`, { headers: this.headers })
       return { data: data as Nonce, error: null }
     } catch (e) {
       return { data: null, error: e as ApiError }

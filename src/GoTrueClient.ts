@@ -37,8 +37,8 @@ type MaybePromisify<T> = T | Promise<T>
 
 type PromisifyMethods<T> = {
   [K in keyof T]: T[K] extends AnyFunction
-  ? (...args: Parameters<T[K]>) => MaybePromisify<ReturnType<T[K]>>
-  : T[K]
+    ? (...args: Parameters<T[K]>) => MaybePromisify<ReturnType<T[K]>>
+    : T[K]
 }
 
 type SupportedStorage = PromisifyMethods<Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>>
@@ -141,12 +141,12 @@ export default class GoTrueClient {
       const { data, error } =
         phone && password
           ? await this.api.signUpWithPhone(phone!, password!, {
-            data: options.data,
-          })
+              data: options.data,
+            })
           : await this.api.signUpWithEmail(email!, password!, {
-            redirectTo: options.redirectTo,
-            data: options.data,
-          })
+              redirectTo: options.redirectTo,
+              data: options.data,
+            })
 
       if (error) {
         throw error
@@ -250,15 +250,17 @@ export default class GoTrueClient {
    * @param nonce The ID of the nonce that was signed.
    * @param signature The nonce that has been signed by the wallet_address.
    */
-  async signInWithEth(
-    { wallet_address, nonce, signature }: EthCredentials,
-  ): Promise<{
+  async signInWithEth({ wallet_address, nonce, signature }: EthCredentials): Promise<{
     session: Session | null
     user: User | null
     error: ApiError | null
   }> {
-    const {data, error} = await this.api.signInWithEth({wallet_address: wallet_address, nonce: nonce, signature: signature});
-    return {user: null, session: data, error: error};
+    const { data, error } = await this.api.signInWithEth({
+      wallet_address: wallet_address,
+      nonce: nonce,
+      signature: signature,
+    })
+    return { user: null, session: data, error: error }
   }
 
   /**
@@ -317,13 +319,21 @@ export default class GoTrueClient {
    * @param chain_id The ID of wallet's chain
    * @param url The url for the nonce, required for server side but uses window.location on browser
    */
-  async getNonce({wallet_address, chain_id, url}: NonceParams): Promise<{ data: Nonce | null; error: GoTrueError | ApiError | null }> {
-    if(!isBrowser() && url == null) {
-      return {data: null, error: { message: "No URL included on server side" }}
+  async getNonce({
+    wallet_address,
+    chain_id,
+    url,
+  }: NonceParams): Promise<{ data: Nonce | null; error: GoTrueError | ApiError | null }> {
+    if (!isBrowser() && url == null) {
+      return { data: null, error: { message: 'No URL included on server side' } }
     }
 
-    const { data, error } = await this.api.getNonce({wallet_address, chain_id, url: isBrowser() ? (url ?? window.location.href) : url});
-    return { data: data, error: error };
+    const { data, error } = await this.api.getNonce({
+      wallet_address,
+      chain_id,
+      url: isBrowser() ? url ?? window.location.href : url,
+    })
+    return { data: data, error: error }
   }
 
   /**

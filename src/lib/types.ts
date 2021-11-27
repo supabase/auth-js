@@ -11,8 +11,8 @@ export type Provider =
   | 'twitch'
   | 'spotify'
   | 'slack'
-  
-  export type AuthChangeEvent =
+
+export type AuthChangeEvent =
   | 'PASSWORD_RECOVERY'
   | 'SIGNED_IN'
   | 'SIGNED_OUT'
@@ -46,7 +46,7 @@ export interface Session {
 
 export interface UserIdentity {
   id: string
-  user_id: string 
+  user_id: string
   identity_data: {
     [key: string]: any
   }
