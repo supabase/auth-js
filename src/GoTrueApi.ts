@@ -8,12 +8,12 @@ import {
   Nonce,
   NonceParams,
   EthCredentials,
+  ApiError,
 } from './lib/types'
 import { COOKIE_OPTIONS } from './lib/constants'
 import { setCookie, deleteCookie } from './lib/cookies'
 import { expiresAt } from './lib/helpers'
 
-import type { ApiError } from './lib/types'
 export default class GoTrueApi {
   protected url: string
   protected headers: {
