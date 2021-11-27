@@ -109,3 +109,6 @@ dist
 
 # Docs via yarn docs
 docs
+
+# Generated CSS
+*.css
