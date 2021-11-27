@@ -20,8 +20,11 @@ export type Provider =
   | 'USER_UPDATED'
   | 'USER_DELETED'
 
-export interface ApiError {
+export interface GoTrueError {
   message: string
+}
+
+export interface ApiError extends GoTrueError {
   status: number
 }
 
@@ -81,10 +84,14 @@ export interface User {
 }
 
 export interface Nonce {
-  id: string
   nonce: string
-  expires_at: string
-  created_at: string
+  id: string
+}
+
+export interface NonceParams {
+  wallet_address: string
+  chain_id: number
+  url?: string
 }
 
 export interface UserAttributes {
@@ -134,6 +141,12 @@ export interface CookieOptions {
   sameSite?: string
 }
 
+export interface EthCredentials {
+  wallet_address: string
+  nonce: Nonce
+  signature: string
+}
+
 export interface UserCredentials {
   email?: string
   phone?: string
@@ -141,12 +154,6 @@ export interface UserCredentials {
   refreshToken?: string
   // (Optional) The name of the provider.
   provider?: Provider
-  // (Optional) The web3/eth info
-  web3?: {
-    nonce: string
-    wallet_address: string
-    signature: string
-  }
 }
 
 export interface VerifyOTPParams {

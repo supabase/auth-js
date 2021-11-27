@@ -16,6 +16,9 @@ import type {
   UserCredentials,
   VerifyOTPParams,
   Nonce,
+  EthCredentials,
+  NonceParams,
+  GoTrueError,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -34,8 +37,8 @@ type MaybePromisify<T> = T | Promise<T>
 
 type PromisifyMethods<T> = {
   [K in keyof T]: T[K] extends AnyFunction
-    ? (...args: Parameters<T[K]>) => MaybePromisify<ReturnType<T[K]>>
-    : T[K]
+  ? (...args: Parameters<T[K]>) => MaybePromisify<ReturnType<T[K]>>
+  : T[K]
 }
 
 type SupportedStorage = PromisifyMethods<Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>>
@@ -138,12 +141,12 @@ export default class GoTrueClient {
       const { data, error } =
         phone && password
           ? await this.api.signUpWithPhone(phone!, password!, {
-              data: options.data,
-            })
+            data: options.data,
+          })
           : await this.api.signUpWithEmail(email!, password!, {
-              redirectTo: options.redirectTo,
-              data: options.data,
-            })
+            redirectTo: options.redirectTo,
+            data: options.data,
+          })
 
       if (error) {
         throw error
@@ -184,7 +187,7 @@ export default class GoTrueClient {
    * @param scopes A space-separated list of scopes granted to the OAuth application.
    */
   async signIn(
-    { email, phone, password, refreshToken, provider, web3 }: UserCredentials,
+    { email, phone, password, refreshToken, provider }: UserCredentials,
     options: {
       redirectTo?: string
       scopes?: string
@@ -217,9 +220,6 @@ export default class GoTrueClient {
       if (phone && password) {
         return this._handlePhoneSignIn(phone, password)
       }
-      if (web3) {
-        return this._handleWeb3SignIn(web3.wallet_address, web3.nonce, web3.signature)
-      }
       if (refreshToken) {
         // currentSession and currentUser will be updated to latest on _callRefreshToken using the passed refreshToken
         const { error } = await this._callRefreshToken(refreshToken)
@@ -241,6 +241,24 @@ export default class GoTrueClient {
     } catch (e) {
       return { user: null, session: null, error: e as ApiError }
     }
+  }
+
+  /**
+   * Log in with an ethereum wallet
+   * @type EthCredentials
+   * @param wallet_address The user's ethereum address.
+   * @param nonce The ID of the nonce that was signed.
+   * @param signature The nonce that has been signed by the wallet_address.
+   */
+  async signInWithEth(
+    { wallet_address, nonce, signature }: EthCredentials,
+  ): Promise<{
+    session: Session | null
+    user: User | null
+    error: ApiError | null
+  }> {
+    const {data, error} = await this.api.signInWithEth({wallet_address: wallet_address, nonce: nonce, signature: signature});
+    return {user: null, session: data, error: error};
   }
 
   /**
@@ -292,9 +310,20 @@ export default class GoTrueClient {
     }
   }
 
-  async getNonce(): Promise<{data: Nonce | null; error: ApiError | null}> {
-    const {data, error} = await this.api.getNonce();
-    return {data: data, error: error};
+  /**
+   * Get a nonce that can be signed and used for signInWithEth
+   * @type NonceParams
+   * @param wallet_address The user's ethereum address.
+   * @param chain_id The ID of wallet's chain
+   * @param url The url for the nonce, required for server side but uses window.location on browser
+   */
+  async getNonce({wallet_address, chain_id, url}: NonceParams): Promise<{ data: Nonce | null; error: GoTrueError | ApiError | null }> {
+    if(!isBrowser() && url == null) {
+      return {data: null, error: { message: "No URL included on server side" }}
+    }
+
+    const { data, error } = await this.api.getNonce({wallet_address, chain_id, url: isBrowser() ? (url ?? window.location.href) : url});
+    return { data: data, error: error };
   }
 
   /**
@@ -533,18 +562,6 @@ export default class GoTrueClient {
     } catch (e) {
       return { data: null, user: null, session: null, error: e as ApiError }
     }
-  }
-
-  private async _handleWeb3SignIn(wallet_address: string, nonce: string, signature: string): Promise<{
-    session: Session | null
-    user: User | null
-    provider?: Provider
-    url?: string | null
-    error: ApiError | null
-  }> {
-    // TODO (HarryET): Improve
-    const {data, error} = await this.api.signInWithWallet(wallet_address, nonce, signature);
-    return {user: null, session: data, error: error}
   }
 
   private _handleProviderSignIn(

@@ -1,5 +1,5 @@
 import { Fetch, get, post, put, remove } from './lib/fetch'
-import { Session, Provider, UserAttributes, CookieOptions, User, Nonce } from './lib/types'
+import { Session, Provider, UserAttributes, CookieOptions, User, Nonce, NonceParams, EthCredentials } from './lib/types'
 import { COOKIE_OPTIONS } from './lib/constants'
 import { setCookie, deleteCookie } from './lib/cookies'
 import { expiresAt } from './lib/helpers'
@@ -201,17 +201,15 @@ export default class GoTrueApi {
    * @param nonce The nonce from the GoTrue server
    * @param signature The nonce that has been signed with the wallet
   */
-  async signInWithWallet(
-    wallet_address: string,
-    nonce: string,
-    signature: string,
+  async signInWithEth(
+    {wallet_address, nonce, signature}: EthCredentials
   ): Promise<{ data: Session | null; error: ApiError | null }> {
     try {
       const headers = { ...this.headers }
       const data = await post(
         this.fetch,
-        `${this.url}/web3`,
-        { wallet_address, nonce, signature },
+        `${this.url}/eth`,
+        { wallet_address, nonce_id: nonce.id, signature },
         { headers }
       )
       // TODO (HarryET): Check if this is the correct data sent back and if not change in GoTrue
@@ -581,11 +579,12 @@ export default class GoTrueApi {
     }
   }
 
-  async getNonce(): Promise<{ data: Nonce | null; error: ApiError | null }> {
+  async getNonce(params: NonceParams): Promise<{ data: Nonce | null; error: ApiError | null }> {
     try {
-      const data: any = await get(
+      const data: any = await post(
         this.fetch,
         `${this.url}/nonce`,
+        {...params},
         { headers: this.headers }
       )
       return { data: data as Nonce, error: null }
