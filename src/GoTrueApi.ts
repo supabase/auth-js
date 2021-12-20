@@ -473,7 +473,7 @@ export default class GoTrueApi {
     }
     const { event, session } = req.body
     if (!event) throw new Error('Auth event missing!')
-    if (event === 'SIGNED_IN') {
+    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
       if (!session) throw new Error('Auth session missing!')
       setCookie(req, res, {
         name: this.cookieOptions.name!,
