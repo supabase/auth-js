@@ -11,6 +11,8 @@ import {
   mockUserCredentials,
   mockAppMetadata,
   mockUserMetadata,
+  mockCookieRequest,
+  mockCookieResponse,
 } from './lib/utils'
 
 import type { Session, User } from '../src/lib/types'
@@ -492,6 +494,62 @@ describe('GoTrueApi', () => {
         expect(error?.status).toEqual(400)
         expect(error?.message).toMatch(/^Invalid format/)
       })
+    })
+  })
+
+  describe('setAuthCookie()', () => {
+    test('setAuthCookie() sets cookie on SIGNED_IN event', async () => {
+      const { email, password } = mockUserCredentials()
+      const { session } = await authClientWithSession.signUp({
+        email,
+        password,
+      })
+
+      const event = 'SIGNED_IN'
+
+      const mockRequest = mockCookieRequest({ event, session })
+      const mockResponse = mockCookieResponse()
+
+      authClientWithSession.api.setAuthCookie(mockRequest, mockResponse)
+
+      expect(mockResponse.setHeader).toHaveBeenCalledWith(
+        'Set-Cookie',
+        expect.arrayContaining([expect.any(String)])
+      )
+    })
+
+    test('setAuthCookie() sets cookie again on TOKEN_REFRESHED event', async () => {
+      const { email, password } = mockUserCredentials()
+      const { session } = await authClientWithSession.signUp({
+        email,
+        password,
+      })
+
+      const event = 'TOKEN_REFRESHED'
+
+      const mockRequest = mockCookieRequest({ event, session })
+      const mockResponse = mockCookieResponse()
+
+      authClientWithSession.api.setAuthCookie(mockRequest, mockResponse)
+
+      expect(mockResponse.setHeader).toHaveBeenCalledWith(
+        'Set-Cookie',
+        expect.arrayContaining([expect.any(String)])
+      )
+    })
+
+    test('setAuthCookie() removes cookie on SIGNED_OUT event', async () => {
+      const event = 'SIGNED_OUT'
+
+      const mockRequest = mockCookieRequest({ event, session: null })
+      const mockResponse = mockCookieResponse()
+
+      authClientWithSession.api.setAuthCookie(mockRequest, mockResponse)
+
+      expect(mockResponse.setHeader).toHaveBeenCalledWith(
+        'Set-Cookie',
+        expect.arrayContaining([expect.any(String)])
+      )
     })
   })
 })

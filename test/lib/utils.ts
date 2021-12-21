@@ -5,6 +5,8 @@ import { serviceRoleApiClient } from './clients'
 
 import { GOTRUE_JWT_SECRET } from './clients'
 
+import type { Session } from '../../src'
+
 export const mockAccessToken = () => {
   return jwt.sign(
     {
@@ -61,4 +63,28 @@ export const createNewUserWithEmail = async ({
     password: newPassword,
     data: {},
   })
+}
+
+export const mockCookieRequest = ({
+  event,
+  session,
+}: {
+  event: string
+  session: Session | null
+}) => {
+  return {
+    method: 'POST',
+    headers: { host: 'localhost:9999' },
+    body: { event, session },
+  }
+}
+
+export const mockCookieResponse = () => {
+  return {
+    getHeader: jest.fn(() => undefined),
+    setHeader: jest.fn(),
+    status: () => {
+      return { json: () => void 0 }
+    },
+  }
 }
