@@ -551,5 +551,59 @@ describe('GoTrueApi', () => {
         expect.arrayContaining([expect.any(String)])
       )
     })
+
+    test('setAuthCookie() returns 405 on an invalid method', async () => {
+      const { email, password } = mockUserCredentials()
+      const { session } = await authClientWithSession.signUp({
+        email,
+        password,
+      })
+
+      const event = 'SIGNED_IN'
+
+      const mockRequest = mockCookieRequest({ event, session, method: 'GET' })
+      const mockResponse = mockCookieResponse()
+
+      authClientWithSession.api.setAuthCookie(mockRequest, mockResponse)
+
+      expect(mockResponse.status).toHaveBeenCalledWith(405)
+    })
+
+    test('setAuthCookie() does not set cookie on other events', async () => {
+      const event = 'UNKNOWN_EVENT'
+
+      const mockRequest = mockCookieRequest({ event, session: null })
+      const mockResponse = mockCookieResponse()
+
+      authClientWithSession.api.setAuthCookie(mockRequest, mockResponse)
+
+      expect(mockResponse.setHeader).not.toHaveBeenCalled()
+    })
+
+    test('setAuthCookie() throws error on missing event', async () => {
+      const { email, password } = mockUserCredentials()
+      const { session } = await authClientWithSession.signUp({
+        email,
+        password,
+      })
+
+      const mockRequest = mockCookieRequest({ session })
+      const mockResponse = mockCookieResponse()
+
+      expect(() => {
+        authClientWithSession.api.setAuthCookie(mockRequest, mockResponse)
+      }).toThrow('Auth event missing!')
+    })
+
+    test('setAuthCookie() throws error on missing session', async () => {
+      const event = 'SIGNED_IN'
+
+      const mockRequest = mockCookieRequest({ event })
+      const mockResponse = mockCookieResponse()
+
+      expect(() => {
+        authClientWithSession.api.setAuthCookie(mockRequest, mockResponse)
+      }).toThrow('Auth session missing!')
+    })
   })
 })

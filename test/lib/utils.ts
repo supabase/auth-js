@@ -68,12 +68,14 @@ export const createNewUserWithEmail = async ({
 export const mockCookieRequest = ({
   event,
   session,
+  method = 'POST',
 }: {
-  event: string
-  session: Session | null
+  event?: string
+  session?: Session | null
+  method?: string
 }) => {
   return {
-    method: 'POST',
+    method,
     headers: { host: 'localhost:9999' },
     body: { event, session },
   }
@@ -83,8 +85,8 @@ export const mockCookieResponse = () => {
   return {
     getHeader: jest.fn(() => undefined),
     setHeader: jest.fn(),
-    status: () => {
-      return { json: () => void 0 }
-    },
+    status: jest.fn(() => {
+      return { json: jest.fn(), end: jest.fn() }
+    }),
   }
 }
