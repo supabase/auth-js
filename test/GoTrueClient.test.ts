@@ -87,6 +87,39 @@ describe('GoTrueClient', () => {
       expect(data).toHaveProperty('refresh_token')
       expect(refreshToken).not.toEqual(data?.refresh_token)
     })
+
+    test('refreshSession() can be called concurrently', async () => {
+      const { email, password } = mockUserCredentials()
+
+      const { error: initialError, session } = await authWithSession.signUp({
+        email,
+        password,
+      })
+
+      expect(initialError).toBeNull()
+      expect(session).not.toBeNull()
+
+      const initialRefreshToken = session?.refresh_token
+
+      const refreshSessionA = authWithSession.refreshSession()
+      const refreshSessionB = authWithSession.refreshSession()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const refreshSessionC = authWithSession.refreshSession()
+
+      const sessionC = await refreshSessionC
+      const sessionB = await refreshSessionB
+      const sessionA = await refreshSessionA
+
+      for (const { error, user, data } of [sessionA, sessionB, sessionC]) {
+        expect(error).toBeNull()
+        expect(user).not.toBeNull()
+        expect(data).not.toBeNull()
+
+        expect(user?.email).toEqual(email)
+        expect(data).toHaveProperty('refresh_token')
+        expect(initialRefreshToken).not.toEqual(data?.refresh_token)
+      }
+    })
   })
 
   describe('Authentication', () => {

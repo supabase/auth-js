@@ -615,11 +615,32 @@ export default class GoTrueClient {
     }
   }
 
+  private _callRefreshTokenPromises: {
+    [refresh_token: string]: ReturnType<GoTrueClient['_callRefreshTokenConcurrently']>
+  } = {}
+
+  // If there is an ongoing request a promise resolving to it will be returned.
+  //
+  // This is necessary because concurrent token refreshes will race and inevitably fail:
+  //    - earliest request will revoke current session and start a new one
+  //    - later requests will fail as they were sent with an old session
+  //    - this will cause new session to also be revoked due to refresh token reuse detection
+  //    - the client will be left with a valid access_token but revoked refresh_token
+  //    - they might not notice it until they try to refresh the token
   private async _callRefreshToken(refresh_token = this.currentSession?.refresh_token) {
+    if (!refresh_token) {
+      return { data: null, error: { message: 'No current session', status: 401 } as ApiError }
+    }
+    if (!(refresh_token in this._callRefreshTokenPromises)) {
+      this._callRefreshTokenPromises[refresh_token] = this._callRefreshTokenConcurrently(
+        refresh_token
+      ).finally(() => delete this._callRefreshTokenPromises[refresh_token])
+    }
+    return this._callRefreshTokenPromises[refresh_token]
+  }
+
+  private async _callRefreshTokenConcurrently(refresh_token: string) {
     try {
-      if (!refresh_token) {
-        throw new Error('No current session.')
-      }
       const { data, error } = await this.api.refreshAccessToken(refresh_token)
       if (error) throw error
       if (!data) throw Error('Invalid session data.')
