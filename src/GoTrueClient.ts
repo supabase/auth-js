@@ -405,13 +405,13 @@ export default class GoTrueClient {
 
       const provider_token = getParameterByName('provider_token', url || null)
       const access_token = getParameterByName('access_token', url || null)
-      if (!access_token) throw new Error('No access_token detected.', url || null)
+      if (!access_token) throw new Error('No access_token detected.')
       const expires_in = getParameterByName('expires_in', url || null)
-      if (!expires_in) throw new Error('No expires_in detected.', url || null)
+      if (!expires_in) throw new Error('No expires_in detected.')
       const refresh_token = getParameterByName('refresh_token', url || null)
-      if (!refresh_token) throw new Error('No refresh_token detected.', url || null)
+      if (!refresh_token) throw new Error('No refresh_token detected.')
       const token_type = getParameterByName('token_type', url || null)
-      if (!token_type) throw new Error('No token_type detected.', url || null)
+      if (!token_type) throw new Error('No token_type detected.')
 
       const timeNow = Math.round(Date.now() / 1000)
       const expires_at = timeNow + parseInt(expires_in)
