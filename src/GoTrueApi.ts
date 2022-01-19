@@ -378,10 +378,55 @@ export default class GoTrueApi {
    * Works for Next.js & Express (requires cookie-parser middleware).
    */
   setAuthCookie(req: any, res: any) {
-    if (req.method !== 'POST') {
-      res.setHeader('Allow', 'POST')
-      res.status(405).end('Method Not Allowed')
+    console.log('req.headers', req.headers)
+    console.log('req.cookies', req.cookies)
+    // Try to read tokens from req.cookies
+    if (req.cookies?.['sb-access-token'] && req.cookies?.['sb-refresh-token']) {
+      ;[
+        { key: 'access-token', value: req.cookies['sb-access-token'] },
+        { key: 'refresh-token', value: req.cookies['sb-refresh-token'] },
+      ].map((token) => {
+        setCookie(req, res, {
+          name: `${this.cookieName()}-${token.key}`,
+          value: token.value,
+          domain: this.cookieOptions.domain,
+          maxAge: this.cookieOptions.lifetime ?? 0,
+          path: this.cookieOptions.path,
+          sameSite: this.cookieOptions.sameSite,
+        })
+      })
+      return res.status(200).json({})
     }
+
+    // Try to parse from req.headers.
+    if (req.headers?.cookie) {
+      const headerCookieString = req.headers.cookie
+      headerCookieString.split('; ').map((cookie: string) => {
+        if (cookie.includes('sb-access-token=')) {
+          setCookie(req, res, {
+            name: `${this.cookieName()}-access-token`,
+            value: cookie.replace('sb-access-token=', ''),
+            domain: this.cookieOptions.domain,
+            maxAge: this.cookieOptions.lifetime ?? 0,
+            path: this.cookieOptions.path,
+            sameSite: this.cookieOptions.sameSite,
+          })
+        }
+        if (cookie.includes('sb-refresh-token=')) {
+          setCookie(req, res, {
+            name: `${this.cookieName()}-refresh-token`,
+            value: cookie.replace('sb-refresh-token=', ''),
+            domain: this.cookieOptions.domain,
+            maxAge: this.cookieOptions.lifetime ?? 0,
+            path: this.cookieOptions.path,
+            sameSite: this.cookieOptions.sameSite,
+          })
+        }
+      })
+      return res.status(200).json({})
+    }
+
+    // Backwards compatability for sending event via AJAX.
     const { event, session } = req.body
 
     if (!event) throw new Error('Auth event missing!')

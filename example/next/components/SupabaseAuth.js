@@ -1,32 +1,36 @@
-import { useState } from 'react';
-import { supabase } from '../utils/initSupabase';
+import { useState } from 'react'
+import { supabase } from '../utils/initSupabase'
 
 export default function SupabaseAuth() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
 
   const handleLogin = async (type, email, password) => {
     const { error, user } =
       type === 'LOGIN'
         ? await supabase.auth.signIn({ email, password })
-        : await supabase.auth.signUp({ email, password });
-    if (!error && !user) alert('Check your email for the login link!');
-    if (error) alert(error.message);
-  };
+        : await supabase.auth.signUp({ email, password })
+    if (!error && !user) alert('Check your email for the login link!')
+    if (error) alert(error.message)
+  }
 
   async function handleOAuthLogin(provider) {
-    let { error } = await supabase.auth.signIn({ provider });
-    if (error) alert(error.message);
+    let { error } = await supabase.auth.signIn(
+      { provider },
+      {
+        redirectTo: 'http://localhost:3000/api/newauth',
+      }
+    )
+    if (error) alert(error.message)
   }
 
   async function forgotPassword() {
-    const email = prompt('Please enter your email:');
-    if (email === null || email === '')
-      return alert('You must enter your email.');
+    const email = prompt('Please enter your email:')
+    if (email === null || email === '') return alert('You must enter your email.')
 
-    const { error } = await supabase.auth.api.resetPasswordForEmail(email);
-    if (error) return alert(error.message);
-    alert('Password recovery email has been sent.');
+    const { error } = await supabase.auth.api.resetPasswordForEmail(email)
+    if (error) return alert(error.message)
+    alert('Password recovery email has been sent.')
   }
 
   return (
@@ -53,14 +57,14 @@ export default function SupabaseAuth() {
       <div>
         <button
           onClick={() => {
-            handleLogin('SIGNUP', email, password);
+            handleLogin('SIGNUP', email, password)
           }}
         >
           Sign up
         </button>
         <button
           onClick={() => {
-            handleLogin('LOGIN', email, password);
+            handleLogin('LOGIN', email, password)
           }}
         >
           {password.length ? 'Sign in' : 'Send magic link'}
@@ -89,5 +93,5 @@ export default function SupabaseAuth() {
         </div>
       </div>
     </div>
-  );
+  )
 }
