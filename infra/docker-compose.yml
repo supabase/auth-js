@@ -2,7 +2,7 @@
 version: '3'
 services:
   gotrue: # Signup enabled, autoconfirm off
-    image: supabase/gotrue:v2.4.0
+    image: supabase/gotrue:latest
     ports:
       - '9999:9999'
     environment:
@@ -16,7 +16,7 @@ services:
       GOTRUE_DISABLE_SIGNUP: 'false'
       API_EXTERNAL_URL: http://localhost:9999
       GOTRUE_SITE_URL: http://localhost:9999
-      GOTRUE_URI_ALLOW_LIST: http://localhost:3000
+      GOTRUE_URI_ALLOW_LIST: https://supabase.io/docs
       GOTRUE_MAILER_AUTOCONFIRM: 'false'
       GOTRUE_LOG_LEVEL: DEBUG
       GOTRUE_OPERATOR_TOKEN: super-secret-operator-token
@@ -25,10 +25,6 @@ services:
       GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: 53566906701-bmhc1ndue7hild39575gkpimhs06b7ds.apps.googleusercontent.com
       GOTRUE_EXTERNAL_GOOGLE_SECRET: Sm3s8RE85rDcS36iMy8YjrpC
       GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: http://localhost:9999/callback
-      GOTRUE_EXTERNAL_GITHUB_ENABLED: 'true'
-      GOTRUE_EXTERNAL_GITHUB_CLIENT_ID: 0cc6116caec3fa4614a3
-      GOTRUE_EXTERNAL_GITHUB_SECRET: 68d827e6cf8b8b9aa7aadaa8abeb36b496a2b63a
-      GOTRUE_EXTERNAL_GITHUB_REDIRECT_URI: http://localhost:9999/callback
       GOTRUE_SMTP_HOST: mail
       GOTRUE_SMTP_PORT: 2500
       GOTRUE_SMTP_USER: GOTRUE_SMTP_USER
@@ -46,7 +42,7 @@ services:
       - db
     restart: on-failure
   autoconfirm: # Signup enabled, autoconfirm on
-    image: supabase/gotrue:v2.4.0
+    image: supabase/gotrue:latest
     ports:
       - '9998:9998'
     environment:
@@ -76,7 +72,7 @@ services:
       - db
     restart: on-failure
   disabled: # Signup disabled
-    image: supabase/gotrue:v2.4.0
+    image: supabase/gotrue:latest
     ports:
       - '9997:9997'
     environment:

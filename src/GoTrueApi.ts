@@ -8,7 +8,7 @@ import {
   User,
 } from './lib/types'
 import { COOKIE_OPTIONS } from './lib/constants'
-import { setCookie, deleteCookie } from './lib/cookies'
+import { setCookies, deleteCookie } from './lib/cookies'
 import { expiresAt } from './lib/helpers'
 
 import type { ApiError } from './lib/types'
@@ -387,19 +387,21 @@ export default class GoTrueApi {
     if (!event) throw new Error('Auth event missing!')
     if (event === 'SIGNED_IN') {
       if (!session) throw new Error('Auth session missing!')
-      ;[
-        { key: 'access-token', value: session.access_token },
-        { key: 'refresh-token', value: session.refresh_token },
-      ].map((token) => {
-        setCookie(req, res, {
+      setCookies(
+        req,
+        res,
+        [
+          { key: 'access-token', value: session.access_token },
+          { key: 'refresh-token', value: session.refresh_token },
+        ].map((token) => ({
           name: `${this.cookieName()}-${token.key}`,
           value: token.value,
           domain: this.cookieOptions.domain,
           maxAge: this.cookieOptions.lifetime ?? 0,
           path: this.cookieOptions.path,
           sameSite: this.cookieOptions.sameSite,
-        })
-      })
+        }))
+      )
     }
     if (event === 'SIGNED_OUT') {
       deleteCookie(req, res, `${this.cookieName()}-access-token`)
@@ -540,19 +542,21 @@ export default class GoTrueApi {
         if (error) {
           throw error
         } else if (data) {
-          ;[
-            { key: 'access-token', value: data.access_token },
-            { key: 'refresh-token', value: data.refresh_token! },
-          ].map((token) => {
-            setCookie(req, res, {
+          setCookies(
+            req,
+            res,
+            [
+              { key: 'access-token', value: data.access_token },
+              { key: 'refresh-token', value: data.refresh_token! },
+            ].map((token) => ({
               name: `${this.cookieName()}-${token.key}`,
               value: token.value,
               domain: this.cookieOptions.domain,
               maxAge: this.cookieOptions.lifetime ?? 0,
               path: this.cookieOptions.path,
               sameSite: this.cookieOptions.sameSite,
-            })
-          })
+            }))
+          )
           return { token: data.access_token, user: data.user, data: data.user, error: null }
         }
       }
