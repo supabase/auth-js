@@ -634,7 +634,7 @@ export default class GoTrueApi {
           return { token: data.access_token, user: data.user, data: data.user, error: null }
         }
       }
-      return { token: access_token, user, data: user, error: null }
+      return { token: access_token, user: user, data: user, error: null }
     } catch (e) {
       return { token: null, user: null, data: null, error: e as ApiError }
     }
