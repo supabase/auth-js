@@ -378,13 +378,18 @@ export default class GoTrueApi {
    * Works for Next.js & Express (requires cookie-parser middleware).
    */
   setAuthCookie(req: any, res: any) {
-    console.log('req.headers', req.headers)
-    console.log('req.cookies', req.cookies)
-    // Try to read tokens from req.cookies
-    if (req.cookies?.['sb-access-token'] && req.cookies?.['sb-refresh-token']) {
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'POST')
+      res.status(405).end('Method Not Allowed')
+    }
+    const { event, session } = req.body
+
+    if (!event) throw new Error('Auth event missing!')
+    if (event === 'SIGNED_IN') {
+      if (!session) throw new Error('Auth session missing!')
       ;[
-        { key: 'access-token', value: req.cookies['sb-access-token'] },
-        { key: 'refresh-token', value: req.cookies['sb-refresh-token'] },
+        { key: 'access-token', value: session.access_token },
+        { key: 'refresh-token', value: session.refresh_token },
       ].map((token) => {
         setCookie(req, res, {
           name: `${this.cookieName()}-${token.key}`,
@@ -395,53 +400,11 @@ export default class GoTrueApi {
           sameSite: this.cookieOptions.sameSite,
         })
       })
-      return res.status(200).json({})
     }
-
-    // Try to parse from req.headers.
-    if (req.headers?.cookie) {
-      const headerCookieString = req.headers.cookie
-      headerCookieString.split('; ').map((cookie: string) => {
-        if (cookie.includes('sb-access-token=')) {
-          setCookie(req, res, {
-            name: `${this.cookieName()}-access-token`,
-            value: cookie.replace('sb-access-token=', ''),
-            domain: this.cookieOptions.domain,
-            maxAge: this.cookieOptions.lifetime ?? 0,
-            path: this.cookieOptions.path,
-            sameSite: this.cookieOptions.sameSite,
-          })
-        }
-        if (cookie.includes('sb-refresh-token=')) {
-          setCookie(req, res, {
-            name: `${this.cookieName()}-refresh-token`,
-            value: cookie.replace('sb-refresh-token=', ''),
-            domain: this.cookieOptions.domain,
-            maxAge: this.cookieOptions.lifetime ?? 0,
-            path: this.cookieOptions.path,
-            sameSite: this.cookieOptions.sameSite,
-          })
-        }
-      })
-      return res.status(200).json({})
+    if (event === 'SIGNED_OUT') {
+      deleteCookie(req, res, `${this.cookieName()}-access-token`)
+      deleteCookie(req, res, `${this.cookieName()}-refresh-token`)
     }
-
-    // Backwards compatability for sending event via AJAX.
-    const { event, session } = req.body
-
-    if (!event) throw new Error('Auth event missing!')
-    if (event === 'SIGNED_IN') {
-      if (!session) throw new Error('Auth session missing!')
-      setCookie(req, res, {
-        name: this.cookieName(),
-        value: session.access_token,
-        domain: this.cookieOptions.domain,
-        maxAge: this.cookieOptions.lifetime ?? 0,
-        path: this.cookieOptions.path,
-        sameSite: this.cookieOptions.sameSite,
-      })
-    }
-    if (event === 'SIGNED_OUT') deleteCookie(req, res, this.cookieName())
     res.status(200).json({})
   }
 
@@ -545,7 +508,10 @@ export default class GoTrueApi {
    * Get user by reading the cookie from the request.
    * Works for Next.js & Express (requires cookie-parser middleware).
    */
-  async getUserByCookie(req: any): Promise<{
+  async getUserByCookie(
+    req: any,
+    res?: any
+  ): Promise<{
     token: string | null
     user: User | null
     data: User | null
@@ -558,15 +524,39 @@ export default class GoTrueApi {
         )
       }
 
-      const token = req.cookies[this.cookieName()]
+      const access_token = req.cookies[`${this.cookieName()}-access-token`]
+      const refresh_token = req.cookies[`${this.cookieName()}-refresh-token`]
 
-      if (!token) {
+      if (!access_token) {
         throw new Error('No cookie found!')
       }
 
-      const { user, error } = await this.getUser(token)
-      if (error) throw error
-      return { token, user, data: user, error: null }
+      const { user, error: getUserError } = await this.getUser(access_token)
+      if (getUserError) {
+        if (!refresh_token) throw new Error('No refresh_token cookie found!')
+        if (!res)
+          throw new Error('You need to pass the res object to automatically refresh the session!')
+        const { data, error } = await this.refreshAccessToken(refresh_token)
+        if (error) {
+          throw error
+        } else if (data) {
+          ;[
+            { key: 'access-token', value: data.access_token },
+            { key: 'refresh-token', value: data.refresh_token! },
+          ].map((token) => {
+            setCookie(req, res, {
+              name: `${this.cookieName()}-${token.key}`,
+              value: token.value,
+              domain: this.cookieOptions.domain,
+              maxAge: this.cookieOptions.lifetime ?? 0,
+              path: this.cookieOptions.path,
+              sameSite: this.cookieOptions.sameSite,
+            })
+          })
+          return { token: data.access_token, user: data.user, data: data.user, error: null }
+        }
+      }
+      return { token: access_token, user, data: user, error: null }
     } catch (e) {
       return { token: null, user: null, data: null, error: e as ApiError }
     }

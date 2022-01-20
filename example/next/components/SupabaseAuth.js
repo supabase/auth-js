@@ -18,7 +18,7 @@ export default function SupabaseAuth() {
     let { error } = await supabase.auth.signIn(
       { provider },
       {
-        redirectTo: 'http://localhost:3000/api/newauth',
+        redirectTo: 'http://localhost:3000/',
       }
     )
     if (error) alert(error.message)
