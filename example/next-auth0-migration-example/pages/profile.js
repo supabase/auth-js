@@ -1,12 +1,17 @@
 // This import is only needed when checking authentication status directly from getInitialProps
 import { useFetchUser } from '../lib/user'
 import Layout from '../components/layout'
+import { supabase } from '../lib/initSupabase'
 
 function ProfileCard({ user }) {
+  const getUser = async () => {
+    const { user } = await supabase.auth.api.getUser()
+    console.log(user)
+  }
   return (
     <>
       <h1>Profile</h1>
-
+      <button onClick={getUser}>click</button>
       <div>
         <h3>Profile (client rendered)</h3>
         <img src={user.user_metadata.picture} alt="user picture" />

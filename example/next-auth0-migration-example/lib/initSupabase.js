@@ -3,6 +3,8 @@ import { GoTrueClient } from '@supabase/gotrue-js'
 const supabaseURL = 'http://localhost:9999'
 
 const auth = new GoTrueClient({
+  autoRefreshToken: false,
+  persistSession: false,
   url: `${supabaseURL}`,
   headers: {
     accept: 'json',

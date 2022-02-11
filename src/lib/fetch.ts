@@ -27,7 +27,11 @@ const handleError = (error: any, reject: any) => {
 }
 
 const _getRequestParams = (method: RequestMethodType, options?: FetchOptions, body?: object) => {
-  const params: { [k: string]: any } = { method, headers: options?.headers || {} }
+  const params: { [k: string]: any } = {
+    method,
+    credentials: 'include',
+    headers: options?.headers || {},
+  }
 
   if (method === 'GET') {
     return params
