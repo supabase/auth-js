@@ -713,7 +713,10 @@ export default class GoTrueClient {
     if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
     if (value <= 0 || !this.autoRefreshToken) return
 
-    this.refreshTokenTimer = setTimeout(() => this._callRefreshToken(), value)
+    this.refreshTokenTimer = setTimeout(async () => {
+      const { error } = await this._callRefreshToken()
+      if (error) throw error
+    }, value)
     if (typeof this.refreshTokenTimer.unref === 'function') this.refreshTokenTimer.unref()
   }
 
