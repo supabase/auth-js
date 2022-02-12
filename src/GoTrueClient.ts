@@ -61,6 +61,7 @@ export default class GoTrueClient {
   protected multiTab: boolean
   protected stateChangeEmitters: Map<string, Subscription> = new Map()
   protected refreshTokenTimer?: ReturnType<typeof setTimeout>
+  protected onlineListener?: () => void
 
   /**
    * Create a new client for use in the browser.
@@ -706,6 +707,34 @@ export default class GoTrueClient {
   }
 
   /**
+   * Listen for 'online' event and refresh token
+   */
+  private _refreshTokenWhenOnline() {
+    this.onlineListener = () => {
+      if (this.onlineListener) {
+        window.removeEventListener('online', this.onlineListener)
+        this.onlineListener = undefined
+      }
+
+      this._autoRefreshToken()
+    }
+
+    window.addEventListener('online', this.onlineListener)
+  }
+
+  /**
+   * Refresh token if online, otherwise wait until online
+   */
+  private async _autoRefreshToken() {
+    if (navigator?.onLine) {
+      const { error } = await this._callRefreshToken()
+      if (error) throw error
+    } else {
+      this._refreshTokenWhenOnline()
+    }
+  }
+
+  /**
    * Clear and re-create refresh token timer
    * @param value time intervals in milliseconds
    */
@@ -713,10 +742,7 @@ export default class GoTrueClient {
     if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
     if (value <= 0 || !this.autoRefreshToken) return
 
-    this.refreshTokenTimer = setTimeout(async () => {
-      const { error } = await this._callRefreshToken()
-      if (error) throw error
-    }, value)
+    this.refreshTokenTimer = setTimeout(() => this._autoRefreshToken(), value)
     if (typeof this.refreshTokenTimer.unref === 'function') this.refreshTokenTimer.unref()
   }
 
