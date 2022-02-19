@@ -244,7 +244,9 @@ export default class GoTrueClient {
       if (oidc) {
         return this._handleOpenIDConnectSignIn(oidc)
       }
-      throw new Error(`You must provide either an email, phone number, a third-party provider or OpenID Connect.`)
+      throw new Error(
+        `You must provide either an email, phone number, a third-party provider or OpenID Connect.`
+        )
     } catch (e) {
       return { user: null, session: null, error: e as ApiError }
     }
@@ -562,16 +564,27 @@ export default class GoTrueClient {
     }
   }
 
-  private async _handleOpenIDConnectSignIn(
-    { id_token, nonce, client_id, issuer, provider }: OpenIDConnectCredentials
+  private async _handleOpenIDConnectSignIn({
+    id_token,
+    nonce,
+    client_id,
+    issuer,
+    provider,
+  }: OpenIDConnectCredentials
   ): Promise<{
     session: Session | null
     user: User | null
     error: ApiError | null
   }> {
-    if (id_token && nonce && ( (client_id && issuer) || provider) ) {
+    if (id_token && nonce && ((client_id && issuer) || provider)) {
       try {
-        const { data, error } = await this.api.signInWithOpenIDConnect({id_token, nonce, client_id, issuer, provider})
+        const { data, error } = await this.api.signInWithOpenIDConnect({
+          id_token,
+          nonce,
+          client_id,
+          issuer,
+          provider,
+        })
         if (error || !data) return { user: null, session: null, error }
         this._saveSession(data)
         this._notifyAllSubscribers('SIGNED_IN')
