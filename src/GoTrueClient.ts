@@ -163,7 +163,7 @@ export default class GoTrueClient {
         session = data as Session
         user = session.user as User
         this._saveSession(session)
-        this._notifyAllSubscribers('SIGNED_IN')
+        this._notifyAllSubscribers('SIGNED_UP')
       }
 
       if ((data as User).id) {
