@@ -120,13 +120,16 @@ export default class GoTrueClient {
    * @param phone The user's phone number.
    * @param redirectTo A URL or mobile address to send the user to after they are confirmed.
    * @param data Optional user metadata.
+   * @param removeSession Optional remove current session or not
    */
   async signUp(
     { email, password, phone }: UserCredentials,
     options: {
       redirectTo?: string
       data?: object
-      captchaToken?: string
+      captchaToken?: string,
+      keepCurrentSession?:boolean
+
     } = {}
   ): Promise<{
     user: User | null
@@ -134,7 +137,7 @@ export default class GoTrueClient {
     error: ApiError | null
   }> {
     try {
-      this._removeSession()
+      !options.keepCurrentSession && this._removeSession()
 
       const { data, error } =
         phone && password
@@ -160,9 +163,11 @@ export default class GoTrueClient {
       let user: User | null = null
 
       if ((data as Session).access_token) {
-        session = data as Session
-        user = session.user as User
-        this._saveSession(session)
+        if (!options.keepCurrentSession) {
+          session = data as Session
+          user = session.user as User
+          this._saveSession(session)
+        }
         this._notifyAllSubscribers('SIGNED_IN')
       }
 
