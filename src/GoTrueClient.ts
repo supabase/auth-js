@@ -605,7 +605,7 @@ export default class GoTrueClient {
    * Attempts to get the session from LocalStorage
    * Note: this should never be async (even for React Native), as we need it to return immediately in the constructor.
    */
-  private _recoverSession() {
+  private async _recoverSession() {
     try {
       const json = isBrowser() && (await this.localStorage?.getItem(STORAGE_KEY))
       if (!json || typeof json !== 'string') {
@@ -711,9 +711,9 @@ export default class GoTrueClient {
     }
   }
 
-  private _persistSession(currentSession: Session) {
+  private async _persistSession(currentSession: Session) {
     const data = { currentSession, expiresAt: currentSession.expires_at }
-    isBrowser() && this.localStorage?.setItem(STORAGE_KEY, JSON.stringify(data))
+    isBrowser() && (await this.localStorage?.setItem(STORAGE_KEY, JSON.stringify(data)))
   }
 
   private async _removeSession() {
