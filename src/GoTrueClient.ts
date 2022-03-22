@@ -607,7 +607,7 @@ export default class GoTrueClient {
    */
   private _recoverSession() {
     try {
-      const json = isBrowser() && this.localStorage?.getItem(STORAGE_KEY)
+      const json = isBrowser() && (await this.localStorage?.getItem(STORAGE_KEY))
       if (!json || typeof json !== 'string') {
         return null
       }
@@ -631,8 +631,8 @@ export default class GoTrueClient {
    */
   private async _recoverAndRefresh() {
     try {
-      const json = isBrowser() && (await this.localStorage.getItem(STORAGE_KEY))
-      if (!json) {
+      const json = isBrowser() && (await this.localStorage?.getItem(STORAGE_KEY))
+      if (!json || typeof json !== 'string') {
         return null
       }
 
