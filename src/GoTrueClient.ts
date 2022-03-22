@@ -713,14 +713,14 @@ export default class GoTrueClient {
 
   private _persistSession(currentSession: Session) {
     const data = { currentSession, expiresAt: currentSession.expires_at }
-    isBrowser() && this.localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    isBrowser() && this.localStorage?.setItem(STORAGE_KEY, JSON.stringify(data))
   }
 
   private async _removeSession() {
     this.currentSession = null
     this.currentUser = null
     if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
-    isBrowser() && (await this.localStorage.removeItem(STORAGE_KEY))
+    isBrowser() && (await this.localStorage?.removeItem(STORAGE_KEY))
   }
 
   /**
