@@ -95,6 +95,11 @@ export interface UserAttributes {
   phone?: string
 
   /**
+   * The nonce sent for reauthentication
+   */
+  nonce?: string
+
+  /**
    * The user's password.
    */
   password?: string

@@ -766,20 +766,18 @@ export default class GoTrueClient {
   /**
    * Sends a reauthentication otp to the user's email or phone number
    */
- async reauthenticate(): Promise<{ data: {} | null, error: ApiError | null }> {
-  try {
-    if (!this.currentSession?.access_token) throw new Error('Not logged in.')
+  async reauthenticate(): Promise<{ data: {} | null, error: ApiError | null }> {
+    try {
+      if (!this.currentSession?.access_token) throw new Error('Not logged in.')
 
-    const { error }: any = await this.api.reauthenticate(
-      this.currentSession.access_token,
-    )
-    if (error) throw error
+      const { error }: any = await this.api.reauthenticate(
+        this.currentSession.access_token,
+      )
+      if (error) throw error
 
-    return { data: {}, error: null }
-  } catch (e) {
-    return { data: null, error: e as ApiError }
+      return { data: {}, error: null }
+    } catch (e) {
+      return { data: null, error: e as ApiError }
+    }
   }
 }
-}
-
-
