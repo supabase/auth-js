@@ -832,4 +832,19 @@ export default class GoTrueApi {
       return { user: null, data: null, error: e as ApiError }
     }
   }
+
+  /**
+   * Sends a reauthentication otp to the user's email or phone number
+   * @param jwt A valid, logged-in JWT.
+   */
+  async reauthenticate(jwt: string): Promise<{ data: {} | null; error: ApiError | null }> {
+    try {
+      const data: any = await get(this.fetch, `${this.url}/reauthenticate`, {
+        headers: this._createRequestHeaders(jwt),
+      })
+      return { data: {}, error: null }
+    } catch (e) {
+      return { data: {}, error: e as ApiError }
+    }
+  }
 }
