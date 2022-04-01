@@ -61,6 +61,7 @@ export default class GoTrueClient {
   protected multiTab: boolean
   protected stateChangeEmitters: Map<string, Subscription> = new Map()
   protected refreshTokenTimer?: ReturnType<typeof setTimeout>
+  protected refreshPending: Promise<void>
 
   /**
    * Create a new client for use in the browser.
@@ -98,18 +99,14 @@ export default class GoTrueClient {
       cookieOptions: settings.cookieOptions,
       fetch: settings.fetch,
     })
+
     this._recoverSession()
-    this._recoverAndRefresh()
     this._listenForMultiTabEvents()
 
-    if (settings.detectSessionInUrl && isBrowser() && !!getParameterByName('access_token')) {
-      // Handle the OAuth redirect
-      this.getSessionFromUrl({ storeSession: true }).then(({ error }) => {
-        if (error) {
-          console.error('Error getting session from URL.', error)
-        }
-      })
-    }
+    this.refreshPending = Promise.all([
+      this._recoverAndRefresh(),
+      settings.detectSessionInUrl ? this._recoverSessionfromUrl() : Promise.resolve(),
+    ]).then()
   }
 
   /**
@@ -318,9 +315,29 @@ export default class GoTrueClient {
   }
 
   /**
+   * Inside a browser context, `refreshedUser()` will return the user data, if there is a logged in user.
+   *
+   * This is the async variant of `user()` function that waits for pending refreshes.
+   */
+  async refreshedUser(): Promise<User | null> {
+    await this.refreshPending
+    return this.currentUser
+  }
+
+  /**
    * Returns the session data, if there is an active session.
    */
   session(): Session | null {
+    return this.currentSession
+  }
+
+  /**
+   * Returns the session data, if there is an active session.
+   *
+   * This is the async variant of `refreshedSession()` function that waits for pending refreshes.
+   */
+  async refreshedSession(): Promise<Session | null> {
+    await this.refreshPending
     return this.currentSession
   }
 
@@ -666,6 +683,20 @@ export default class GoTrueClient {
     }
   }
 
+  /**
+   * Attempts to recover session from URL
+   * Note: this method is async to accommodate for AsyncStorage e.g. in React native.
+   */
+  private async _recoverSessionfromUrl() {
+    if (isBrowser() && !!getParameterByName('access_token')) {
+      // Handle the OAuth redirect
+      const { error } = await this.getSessionFromUrl({ storeSession: true })
+      if (error) {
+        console.error('Error getting session from URL.', error)
+      }
+    }
+  }
+
   private async _callRefreshToken(refresh_token = this.currentSession?.refresh_token) {
     try {
       if (!refresh_token) {
@@ -732,7 +763,9 @@ export default class GoTrueClient {
     if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
     if (value <= 0 || !this.autoRefreshToken) return
 
-    this.refreshTokenTimer = setTimeout(() => this._callRefreshToken(), value)
+    this.refreshTokenTimer = setTimeout(() => {
+      this.refreshPending = this._callRefreshToken().then()
+    }, value)
     if (typeof this.refreshTokenTimer.unref === 'function') this.refreshTokenTimer.unref()
   }
 
