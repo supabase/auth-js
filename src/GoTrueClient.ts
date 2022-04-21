@@ -678,17 +678,14 @@ export default class GoTrueClient {
       const tokenRefreshLock =
         isBrowser() && (await this.localStorage?.getItem(`${STORAGE_KEY}-tokenRefreshLock`))
       if (tokenRefreshLock === 'IN_PROGRESS') {
-        console.log('Token refresh in progress.')
         return { data: null, error: { message: 'Token refresh in progress.' } }
       }
       // Set refresh lock
       isBrowser() && this.localStorage?.setItem(`${STORAGE_KEY}-tokenRefreshLock`, 'IN_PROGRESS')
-      console.log('locked')
       // Refresh the token
       const { data, error } = await this.api.refreshAccessToken(refresh_token)
       // Release refresh lock
       isBrowser() && this.localStorage?.removeItem(`${STORAGE_KEY}-tokenRefreshLock`)
-      console.log('unlocked')
       if (error) throw error
       if (!data) throw Error('Invalid session data.')
 
@@ -786,7 +783,6 @@ export default class GoTrueClient {
   private _handleVisibilityChange() {
     try {
       window?.addEventListener('visibilitychange', () => {
-        console.log(document.visibilityState)
         if (document.visibilityState === 'visible') {
           this._recoverAndRefresh()
         } else {
