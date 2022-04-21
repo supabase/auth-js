@@ -101,6 +101,7 @@ export default class GoTrueClient {
     this._recoverSession()
     this._recoverAndRefresh()
     this._listenForMultiTabEvents()
+    this._handleVisibilityChange()
 
     if (settings.detectSessionInUrl && isBrowser() && !!getParameterByName('access_token')) {
       // Handle the OAuth redirect
@@ -184,7 +185,7 @@ export default class GoTrueClient {
    * @param password The user's password.
    * @param refreshToken A valid refresh token that was returned on login.
    * @param provider One of the providers supported by GoTrue.
-   * @param redirectTo A URL to send the user to after they are confirmed (OAuth logins only). 
+   * @param redirectTo A URL to send the user to after they are confirmed (OAuth logins only).
    * @param shouldCreateUser A boolean flag to indicate whether to automatically create a user on magiclink / otp sign-ins if the user doesn't exist. Defaults to true.
    * @param scopes A space-separated list of scopes granted to the OAuth application.
    */
@@ -404,7 +405,7 @@ export default class GoTrueClient {
       ...this.currentSession,
       access_token,
       token_type: 'bearer',
-      user: this.user()
+      user: this.user(),
     }
 
     this._notifyAllSubscribers('TOKEN_REFRESHED')
@@ -634,7 +635,7 @@ export default class GoTrueClient {
    */
   private async _recoverAndRefresh() {
     try {
-      const json = isBrowser() && (await this.localStorage.getItem(STORAGE_KEY))
+      const json = isBrowser() && (await this.localStorage?.getItem(STORAGE_KEY))
       if (!json) {
         return null
       }
@@ -643,7 +644,7 @@ export default class GoTrueClient {
       const { currentSession, expiresAt } = data
       const timeNow = Math.round(Date.now() / 1000)
 
-      if (expiresAt < timeNow) {
+      if (expiresAt < timeNow + 10) {
         if (this.autoRefreshToken && currentSession.refresh_token) {
           const { error } = await this._callRefreshToken(currentSession.refresh_token)
           if (error) {
@@ -673,7 +674,21 @@ export default class GoTrueClient {
       if (!refresh_token) {
         throw new Error('No current session.')
       }
+      // Check if refresh already in progress
+      const tokenRefreshLock =
+        isBrowser() && (await this.localStorage?.getItem(`${STORAGE_KEY}-tokenRefreshLock`))
+      if (tokenRefreshLock === 'IN_PROGRESS') {
+        console.log('Token refresh in progress.')
+        return { data: null, error: { message: 'Token refresh in progress.' } }
+      }
+      // Set refresh lock
+      isBrowser() && this.localStorage?.setItem(`${STORAGE_KEY}-tokenRefreshLock`, 'IN_PROGRESS')
+      console.log('locked')
+      // Refresh the token
       const { data, error } = await this.api.refreshAccessToken(refresh_token)
+      // Release refresh lock
+      isBrowser() && this.localStorage?.removeItem(`${STORAGE_KEY}-tokenRefreshLock`)
+      console.log('unlocked')
       if (error) throw error
       if (!data) throw Error('Invalid session data.')
 
@@ -704,7 +719,10 @@ export default class GoTrueClient {
       const timeNow = Math.round(Date.now() / 1000)
       const expiresIn = expiresAt - timeNow
       const refreshDurationBeforeExpires = expiresIn > 60 ? 60 : 0.5
-      this._startAutoRefreshToken((expiresIn - refreshDurationBeforeExpires) * 1000)
+      const randomTimeoutOffsetMs = Math.floor(Math.random() * 50) * 10 // random offset between 0-500ms
+      this._startAutoRefreshToken(
+        (expiresIn - refreshDurationBeforeExpires) * 1000 + randomTimeoutOffsetMs
+      )
     }
 
     // Do we need any extra check before persist session
@@ -716,14 +734,14 @@ export default class GoTrueClient {
 
   private _persistSession(currentSession: Session) {
     const data = { currentSession, expiresAt: currentSession.expires_at }
-    isBrowser() && this.localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    isBrowser() && this.localStorage?.setItem(STORAGE_KEY, JSON.stringify(data))
   }
 
   private async _removeSession() {
     this.currentSession = null
     this.currentUser = null
     if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
-    isBrowser() && (await this.localStorage.removeItem(STORAGE_KEY))
+    isBrowser() && (await this.localStorage?.removeItem(STORAGE_KEY))
   }
 
   /**
@@ -762,6 +780,21 @@ export default class GoTrueClient {
       })
     } catch (error) {
       console.error('_listenForMultiTabEvents', error)
+    }
+  }
+
+  private _handleVisibilityChange() {
+    try {
+      window?.addEventListener('visibilitychange', () => {
+        console.log(document.visibilityState)
+        if (document.visibilityState === 'visible') {
+          this._recoverAndRefresh()
+        } else {
+          if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
+        }
+      })
+    } catch (error) {
+      console.error('_handleVisibilityChange', error)
     }
   }
 }
