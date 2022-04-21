@@ -644,7 +644,7 @@ export default class GoTrueClient {
       const { currentSession, expiresAt } = data
       const timeNow = Math.round(Date.now() / 1000)
 
-      if (expiresAt < timeNow + 10) {
+      if (expiresAt < timeNow + 60) {
         if (this.autoRefreshToken && currentSession.refresh_token) {
           const { error } = await this._callRefreshToken(currentSession.refresh_token)
           if (error) {
@@ -678,7 +678,16 @@ export default class GoTrueClient {
       const tokenRefreshLock =
         isBrowser() && (await this.localStorage?.getItem(`${STORAGE_KEY}-tokenRefreshLock`))
       if (tokenRefreshLock === 'IN_PROGRESS') {
-        return { data: null, error: { message: 'Token refresh in progress.' } }
+        // Release lock after 5s in case original lock setter has dropped off.
+        if (isBrowser())
+          setTimeout(
+            () => {
+              this.localStorage?.removeItem(`${STORAGE_KEY}-tokenRefreshLock`)
+              this._recoverAndRefresh()
+            },
+            5 * 1000 // remove lock after 5s
+          )
+        return { data: this.currentSession, error: null }
       }
       // Set refresh lock
       isBrowser() && this.localStorage?.setItem(`${STORAGE_KEY}-tokenRefreshLock`, 'IN_PROGRESS')
