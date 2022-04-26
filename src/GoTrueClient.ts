@@ -619,7 +619,7 @@ export default class GoTrueClient {
       const { currentSession, expiresAt } = data
       const timeNow = Math.round(Date.now() / 1000)
 
-      if (expiresAt >= timeNow && currentSession?.user) {
+      if (expiresAt >= timeNow + 60 && currentSession?.user) {
         this._saveSession(currentSession)
         this._notifyAllSubscribers('SIGNED_IN')
       }
@@ -672,10 +672,18 @@ export default class GoTrueClient {
     }
   }
 
-  private async _callRefreshToken(refresh_token = this.currentSession?.refresh_token) {
+  private async _callRefreshToken(refresh_token?: string) {
     try {
       if (!refresh_token) {
-        throw new Error('No current session.')
+        const session = this.currentSession
+        if (!session?.refresh_token) throw new Error('No current session.')
+        const expiresAt = session.expires_at
+        const timeNow = Math.round(Date.now() / 1000)
+        if (expiresAt && expiresAt >= timeNow + 60) {
+          this._saveSession(session)
+          return { data: session, error: null }
+        }
+        refresh_token = session.refresh_token
       }
       // Check if refresh already in progress
       const tokenRefreshLock =
@@ -722,16 +730,8 @@ export default class GoTrueClient {
     this.currentSession = session
     this.currentUser = session.user
 
-    const expiresAt = session.expires_at
-    if (expiresAt) {
-      const timeNow = Math.round(Date.now() / 1000)
-      const expiresIn = expiresAt - timeNow
-      const refreshDurationBeforeExpires = expiresIn > 60 ? 60 : 0.5
-      const randomTimeoutOffsetMs = Math.floor(Math.random() * 50) * 10 // random offset between 0-500ms
-      this._startAutoRefreshToken(
-        (expiresIn - refreshDurationBeforeExpires) * 1000 + randomTimeoutOffsetMs
-      )
-    }
+    const randomTimeoutOffsetMs = Math.floor(Math.random() * 50) * 100 // random offset between 0-5000ms
+    this._startAutoRefreshToken(randomTimeoutOffsetMs)
 
     // Do we need any extra check before persist session
     // access_token or user ?
