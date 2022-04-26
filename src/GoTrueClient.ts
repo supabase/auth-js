@@ -336,7 +336,7 @@ export default class GoTrueClient {
       if (!this.currentSession?.access_token) throw new Error('Not logged in.')
 
       // currentSession and currentUser will be updated to latest on _callRefreshToken
-      const { error } = await this._callRefreshToken()
+      const { error } = await this._callRefreshToken(this.currentSession.refresh_token)
       if (error) throw error
 
       return { data: this.currentSession, user: this.currentUser, error: null }
