@@ -1,6 +1,6 @@
 import GoTrueApi from './GoTrueApi'
 import { isBrowser, getParameterByName, uuid } from './lib/helpers'
-import { GOTRUE_URL, DEFAULT_HEADERS, STORAGE_KEY } from './lib/constants'
+import { GOTRUE_URL, DEFAULT_HEADERS, STORAGE_KEY, TOKEN_EXPIRY_MARGIN } from './lib/constants'
 import { polyfillGlobalThis } from './lib/polyfills'
 import { Fetch } from './lib/fetch'
 
@@ -619,7 +619,7 @@ export default class GoTrueClient {
       const { currentSession, expiresAt } = data
       const timeNow = Math.round(Date.now() / 1000)
 
-      if (expiresAt >= timeNow + 60 && currentSession?.user) {
+      if (expiresAt >= timeNow + TOKEN_EXPIRY_MARGIN && currentSession?.user) {
         this._saveSession(currentSession)
         this._notifyAllSubscribers('SIGNED_IN')
       }
@@ -643,12 +643,12 @@ export default class GoTrueClient {
       const { currentSession, expiresAt } = data
       const timeNow = Math.round(Date.now() / 1000)
 
-      if (expiresAt < timeNow + 60) {
+      if (expiresAt < timeNow + TOKEN_EXPIRY_MARGIN) {
         if (this.autoRefreshToken && currentSession.refresh_token) {
           const { error } = await this._callRefreshToken(currentSession.refresh_token)
           if (error) {
             console.log(error.message)
-            if (['Failed to fetch', 'Refresh in progress'].includes(error.message ?? '')) {
+            if (error.message === 'Failed to fetch') {
               setTimeout(() => this._recoverAndRefresh(), 5000)
               return
             }
@@ -679,32 +679,13 @@ export default class GoTrueClient {
         if (!session?.refresh_token) throw new Error('No current session.')
         const expiresAt = session.expires_at
         const timeNow = Math.round(Date.now() / 1000)
-        if (expiresAt && expiresAt >= timeNow + 60) {
+        if (expiresAt && expiresAt >= timeNow + TOKEN_EXPIRY_MARGIN) {
           this._saveSession(session)
           return { data: session, error: null }
         }
         refresh_token = session.refresh_token
       }
-      // Check if refresh already in progress
-      const tokenRefreshLock =
-        isBrowser() && (await this.localStorage?.getItem(`${STORAGE_KEY}-tokenRefreshLock`))
-      if (tokenRefreshLock === 'IN_PROGRESS') {
-        // Release lock after 5s in case original lock setter has dropped off.
-        if (isBrowser())
-          setTimeout(
-            () => {
-              this.localStorage?.removeItem(`${STORAGE_KEY}-tokenRefreshLock`)
-            },
-            5 * 1000 // remove lock after 5s
-          )
-        return { data: null, error: { message: 'Refresh in progress' } }
-      }
-      // Set refresh lock
-      isBrowser() && this.localStorage?.setItem(`${STORAGE_KEY}-tokenRefreshLock`, 'IN_PROGRESS')
-      // Refresh the token
       const { data, error } = await this.api.refreshAccessToken(refresh_token)
-      // Release refresh lock
-      isBrowser() && this.localStorage?.removeItem(`${STORAGE_KEY}-tokenRefreshLock`)
       if (error) throw error
       if (!data) throw Error('Invalid session data.')
 
@@ -754,7 +735,7 @@ export default class GoTrueClient {
 
   /**
    * Clear and re-create refresh token timer
-   * @param value time intervals in milliseconds
+   * @param value timeout delay in milliseconds
    */
   private _startAutoRefreshToken(value: number) {
     if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
@@ -763,8 +744,7 @@ export default class GoTrueClient {
     this.refreshTokenTimer = setTimeout(async () => {
       const { error } = await this._callRefreshToken()
       // Retry in five seconds
-      if (['Failed to fetch', 'Refresh in progress'].includes(error?.message ?? ''))
-        this._startAutoRefreshToken(5000)
+      if (error?.message === 'Failed to fetch') this._startAutoRefreshToken(5000)
     }, value)
     if (typeof this.refreshTokenTimer.unref === 'function') this.refreshTokenTimer.unref()
   }
