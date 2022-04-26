@@ -101,7 +101,6 @@ export default class GoTrueClient {
     this._recoverSession()
     this._recoverAndRefresh()
     this._listenForMultiTabEvents()
-    this._handleVisibilityChange()
 
     if (settings.detectSessionInUrl && isBrowser() && !!getParameterByName('access_token')) {
       // Handle the OAuth redirect
@@ -649,6 +648,10 @@ export default class GoTrueClient {
           const { error } = await this._callRefreshToken(currentSession.refresh_token)
           if (error) {
             console.log(error.message)
+            if (['Failed to fetch', 'Refresh in progress'].includes(error.message ?? '')) {
+              setTimeout(() => this._recoverAndRefresh(), 5000)
+              return
+            }
             await this._removeSession()
           }
         } else {
@@ -683,11 +686,10 @@ export default class GoTrueClient {
           setTimeout(
             () => {
               this.localStorage?.removeItem(`${STORAGE_KEY}-tokenRefreshLock`)
-              this._recoverAndRefresh()
             },
             5 * 1000 // remove lock after 5s
           )
-        return { data: this.currentSession, error: null }
+        return { data: null, error: { message: 'Refresh in progress' } }
       }
       // Set refresh lock
       isBrowser() && this.localStorage?.setItem(`${STORAGE_KEY}-tokenRefreshLock`, 'IN_PROGRESS')
@@ -758,7 +760,12 @@ export default class GoTrueClient {
     if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
     if (value <= 0 || !this.autoRefreshToken) return
 
-    this.refreshTokenTimer = setTimeout(() => this._callRefreshToken(), value)
+    this.refreshTokenTimer = setTimeout(async () => {
+      const { error } = await this._callRefreshToken()
+      // Retry in five seconds
+      if (['Failed to fetch', 'Refresh in progress'].includes(error?.message ?? ''))
+        this._startAutoRefreshToken(5000)
+    }, value)
     if (typeof this.refreshTokenTimer.unref === 'function') this.refreshTokenTimer.unref()
   }
 
@@ -776,7 +783,7 @@ export default class GoTrueClient {
         if (e.key === STORAGE_KEY) {
           const newSession = JSON.parse(String(e.newValue))
           if (newSession?.currentSession?.access_token) {
-            this._recoverAndRefresh()
+            this._saveSession(newSession.currentSession)
             this._notifyAllSubscribers('SIGNED_IN')
           } else {
             this._removeSession()
@@ -786,20 +793,6 @@ export default class GoTrueClient {
       })
     } catch (error) {
       console.error('_listenForMultiTabEvents', error)
-    }
-  }
-
-  private _handleVisibilityChange() {
-    try {
-      window?.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          this._recoverAndRefresh()
-        } else {
-          if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
-        }
-      })
-    } catch (error) {
-      console.error('_handleVisibilityChange', error)
     }
   }
 }
