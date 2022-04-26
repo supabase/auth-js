@@ -631,6 +631,7 @@ export default class GoTrueClient {
   /**
    * Recovers the session from LocalStorage and refreshes
    * Note: this method is async to accommodate for AsyncStorage e.g. in React native.
+   * IMPORTANT: this method must only be called in the constructor, otherwise we run into race conditions!
    */
   private async _recoverAndRefresh() {
     try {
