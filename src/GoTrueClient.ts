@@ -656,7 +656,11 @@ export default class GoTrueClient {
           if (error) {
             console.log(error.message)
             if (error.message === 'Failed to fetch') {
-              setTimeout(() => this._recoverAndRefresh(), OFFLINE_RETRY_INTERVAL * 1000)
+              if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
+              this.refreshTokenTimer = setTimeout(
+                () => this._recoverAndRefresh(),
+                OFFLINE_RETRY_INTERVAL * 1000
+              )
               return
             }
             await this._removeSession()
