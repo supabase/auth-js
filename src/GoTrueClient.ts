@@ -1,6 +1,12 @@
 import GoTrueApi from './GoTrueApi'
 import { isBrowser, getParameterByName, uuid } from './lib/helpers'
-import { GOTRUE_URL, DEFAULT_HEADERS, STORAGE_KEY, EXPIRY_MARGIN } from './lib/constants'
+import {
+  GOTRUE_URL,
+  DEFAULT_HEADERS,
+  STORAGE_KEY,
+  EXPIRY_MARGIN,
+  OFFLINE_RETRY_INTERVAL,
+} from './lib/constants'
 import { polyfillGlobalThis } from './lib/polyfills'
 import { Fetch } from './lib/fetch'
 
@@ -649,6 +655,10 @@ export default class GoTrueClient {
           const { error } = await this._callRefreshToken(currentSession.refresh_token)
           if (error) {
             console.log(error.message)
+            if (error.message === 'Failed to fetch') {
+              setTimeout(() => this._recoverAndRefresh(), OFFLINE_RETRY_INTERVAL * 1000)
+              return
+            }
             await this._removeSession()
           }
         } else {
@@ -735,7 +745,11 @@ export default class GoTrueClient {
     if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
     if (value <= 0 || !this.autoRefreshToken) return
 
-    this.refreshTokenTimer = setTimeout(() => this._callRefreshToken(), value)
+    this.refreshTokenTimer = setTimeout(async () => {
+      const { error } = await this._callRefreshToken()
+      if (error?.message === 'Failed to fetch')
+        this._startAutoRefreshToken(OFFLINE_RETRY_INTERVAL * 1000)
+    }, value)
     if (typeof this.refreshTokenTimer.unref === 'function') this.refreshTokenTimer.unref()
   }
 
