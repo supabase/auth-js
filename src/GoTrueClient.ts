@@ -184,7 +184,7 @@ export default class GoTrueClient {
    * @param password The user's password.
    * @param refreshToken A valid refresh token that was returned on login.
    * @param provider One of the providers supported by GoTrue.
-   * @param redirectTo A URL to send the user to after they are confirmed (OAuth logins only). 
+   * @param redirectTo A URL to send the user to after they are confirmed (OAuth logins only).
    * @param shouldCreateUser A boolean flag to indicate whether to automatically create a user on magiclink / otp sign-ins if the user doesn't exist. Defaults to true.
    * @param scopes A space-separated list of scopes granted to the OAuth application.
    */
@@ -404,7 +404,7 @@ export default class GoTrueClient {
       ...this.currentSession,
       access_token,
       token_type: 'bearer',
-      user: this.user()
+      user: this.user(),
     }
 
     this._notifyAllSubscribers('TOKEN_REFRESHED')
@@ -752,7 +752,7 @@ export default class GoTrueClient {
         if (e.key === STORAGE_KEY) {
           const newSession = JSON.parse(String(e.newValue))
           if (newSession?.currentSession?.access_token) {
-            this._recoverAndRefresh()
+            this._saveSession(newSession.currentSession)
             this._notifyAllSubscribers('SIGNED_IN')
           } else {
             this._removeSession()
