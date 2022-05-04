@@ -1,6 +1,6 @@
 import GoTrueApi from './GoTrueApi'
 import { isBrowser, getParameterByName, uuid } from './lib/helpers'
-import { GOTRUE_URL, DEFAULT_HEADERS, STORAGE_KEY } from './lib/constants'
+import { GOTRUE_URL, DEFAULT_HEADERS, STORAGE_KEY, EXPIRY_MARGIN } from './lib/constants'
 import { polyfillGlobalThis } from './lib/polyfills'
 import { Fetch } from './lib/fetch'
 
@@ -101,6 +101,7 @@ export default class GoTrueClient {
     this._recoverSession()
     this._recoverAndRefresh()
     this._listenForMultiTabEvents()
+    this._handleVisibilityChange()
 
     if (settings.detectSessionInUrl && isBrowser() && !!getParameterByName('access_token')) {
       // Handle the OAuth redirect
@@ -619,7 +620,7 @@ export default class GoTrueClient {
       const { currentSession, expiresAt } = data
       const timeNow = Math.round(Date.now() / 1000)
 
-      if (expiresAt >= timeNow && currentSession?.user) {
+      if (expiresAt >= timeNow + EXPIRY_MARGIN && currentSession?.user) {
         this._saveSession(currentSession)
         this._notifyAllSubscribers('SIGNED_IN')
       }
@@ -643,7 +644,7 @@ export default class GoTrueClient {
       const { currentSession, expiresAt } = data
       const timeNow = Math.round(Date.now() / 1000)
 
-      if (expiresAt < timeNow) {
+      if (expiresAt < timeNow + EXPIRY_MARGIN) {
         if (this.autoRefreshToken && currentSession.refresh_token) {
           const { error } = await this._callRefreshToken(currentSession.refresh_token)
           if (error) {
@@ -703,7 +704,7 @@ export default class GoTrueClient {
     if (expiresAt) {
       const timeNow = Math.round(Date.now() / 1000)
       const expiresIn = expiresAt - timeNow
-      const refreshDurationBeforeExpires = expiresIn > 60 ? 60 : 0.5
+      const refreshDurationBeforeExpires = expiresIn > EXPIRY_MARGIN ? EXPIRY_MARGIN : 0.5
       this._startAutoRefreshToken((expiresIn - refreshDurationBeforeExpires) * 1000)
     }
 
@@ -762,6 +763,18 @@ export default class GoTrueClient {
       })
     } catch (error) {
       console.error('_listenForMultiTabEvents', error)
+    }
+  }
+
+  private _handleVisibilityChange() {
+    try {
+      window?.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this._recoverAndRefresh()
+        }
+      })
+    } catch (error) {
+      console.error('_handleVisibilityChange', error)
     }
   }
 }
