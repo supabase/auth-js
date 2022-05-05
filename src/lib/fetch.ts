@@ -11,6 +11,24 @@ export interface FetchOptions {
 
 export type RequestMethodType = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
+const _getErrorMessage = (err: any): string =>
+  err.msg || err.message || err.error_description || err.error || JSON.stringify(err)
+
+const handleError = (error: any, reject: any) => {
+  if (!error?.status) {
+    return reject({ message: NETWORK_FAILURE })
+  }
+  if (typeof error.json !== 'function') {
+    return reject(error)
+  }
+  error.json().then((err: any) => {
+    return reject({
+      message: _getErrorMessage(err),
+      status: error?.status || 500,
+    })
+  })
+}
+
 const _getRequestParams = (method: RequestMethodType, options?: FetchOptions, body?: object) => {
   const params: { [k: string]: any } = { method, headers: options?.headers || {} }
 
@@ -39,12 +57,7 @@ async function _handleRequest(
         return result.json()
       })
       .then((data) => resolve(data))
-      .catch(() =>
-        reject({
-          message: NETWORK_FAILURE,
-          status: null,
-        })
-      )
+      .catch((error) => handleError(error, reject))
   })
 }
 

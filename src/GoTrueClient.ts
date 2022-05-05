@@ -753,7 +753,6 @@ export default class GoTrueClient {
    */
   private _listenForMultiTabEvents() {
     if (!this.multiTab || !isBrowser() || !window?.addEventListener) {
-      // console.debug('Auth multi-tab support is disabled.')
       return false
     }
 
@@ -776,6 +775,10 @@ export default class GoTrueClient {
   }
 
   private _handleVisibilityChange() {
+    if (!this.multiTab || !isBrowser() || !window?.addEventListener) {
+      return false
+    }
+
     try {
       window?.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
