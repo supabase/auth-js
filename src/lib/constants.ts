@@ -3,7 +3,8 @@ export const GOTRUE_URL = 'http://localhost:9999'
 export const AUDIENCE = ''
 export const DEFAULT_HEADERS = { 'X-Client-Info': `gotrue-js/${version}` }
 export const EXPIRY_MARGIN = 60 // in seconds
-export const OFFLINE_RETRY_INTERVAL = 5 // in seconds
+export const NETWORK_FAILURE = 'NETWORK_FAILURE'
+export const NETWORK_FAILURE_RETRY_INTERVAL = 1 // in seconds
 export const STORAGE_KEY = 'supabase.auth.token'
 export const COOKIE_OPTIONS = {
   name: 'sb',

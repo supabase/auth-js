@@ -5,7 +5,8 @@ import {
   DEFAULT_HEADERS,
   STORAGE_KEY,
   EXPIRY_MARGIN,
-  OFFLINE_RETRY_INTERVAL,
+  NETWORK_FAILURE,
+  NETWORK_FAILURE_RETRY_INTERVAL,
 } from './lib/constants'
 import { polyfillGlobalThis } from './lib/polyfills'
 import { Fetch } from './lib/fetch'
@@ -655,11 +656,11 @@ export default class GoTrueClient {
           const { error } = await this._callRefreshToken(currentSession.refresh_token)
           if (error) {
             console.log(error.message)
-            if (error.message === 'Failed to fetch') {
+            if (error.message === NETWORK_FAILURE) {
               if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
               this.refreshTokenTimer = setTimeout(
                 () => this._recoverAndRefresh(),
-                OFFLINE_RETRY_INTERVAL * 1000
+                NETWORK_FAILURE_RETRY_INTERVAL * 1000
               )
               return
             }
@@ -751,8 +752,8 @@ export default class GoTrueClient {
 
     this.refreshTokenTimer = setTimeout(async () => {
       const { error } = await this._callRefreshToken()
-      if (error?.message === 'Failed to fetch')
-        this._startAutoRefreshToken(OFFLINE_RETRY_INTERVAL * 1000)
+      if (error?.message === NETWORK_FAILURE)
+        this._startAutoRefreshToken(NETWORK_FAILURE_RETRY_INTERVAL * 1000)
     }, value)
     if (typeof this.refreshTokenTimer.unref === 'function') this.refreshTokenTimer.unref()
   }
