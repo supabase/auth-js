@@ -617,6 +617,7 @@ export default class GoTrueClient {
   private _recoverSession() {
     try {
       const data = getItemSynchronously(this.localStorage, STORAGE_KEY)
+      if (!data) return null
       const { currentSession, expiresAt } = data
       const timeNow = Math.round(Date.now() / 1000)
 
@@ -636,6 +637,7 @@ export default class GoTrueClient {
   private async _recoverAndRefresh() {
     try {
       const data = await getItemAsync(this.localStorage, STORAGE_KEY)
+      if (!data) return null
       const { currentSession, expiresAt } = data
       const timeNow = Math.round(Date.now() / 1000)
 
