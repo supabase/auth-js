@@ -1,5 +1,13 @@
 import GoTrueApi from './GoTrueApi'
-import { isBrowser, getParameterByName, uuid } from './lib/helpers'
+import {
+  isBrowser,
+  getParameterByName,
+  uuid,
+  setItemAsync,
+  removeItemAsync,
+  getItemSynchronously,
+  getItemAsync,
+} from './lib/helpers'
 import {
   GOTRUE_URL,
   DEFAULT_HEADERS,
@@ -23,6 +31,7 @@ import type {
   UserCredentials,
   VerifyOTPParams,
   OpenIDConnectCredentials,
+  SupportedStorage,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -35,17 +44,6 @@ const DEFAULT_OPTIONS = {
   multiTab: true,
   headers: DEFAULT_HEADERS,
 }
-
-type AnyFunction = (...args: any[]) => any
-type MaybePromisify<T> = T | Promise<T>
-
-type PromisifyMethods<T> = {
-  [K in keyof T]: T[K] extends AnyFunction
-    ? (...args: Parameters<T[K]>) => MaybePromisify<ReturnType<T[K]>>
-    : T[K]
-}
-
-type SupportedStorage = PromisifyMethods<Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>>
 
 export default class GoTrueClient {
   /**
@@ -618,12 +616,7 @@ export default class GoTrueClient {
    */
   private _recoverSession() {
     try {
-      const json = isBrowser() && this.localStorage?.getItem(STORAGE_KEY)
-      if (!json || typeof json !== 'string') {
-        return null
-      }
-
-      const data = JSON.parse(json)
+      const data = getItemSynchronously(this.localStorage, STORAGE_KEY)
       const { currentSession, expiresAt } = data
       const timeNow = Math.round(Date.now() / 1000)
 
@@ -642,12 +635,7 @@ export default class GoTrueClient {
    */
   private async _recoverAndRefresh() {
     try {
-      const json = isBrowser() && (await this.localStorage.getItem(STORAGE_KEY))
-      if (!json) {
-        return null
-      }
-
-      const data = JSON.parse(json)
+      const data = await getItemAsync(this.localStorage, STORAGE_KEY)
       const { currentSession, expiresAt } = data
       const timeNow = Math.round(Date.now() / 1000)
 
@@ -732,14 +720,14 @@ export default class GoTrueClient {
 
   private _persistSession(currentSession: Session) {
     const data = { currentSession, expiresAt: currentSession.expires_at }
-    isBrowser() && this.localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    setItemAsync(this.localStorage, STORAGE_KEY, data)
   }
 
   private async _removeSession() {
     this.currentSession = null
     this.currentUser = null
     if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
-    isBrowser() && (await this.localStorage.removeItem(STORAGE_KEY))
+    removeItemAsync(this.localStorage, STORAGE_KEY)
   }
 
   /**
