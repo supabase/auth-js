@@ -14,7 +14,6 @@ import {
   STORAGE_KEY,
   EXPIRY_MARGIN,
   NETWORK_FAILURE,
-  NETWORK_FAILURE_RETRY_INTERVAL,
 } from './lib/constants'
 import { polyfillGlobalThis } from './lib/polyfills'
 import { Fetch } from './lib/fetch'
@@ -66,6 +65,7 @@ export default class GoTrueClient {
   protected multiTab: boolean
   protected stateChangeEmitters: Map<string, Subscription> = new Map()
   protected refreshTokenTimer?: ReturnType<typeof setTimeout>
+  protected networkRetries: number = 0
 
   /**
    * Create a new client for use in the browser.
@@ -643,19 +643,24 @@ export default class GoTrueClient {
 
       if (expiresAt < timeNow + EXPIRY_MARGIN) {
         if (this.autoRefreshToken && currentSession.refresh_token) {
+          this.networkRetries++
           const { error } = await this._callRefreshToken(currentSession.refresh_token)
           if (error) {
             console.log(error.message)
-            if (error.message === NETWORK_FAILURE) {
+            if (
+              error.message === NETWORK_FAILURE.ERROR_MESSAGE &&
+              this.networkRetries < NETWORK_FAILURE.MAX_RETRIES
+            ) {
               if (this.refreshTokenTimer) clearTimeout(this.refreshTokenTimer)
               this.refreshTokenTimer = setTimeout(
                 () => this._recoverAndRefresh(),
-                NETWORK_FAILURE_RETRY_INTERVAL * 1000
+                NETWORK_FAILURE.RETRY_INTERVAL ** this.networkRetries * 100 // exponential backoff
               )
               return
             }
             await this._removeSession()
           }
+          this.networkRetries = 0
         } else {
           this._removeSession()
         }
@@ -741,9 +746,14 @@ export default class GoTrueClient {
     if (value <= 0 || !this.autoRefreshToken) return
 
     this.refreshTokenTimer = setTimeout(async () => {
+      this.networkRetries++
       const { error } = await this._callRefreshToken()
-      if (error?.message === NETWORK_FAILURE)
-        this._startAutoRefreshToken(NETWORK_FAILURE_RETRY_INTERVAL * 1000)
+      if (!error) this.networkRetries = 0
+      if (
+        error?.message === NETWORK_FAILURE.ERROR_MESSAGE &&
+        this.networkRetries < NETWORK_FAILURE.MAX_RETRIES
+      )
+        this._startAutoRefreshToken(NETWORK_FAILURE.RETRY_INTERVAL ** this.networkRetries * 100) // exponential backoff
     }, value)
     if (typeof this.refreshTokenTimer.unref === 'function') this.refreshTokenTimer.unref()
   }

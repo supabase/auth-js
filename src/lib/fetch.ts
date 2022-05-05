@@ -16,7 +16,7 @@ const _getErrorMessage = (err: any): string =>
 
 const handleError = (error: any, reject: any) => {
   if (!error?.status) {
-    return reject({ message: NETWORK_FAILURE })
+    return reject({ message: NETWORK_FAILURE.ERROR_MESSAGE })
   }
   if (typeof error.json !== 'function') {
     return reject(error)
