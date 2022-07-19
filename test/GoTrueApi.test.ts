@@ -362,8 +362,8 @@ describe('GoTrueApi', () => {
         }
       )
 
-      expect(user).toBeNull()
-      expect(error?.message).toEqual('User not found')
+      expect(user).toEqual({})
+      expect(error).toBeNull()
     })
 
     test('refreshAccessToken()', async () => {
