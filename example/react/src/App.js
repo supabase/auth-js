@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
 import { GoTrueClient } from '@supabase/gotrue-js'
 import './tailwind.output.css'
+import HCaptcha from '@hcaptcha/react-hcaptcha';
 
-const GOTRUE_URL_AUTOCONFIRM = 'http://localhost:9998'
+const GOTRUE_URL_AUTOCONFIRM = 'http://localhost:9999'
 
 const auth = new GoTrueClient({
   url: GOTRUE_URL_AUTOCONFIRM,
@@ -12,6 +13,7 @@ function App() {
   let [session, setSession] = useState(auth.session())
   let [email, setEmail] = useState(localStorage.getItem('email') ?? '')
   let [phone, setPhone] = useState(localStorage.getItem('phone') ?? '')
+  let [captchaToken, setCaptchaToken] = useState('')
   let [password, setPassword] = useState('')
   let [otp, setOtp] = useState('')
   let [rememberMe, setRememberMe] = useState(false)
@@ -43,7 +45,7 @@ function App() {
     if (error) console.log('Error: ', error.message)
   }
   async function handleEmailSignUp() {
-    let { error } = await auth.signUp({ email, password })
+    let { error } = await auth.signUp({ email, password }, { captchaToken: captchaToken})
     if (error) console.log('Error: ', error.message)
   }
   async function handleSignOut() {
@@ -62,6 +64,9 @@ function App() {
         alert('Password recovery email has been sent.')
       }
     }
+  }
+  async function handleVerificationSuccess(token, ekey) {
+    setCaptchaToken(token)
   }
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -121,6 +126,10 @@ function App() {
               />
             </div>
           </div>
+          <HCaptcha
+            sitekey={process.env.REACT_APP_HCAPTCHA_SITE_KEY}
+            onVerify={(token,ekey) => handleVerificationSuccess(token, ekey)}
+          />
 
           <div className="mt-6">
             <label htmlFor="password" className="block text-sm font-medium leading-5 text-gray-700">
