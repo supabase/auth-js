@@ -40,12 +40,12 @@ function App() {
     } else {
       localStorage.removeItem('email')
     }
-    let { error, user } = await auth.signIn({ email, password })
+    let { error, user } = await auth.signIn({ email, password }, { captchaToken: captchaToken })
     if (!error && !user) alert('Check your email for the login link!')
     if (error) console.log('Error: ', error.message)
   }
   async function handleEmailSignUp() {
-    let { error } = await auth.signUp({ email, password }, { captchaToken: captchaToken})
+    let { error } = await auth.signUp({ email, password }, { captchaToken: captchaToken })
     if (error) console.log('Error: ', error.message)
   }
   async function handleSignOut() {
