@@ -42,7 +42,7 @@ const _getRequestParams = (method: RequestMethodType, options?: FetchOptions, bo
   return params
 }
 
-async function _handleRequest(
+export async function request(
   fetcher: Fetch,
   method: RequestMethodType,
   url: string,
@@ -59,35 +59,4 @@ async function _handleRequest(
       .then((data) => resolve(data))
       .catch((error) => handleError(error, reject))
   })
-}
-
-export async function get(fetcher: Fetch, url: string, options?: FetchOptions): Promise<any> {
-  return _handleRequest(fetcher, 'GET', url, options)
-}
-
-export async function post(
-  fetcher: Fetch,
-  url: string,
-  body: object,
-  options?: FetchOptions
-): Promise<any> {
-  return _handleRequest(fetcher, 'POST', url, options, body)
-}
-
-export async function put(
-  fetcher: Fetch,
-  url: string,
-  body: object,
-  options?: FetchOptions
-): Promise<any> {
-  return _handleRequest(fetcher, 'PUT', url, options, body)
-}
-
-export async function remove(
-  fetcher: Fetch,
-  url: string,
-  body: object,
-  options?: FetchOptions
-): Promise<any> {
-  return _handleRequest(fetcher, 'DELETE', url, options, body)
 }

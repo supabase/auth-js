@@ -1,4 +1,4 @@
-import { Fetch, get, post, put, remove } from './lib/fetch'
+import { Fetch, FetchOptions, RequestMethodType, request } from './lib/fetch'
 import {
   Session,
   Provider,
@@ -12,6 +12,15 @@ import {
 import { COOKIE_OPTIONS } from './lib/constants'
 import { setCookies, getCookieString } from './lib/cookies'
 import { expiresAt, resolveFetch } from './lib/helpers'
+
+interface ClientFetchOptions extends FetchOptions {
+  jwt?: string
+  body?: object
+  redirectTo?: string
+  xerr?: (err: ApiError) => any
+  xform?: (data: any) => any
+  query?: { [key: string]: string }
+}
 
 import type { ApiError } from './lib/types'
 export default class GoTrueApi {
@@ -41,17 +50,6 @@ export default class GoTrueApi {
     this.fetch = resolveFetch(fetch)
   }
 
-  /**
-   * Create a temporary object with all configured headers and
-   * adds the Authorization token to be used on request methods
-   * @param jwt A valid, logged-in JWT.
-   */
-  private _createRequestHeaders(jwt: string) {
-    const headers = { ...this.headers }
-    headers['Authorization'] = `Bearer ${jwt}`
-    return headers
-  }
-
   private cookieName() {
     return this.cookieOptions.name ?? ''
   }
@@ -70,18 +68,17 @@ export default class GoTrueApi {
       queryParams?: { [key: string]: string }
     }
   ) {
-    const urlParams: string[] = [`provider=${encodeURIComponent(provider)}`]
+    const query = options?.queryParams ? options.queryParams : {}
+    query['provider'] = provider
+
     if (options?.redirectTo) {
-      urlParams.push(`redirect_to=${encodeURIComponent(options.redirectTo)}`)
+      query['redirect_to'] = options.redirectTo
     }
     if (options?.scopes) {
-      urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
+      query['scopes'] = options.scopes
     }
-    if (options?.queryParams) {
-      const query = new URLSearchParams(options.queryParams)
-      urlParams.push(`${query}`)
-    }
-    return `${this.url}/authorize?${urlParams.join('&')}`
+    const qs = new URLSearchParams(query).toString()
+    return `${this.url}/authorize?${qs}`
   }
 
   /**
@@ -104,29 +101,16 @@ export default class GoTrueApi {
       captchaToken?: string
     } = {}
   ): Promise<{ data: Session | User | null; error: ApiError | null }> {
-    try {
-      const headers = { ...this.headers }
-      let queryString = ''
-      if (options.redirectTo) {
-        queryString = '?redirect_to=' + encodeURIComponent(options.redirectTo)
-      }
-      const data = await post(
-        this.fetch,
-        `${this.url}/signup${queryString}`,
-        {
-          email,
-          password,
-          data: options.data,
-          gotrue_meta_security: { captcha_token: options.captchaToken },
-        },
-        { headers }
-      )
-      const session = { ...data }
-      if (session.expires_in) session.expires_at = expiresAt(data.expires_in)
-      return { data: session, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    return this._request('POST', `/signup`, {
+      body: {
+        email,
+        password,
+        data: options.data,
+        gotrue_meta_security: { captcha_token: options.captchaToken },
+      },
+      xform: this._sessionResponse,
+      redirectTo: options.redirectTo,
+    })
   }
 
   /**
@@ -136,7 +120,7 @@ export default class GoTrueApi {
    * @param redirectTo A URL or mobile address to send the user to after they are confirmed.
    * @param captchaToken Verification token received when the user completes the captcha on your site.
    */
-  async signInWithEmail(
+  signInWithEmail(
     email: string,
     password: string,
     options: {
@@ -144,24 +128,12 @@ export default class GoTrueApi {
       captchaToken?: string
     } = {}
   ): Promise<{ data: Session | null; error: ApiError | null }> {
-    try {
-      const headers = { ...this.headers }
-      let queryString = '?grant_type=password'
-      if (options.redirectTo) {
-        queryString += '&redirect_to=' + encodeURIComponent(options.redirectTo)
-      }
-      const data = await post(
-        this.fetch,
-        `${this.url}/token${queryString}`,
-        { email, password, gotrue_meta_security: { captcha_token: options.captchaToken } },
-        { headers }
-      )
-      const session = { ...data }
-      if (session.expires_in) session.expires_at = expiresAt(data.expires_in)
-      return { data: session, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    return this._request('POST', '/token', {
+      body: { email, password, gotrue_meta_security: { captcha_token: options.captchaToken } },
+      xform: this._sessionResponse,
+      redirectTo: options.redirectTo,
+      query: { grant_type: 'password' },
+    })
   }
 
   /**
@@ -171,7 +143,7 @@ export default class GoTrueApi {
    * @param data Optional user metadata.
    * @param captchaToken Verification token received when the user completes the captcha on your site.
    */
-  async signUpWithPhone(
+  signUpWithPhone(
     phone: string,
     password: string,
     options: {
@@ -179,25 +151,15 @@ export default class GoTrueApi {
       captchaToken?: string
     } = {}
   ): Promise<{ data: Session | User | null; error: ApiError | null }> {
-    try {
-      const headers = { ...this.headers }
-      const data = await post(
-        this.fetch,
-        `${this.url}/signup`,
-        {
-          phone,
-          password,
-          data: options.data,
-          gotrue_meta_security: { captcha_token: options.captchaToken },
-        },
-        { headers }
-      )
-      const session = { ...data }
-      if (session.expires_in) session.expires_at = expiresAt(data.expires_in)
-      return { data: session, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    return this._request('POST', '/signup', {
+      body: {
+        phone,
+        password,
+        data: options.data,
+        gotrue_meta_security: { captcha_token: options.captchaToken },
+      },
+      xform: this._sessionResponse,
+    })
   }
 
   /**
@@ -206,28 +168,17 @@ export default class GoTrueApi {
    * @param password The password of the user.
    * @param captchaToken Verification token received when the user completes the captcha on your site.
    */
-  async signInWithPhone(
+  signInWithPhone(
     phone: string,
     password: string,
     options: {
       captchaToken?: string
     } = {}
   ): Promise<{ data: Session | null; error: ApiError | null }> {
-    try {
-      const headers = { ...this.headers }
-      const queryString = '?grant_type=password'
-      const data = await post(
-        this.fetch,
-        `${this.url}/token${queryString}`,
-        { phone, password, gotrue_meta_security: { captcha_token: options.captchaToken } },
-        { headers }
-      )
-      const session = { ...data }
-      if (session.expires_in) session.expires_at = expiresAt(data.expires_in)
-      return { data: session, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    return this._request('POST', '/token?grant_type=password', {
+      body: { phone, password, gotrue_meta_security: { captcha_token: options.captchaToken } },
+      xform: this._sessionResponse,
+    })
   }
 
   /**
@@ -238,28 +189,17 @@ export default class GoTrueApi {
    * @param client_id The clientID of the user.
    * @param issuer The issuer of the user.
    */
-  async signInWithOpenIDConnect({
+  signInWithOpenIDConnect({
     id_token,
     nonce,
     client_id,
     issuer,
     provider,
   }: OpenIDConnectCredentials): Promise<{ data: Session | null; error: ApiError | null }> {
-    try {
-      const headers = { ...this.headers }
-      const queryString = '?grant_type=id_token'
-      const data = await post(
-        this.fetch,
-        `${this.url}/token${queryString}`,
-        { id_token, nonce, client_id, issuer, provider },
-        { headers }
-      )
-      const session = { ...data }
-      if (session.expires_in) session.expires_at = expiresAt(data.expires_in)
-      return { data: session, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    return this._request('POST', '/token?grant_type=id_token', {
+      body: { id_token, nonce, client_id, issuer, provider },
+      xform: this._sessionResponse,
+    })
   }
 
   /**
@@ -269,7 +209,7 @@ export default class GoTrueApi {
    * @param redirectTo A URL or mobile address to send the user to after they are confirmed.
    * @param captchaToken Verification token received when the user completes the captcha on your site.
    */
-  async sendMagicLinkEmail(
+  sendMagicLinkEmail(
     email: string,
     options: {
       shouldCreateUser?: boolean
@@ -277,28 +217,15 @@ export default class GoTrueApi {
       captchaToken?: string
     } = {}
   ): Promise<{ data: {} | null; error: ApiError | null }> {
-    try {
-      const headers = { ...this.headers }
-      let queryString = ''
-      if (options.redirectTo) {
-        queryString += '?redirect_to=' + encodeURIComponent(options.redirectTo)
-      }
-
-      const shouldCreateUser = options.shouldCreateUser ?? true
-      const data = await post(
-        this.fetch,
-        `${this.url}/otp${queryString}`,
-        {
-          email,
-          create_user: shouldCreateUser,
-          gotrue_meta_security: { captcha_token: options.captchaToken },
-        },
-        { headers }
-      )
-      return { data, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    const shouldCreateUser = options.shouldCreateUser ?? true
+    return this._request('POST', '/otp', {
+      body: {
+        email,
+        create_user: shouldCreateUser,
+        gotrue_meta_security: { captcha_token: options.captchaToken },
+      },
+      redirectTo: options.redirectTo,
+    })
   }
 
   /**
@@ -307,48 +234,36 @@ export default class GoTrueApi {
    * @param shouldCreateUser A boolean flag to indicate whether to automatically create a user on magiclink / otp sign-ins if the user doesn't exist. Defaults to true.
    * @param captchaToken Verification token received when the user completes the captcha on your site.
    */
-  async sendMobileOTP(
+  sendMobileOTP(
     phone: string,
     options: {
       shouldCreateUser?: boolean
       captchaToken?: string
     } = {}
   ): Promise<{ data: {} | null; error: ApiError | null }> {
-    try {
-      const shouldCreateUser = options.shouldCreateUser ?? true
-      const headers = { ...this.headers }
-      const data = await post(
-        this.fetch,
-        `${this.url}/otp`,
-        {
-          phone,
-          create_user: shouldCreateUser,
-          gotrue_meta_security: { captcha_token: options.captchaToken },
-        },
-        { headers }
-      )
-      return { data, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    const shouldCreateUser = options.shouldCreateUser ?? true
+    return this._request('POST', '/otp', {
+      body: {
+        phone,
+        create_user: shouldCreateUser,
+        gotrue_meta_security: { captcha_token: options.captchaToken },
+      },
+    })
   }
 
   /**
    * Removes a logged-in session.
    * @param jwt A valid, logged-in JWT.
    */
-  async signOut(jwt: string): Promise<{ error: ApiError | null }> {
-    try {
-      await post(
-        this.fetch,
-        `${this.url}/logout`,
-        {},
-        { headers: this._createRequestHeaders(jwt), noResolveJson: true }
-      )
-      return { error: null }
-    } catch (e) {
-      return { error: e as ApiError }
-    }
+  signOut(jwt: string): Promise<{ error: ApiError | null }> {
+    return this._request('POST', '/logout', {
+      jwt: jwt,
+      body: {},
+      xform: (_: any) => {
+        return { error: null }
+      },
+      noResolveJson: true,
+    })
   }
 
   /**
@@ -357,27 +272,17 @@ export default class GoTrueApi {
    * @param token token that user was sent to their mobile phone
    * @param redirectTo A URL or mobile address to send the user to after they are confirmed.
    */
-  async verifyMobileOTP(
+  verifyMobileOTP(
     phone: string,
     token: string,
     options: {
       redirectTo?: string
     } = {}
   ): Promise<{ data: Session | User | null; error: ApiError | null }> {
-    try {
-      const headers = { ...this.headers }
-      const data = await post(
-        this.fetch,
-        `${this.url}/verify`,
-        { phone, token, type: 'sms', redirect_to: options.redirectTo },
-        { headers }
-      )
-      const session = { ...data }
-      if (session.expires_in) session.expires_at = expiresAt(data.expires_in)
-      return { data: session, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    return this._request('POST', '/verify', {
+      body: { phone, token, type: 'sms', redirect_to: options.redirectTo },
+      xform: this._sessionResponse,
+    })
   }
 
   /**
@@ -388,26 +293,16 @@ export default class GoTrueApi {
    * @param type verification type that the otp is generated for
    * @param redirectTo A URL or mobile address to send the user to after they are confirmed.
    */
-  async verifyOTP(
+  verifyOTP(
     { email, phone, token, type = 'sms' }: VerifyOTPParams,
     options: {
       redirectTo?: string
     } = {}
   ): Promise<{ data: Session | User | null; error: ApiError | null }> {
-    try {
-      const headers = { ...this.headers }
-      const data = await post(
-        this.fetch,
-        `${this.url}/verify`,
-        { email, phone, token, type, redirect_to: options.redirectTo },
-        { headers }
-      )
-      const session = { ...data }
-      if (session.expires_in) session.expires_at = expiresAt(data.expires_in)
-      return { data: session, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    return this._request('POST', '/verify', {
+      body: { email, phone, token, type, redirect_to: options.redirectTo },
+      xform: this._sessionResponse,
+    })
   }
 
   /**
@@ -416,29 +311,17 @@ export default class GoTrueApi {
    * @param redirectTo A URL or mobile address to send the user to after they are confirmed.
    * @param data Optional user metadata
    */
-  async inviteUserByEmail(
+  inviteUserByEmail(
     email: string,
     options: {
       redirectTo?: string
       data?: object
     } = {}
   ): Promise<{ data: User | null; error: ApiError | null }> {
-    try {
-      const headers = { ...this.headers }
-      let queryString = ''
-      if (options.redirectTo) {
-        queryString += '?redirect_to=' + encodeURIComponent(options.redirectTo)
-      }
-      const data = await post(
-        this.fetch,
-        `${this.url}/invite${queryString}`,
-        { email, data: options.data },
-        { headers }
-      )
-      return { data, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    return this._request('POST', '/invite', {
+      body: { email, data: options.data },
+      redirectTo: options.redirectTo,
+    })
   }
 
   /**
@@ -447,51 +330,30 @@ export default class GoTrueApi {
    * @param redirectTo A URL or mobile address to send the user to after they are confirmed.
    * @param captchaToken Verification token received when the user completes the captcha on your site.
    */
-  async resetPasswordForEmail(
+  resetPasswordForEmail(
     email: string,
     options: {
       redirectTo?: string
       captchaToken?: string
     } = {}
   ): Promise<{ data: {} | null; error: ApiError | null }> {
-    try {
-      const headers = { ...this.headers }
-      let queryString = ''
-      if (options.redirectTo) {
-        queryString += '?redirect_to=' + encodeURIComponent(options.redirectTo)
-      }
-      const data = await post(
-        this.fetch,
-        `${this.url}/recover${queryString}`,
-        { email, gotrue_meta_security: { captcha_token: options.captchaToken } },
-        { headers }
-      )
-      return { data, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    return this._request('POST', '/recover', {
+      body: { email, gotrue_meta_security: { captcha_token: options.captchaToken } },
+      redirectTo: options.redirectTo,
+    })
   }
 
   /**
    * Generates a new JWT.
    * @param refreshToken A valid refresh token that was returned on login.
    */
-  async refreshAccessToken(
+  refreshAccessToken(
     refreshToken: string
   ): Promise<{ data: Session | null; error: ApiError | null }> {
-    try {
-      const data: any = await post(
-        this.fetch,
-        `${this.url}/token?grant_type=refresh_token`,
-        { refresh_token: refreshToken },
-        { headers: this.headers }
-      )
-      const session = { ...data }
-      if (session.expires_in) session.expires_at = expiresAt(data.expires_in)
-      return { data: session, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    return this._request('POST', '/token?grant_type=refresh_token', {
+      body: { refresh_token: refreshToken },
+      xform: this._sessionResponse,
+    })
   }
 
   /**
@@ -510,32 +372,10 @@ export default class GoTrueApi {
     if (!event) throw new Error('Auth event missing!')
     if (event === 'SIGNED_IN') {
       if (!session) throw new Error('Auth session missing!')
-      setCookies(
-        req,
-        res,
-        [
-          { key: 'access-token', value: session.access_token },
-          { key: 'refresh-token', value: session.refresh_token },
-        ].map((token) => ({
-          name: `${this.cookieName()}-${token.key}`,
-          value: token.value,
-          domain: this.cookieOptions.domain,
-          maxAge: this.cookieOptions.lifetime ?? 0,
-          path: this.cookieOptions.path,
-          sameSite: this.cookieOptions.sameSite,
-        }))
-      )
+      setCookies(req, res, this._createSetAuthCookies(session.access_token, session.refresh_token))
     }
     if (event === 'SIGNED_OUT') {
-      setCookies(
-        req,
-        res,
-        ['access-token', 'refresh-token'].map((key) => ({
-          name: `${this.cookieName()}-${key}`,
-          value: '',
-          maxAge: -1,
-        }))
-      )
+      setCookies(req, res, this._createDeleteAuthCookies())
     }
     res.status(200).json({})
   }
@@ -547,15 +387,7 @@ export default class GoTrueApi {
    * @param options Optionally specify a `redirectTo` URL in the options.
    */
   deleteAuthCookie(req: any, res: any, { redirectTo = '/' }: { redirectTo?: string }) {
-    setCookies(
-      req,
-      res,
-      ['access-token', 'refresh-token'].map((key) => ({
-        name: `${this.cookieName()}-${key}`,
-        value: '',
-        maxAge: -1,
-      }))
-    )
+    setCookies(req, res, this._createDeleteAuthCookies())
     return res.redirect(307, redirectTo)
   }
 
@@ -578,29 +410,11 @@ export default class GoTrueApi {
       return getCookieString(
         req,
         res,
-        [
-          { key: 'access-token', value: session.access_token },
-          { key: 'refresh-token', value: session.refresh_token },
-        ].map((token) => ({
-          name: `${this.cookieName()}-${token.key}`,
-          value: token.value,
-          domain: this.cookieOptions.domain,
-          maxAge: this.cookieOptions.lifetime ?? 0,
-          path: this.cookieOptions.path,
-          sameSite: this.cookieOptions.sameSite,
-        }))
+        this._createSetAuthCookies(session.access_token, session.refresh_token)
       )
     }
     if (event === 'SIGNED_OUT') {
-      return getCookieString(
-        req,
-        res,
-        ['access-token', 'refresh-token'].map((key) => ({
-          name: `${this.cookieName()}-${key}`,
-          value: '',
-          maxAge: -1,
-        }))
-      )
+      return getCookieString(req, res, this._createDeleteAuthCookies())
     }
     return res.getHeader('Set-Cookie')
   }
@@ -613,7 +427,7 @@ export default class GoTrueApi {
    * @param data Optional user metadata. For signup only.
    * @param redirectTo The link type ("signup" or "magiclink" or "recovery" or "invite").
    */
-  async generateLink(
+  generateLink(
     type: 'signup' | 'magiclink' | 'recovery' | 'invite',
     email: string,
     options: {
@@ -622,23 +436,15 @@ export default class GoTrueApi {
       redirectTo?: string
     } = {}
   ): Promise<{ data: Session | User | null; error: ApiError | null }> {
-    try {
-      const data: any = await post(
-        this.fetch,
-        `${this.url}/admin/generate_link`,
-        {
-          type,
-          email,
-          password: options.password,
-          data: options.data,
-          redirect_to: options.redirectTo,
-        },
-        { headers: this.headers }
-      )
-      return { data, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+    return this._request('POST', '/admin/generate_link', {
+      body: {
+        type,
+        email,
+        password: options.password,
+        data: options.data,
+        redirect_to: options.redirectTo,
+      },
+    })
   }
 
   // User Admin API
@@ -650,19 +456,16 @@ export default class GoTrueApi {
    *
    * @param attributes The data you want to create the user with.
    */
-  async createUser(
+  createUser(
     attributes: AdminUserAttributes
   ): Promise<
     { user: null; data: null; error: ApiError } | { user: User; data: User; error: null }
   > {
-    try {
-      const data: any = await post(this.fetch, `${this.url}/admin/users`, attributes, {
-        headers: this.headers,
-      })
-      return { user: data, data, error: null }
-    } catch (e) {
-      return { user: null, data: null, error: e as ApiError }
-    }
+    return this._request('POST', '/admin/users', {
+      body: attributes,
+      xform: this._userResponse,
+      xerr: this._userResponseErr,
+    })
   }
 
   /**
@@ -670,15 +473,12 @@ export default class GoTrueApi {
    *
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
    */
-  async listUsers(): Promise<{ data: null; error: ApiError } | { data: User[]; error: null }> {
-    try {
-      const data: any = await get(this.fetch, `${this.url}/admin/users`, {
-        headers: this.headers,
-      })
-      return { data: data.users, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+  listUsers(): Promise<{ data: null; error: ApiError } | { data: User[]; error: null }> {
+    return this._request('GET', '/admin/users', {
+      xform: (data: any) => {
+        return { data: data.users, error: null }
+      },
+    })
   }
 
   /**
@@ -688,17 +488,8 @@ export default class GoTrueApi {
    *
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
    */
-  async getUserById(
-    uid: string
-  ): Promise<{ data: null; error: ApiError } | { data: User; error: null }> {
-    try {
-      const data: any = await get(this.fetch, `${this.url}/admin/users/${uid}`, {
-        headers: this.headers,
-      })
-      return { data, error: null }
-    } catch (e) {
-      return { data: null, error: e as ApiError }
-    }
+  getUserById(uid: string): Promise<{ data: null; error: ApiError } | { data: User; error: null }> {
+    return this._request('GET', `/admin/users/${uid}`)
   }
 
   /**
@@ -737,21 +528,7 @@ export default class GoTrueApi {
         if (error) {
           throw error
         } else if (data) {
-          setCookies(
-            req,
-            res,
-            [
-              { key: 'access-token', value: data.access_token },
-              { key: 'refresh-token', value: data.refresh_token! },
-            ].map((token) => ({
-              name: `${this.cookieName()}-${token.key}`,
-              value: token.value,
-              domain: this.cookieOptions.domain,
-              maxAge: this.cookieOptions.lifetime ?? 0,
-              path: this.cookieOptions.path,
-              sameSite: this.cookieOptions.sameSite,
-            }))
-          )
+          setCookies(req, res, this._createSetAuthCookies(data.access_token, data.refresh_token!))
           return { token: data.access_token, user: data.user, data: data.user, error: null }
         }
       }
@@ -768,19 +545,15 @@ export default class GoTrueApi {
    *
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
    */
-  async updateUserById(
+  updateUserById(
     uid: string,
     attributes: AdminUserAttributes
   ): Promise<{ user: User | null; data: User | null; error: ApiError | null }> {
-    try {
-      this //
-      const data: any = await put(this.fetch, `${this.url}/admin/users/${uid}`, attributes, {
-        headers: this.headers,
-      })
-      return { user: data, data, error: null }
-    } catch (e) {
-      return { user: null, data: null, error: e as ApiError }
-    }
+    return this._request('PUT', `/admin/users/${uid}`, {
+      body: attributes,
+      xform: this._userResponse,
+      xerr: this._userResponseErr,
+    })
   }
 
   /**
@@ -790,22 +563,13 @@ export default class GoTrueApi {
    *
    * @param uid The user uid you want to remove.
    */
-  async deleteUser(
+  deleteUser(
     uid: string
   ): Promise<{ user: User | null; data: User | null; error: ApiError | null }> {
-    try {
-      const data: any = await remove(
-        this.fetch,
-        `${this.url}/admin/users/${uid}`,
-        {},
-        {
-          headers: this.headers,
-        }
-      )
-      return { user: data, data, error: null }
-    } catch (e) {
-      return { user: null, data: null, error: e as ApiError }
-    }
+    return this._request('DELETE', `/admin/users/${uid}`, {
+      xform: this._userResponse,
+      xerr: this._userResponseErr,
+    })
   }
 
   /**
@@ -817,35 +581,144 @@ export default class GoTrueApi {
    *
    * @param jwt A valid, logged-in JWT. Typically, the access_token for the currentSession
    */
-  async getUser(
-    jwt: string
-  ): Promise<{ user: User | null; data: User | null; error: ApiError | null }> {
-    try {
-      const data: any = await get(this.fetch, `${this.url}/user`, {
-        headers: this._createRequestHeaders(jwt),
-      })
-      return { user: data, data, error: null }
-    } catch (e) {
-      return { user: null, data: null, error: e as ApiError }
-    }
+  getUser(jwt: string): Promise<{ user: User | null; data: User | null; error: ApiError | null }> {
+    return this._request('GET', '/user', {
+      jwt: jwt,
+      xform: this._userResponse,
+      xerr: this._userResponseErr,
+    })
   }
-
   /**
    * Updates the user data.
    * @param jwt A valid, logged-in JWT.
    * @param attributes The data you want to update.
    */
-  async updateUser(
+  updateUser(
     jwt: string,
     attributes: UserAttributes
   ): Promise<{ user: User | null; data: User | null; error: ApiError | null }> {
+    return this._request('PUT', '/user', {
+      jwt: jwt,
+      body: attributes,
+      xform: this._userResponse,
+      xerr: this._userResponseErr,
+    })
+  }
+
+  /**
+   * Creates a list of objects that can be used with setCookies
+   * or getCookieString to erase all auth cookies
+   */
+  private _createDeleteAuthCookies(): { name: string; value: ''; maxAge: -1 }[] {
+    const cn = this.cookieName()
+    return [
+      { name: `${cn}-access-token`, value: '', maxAge: -1 },
+      { name: `${cn}-refresh-token`, value: '', maxAge: -1 },
+    ]
+  }
+
+  /**
+   * Creates a list of objects that can be used with setCookies
+   * or getCookieString to create all auth cookies
+   * @param accessToken the access token value to store in the access token cookie
+   * @param refreshToken the refresh token value to store in the refresh token cookie
+   */
+  private _createSetAuthCookies(
+    accessToken: string,
+    refreshToken: string
+  ): {
+    name: string
+    value: string
+    maxAge: number
+    path?: string
+    domain?: string
+    sameSite?: string
+  }[] {
+    const cn = this.cookieName()
+    const co = this.cookieOptions
+    const base = {
+      path: co.path,
+      domain: co.domain,
+      maxAge: co.lifetime ?? 0,
+      sameSite: co.sameSite,
+    }
+    return [
+      { ...base, ...{ name: `${cn}-access-token`, value: accessToken } },
+      { ...base, ...{ name: `${cn}-refresh-token`, value: refreshToken } },
+    ]
+  }
+
+  /**
+   * Handles a successful response to an function that returns a session
+   * ensuring that sessions are consistently handled.
+   * @param data a session object
+   */
+  private _sessionResponse(data: any): { data: Session; error: null } {
+    const session = { ...data }
+    if (session.expires_in) session.expires_at = expiresAt(data.expires_in)
+    return { data: session, error: null }
+  }
+
+  /**
+   * Handles a success response for a user-returning function
+   * Unlike most other responses, these copy the `data` field to
+   * a `user` field
+   * @param data the user response
+   */
+  private _userResponse(data: any): { data: User; user: User; error: null } {
+    return { data: data, user: data, error: null }
+  }
+
+  /**
+   * Handles an error response for a user-returning function
+   * Unlike most other responses, these return a `user: null`
+   * field in addition to `data: null`.
+   * @param error an api error
+   */
+  private _userResponseErr(error: ApiError): { data: null; user: null; error: ApiError } {
+    return { data: null, user: null, error: error }
+  }
+
+  /**
+   * Sends the request to the underlying fetch library. Converts any API exception
+   * into an error result.
+   * @param method method to use
+   * @param path path to send request to
+   * @param cb optional callback to transform the successful response data
+   * @param options optional option to pass to the underlying fetch library (e.g. headers)
+   * @param body body to send
+   */
+  private async _request(
+    method: RequestMethodType,
+    path: string,
+    options: ClientFetchOptions = {}
+  ): Promise<any> {
+    if (options.headers === undefined) {
+      options.headers = { ...this.headers }
+    }
+
+    if (options.jwt) {
+      options.headers['Authorization'] = `Bearer ${options.jwt}`
+    }
+
+    let qs = options.query
+    if (options.redirectTo) {
+      if (qs === undefined) qs = {}
+      qs['redirect_to'] = options.redirectTo
+    }
+    const queryString = qs ? '?' + new URLSearchParams(qs).toString() : ''
+
     try {
-      const data: any = await put(this.fetch, `${this.url}/user`, attributes, {
-        headers: this._createRequestHeaders(jwt),
-      })
-      return { user: data, data, error: null }
+      const data = await request(
+        this.fetch,
+        method,
+        this.url + path + queryString,
+        options,
+        options.body
+      )
+      return options.xform ? options.xform(data) : { data: data, error: null }
     } catch (e) {
-      return { user: null, data: null, error: e as ApiError }
+      return options.xerr ? options.xerr(e as ApiError) : { data: null, error: e as ApiError }
     }
   }
 }
