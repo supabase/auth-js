@@ -51,6 +51,10 @@ export default class GoTrueClient {
    */
   api: GoTrueApi
   /**
+   * Resolved when the initializing of the user session, if one exists, is complete.
+   */
+  protected initializedPromise: Promise<void>;
+  /**
    * The currently logged in user or null.
    */
   protected currentUser: User | null
@@ -104,7 +108,7 @@ export default class GoTrueClient {
       fetch: settings.fetch,
     })
     this._recoverSession()
-    this._recoverAndRefresh()
+    this.initializedPromise = this._recoverAndRefresh().then(() => undefined);
     this._listenForMultiTabEvents()
     this._handleVisibilityChange()
 
@@ -116,6 +120,13 @@ export default class GoTrueClient {
         }
       })
     }
+  }
+
+  /**
+   * @returns A promise that resolves when the initializing of the user session, if one exists, is complete.
+   */
+  initialized(): Promise<void> {
+    return this.initializedPromise;
   }
 
   /**
