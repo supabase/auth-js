@@ -52,7 +52,6 @@ polyfillGlobalThis() // Make "globalThis" available
 
 const DEFAULT_OPTIONS = {
   url: GOTRUE_URL,
-  persistenceKey: PERSISTENCE_KEY,
   autoRefreshToken: true,
   persistSession: true,
   detectSessionInUrl: true,
