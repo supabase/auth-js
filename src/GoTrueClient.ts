@@ -13,7 +13,7 @@ import {
   DEFAULT_HEADERS,
   EXPIRY_MARGIN,
   NETWORK_FAILURE,
-  STORAGE_KEY,
+  PERSISTENCE_KEY,
 } from './lib/constants'
 import { polyfillGlobalThis } from './lib/polyfills'
 import { Fetch } from './lib/fetch'
@@ -46,12 +46,13 @@ import type {
   OAuthResponse,
   CallRefreshTokenResult,
 } from './lib/types'
+import { LocalStorage } from './lib/storage/localStorage'
 
 polyfillGlobalThis() // Make "globalThis" available
 
 const DEFAULT_OPTIONS = {
   url: GOTRUE_URL,
-  storageKey: STORAGE_KEY,
+  persistenceKey: PERSISTENCE_KEY,
   autoRefreshToken: true,
   persistSession: true,
   detectSessionInUrl: true,
@@ -65,10 +66,6 @@ export default class GoTrueClient {
    * These can be used for example to get a user from a JWT in a server environment or reset a user's password.
    */
   api: GoTrueApi
-  /**
-   * The storage key used to identity the values saved in localStorage
-   */
-  protected storageKey: string
 
   /**
    * The session object for the currently logged in user or null.
@@ -78,7 +75,7 @@ export default class GoTrueClient {
 
   protected autoRefreshToken: boolean
   protected persistSession: boolean
-  protected localStorage: SupportedStorage
+  protected storage: SupportedStorage
   protected stateChangeEmitters: Map<string, Subscription> = new Map()
   protected refreshTokenTimer?: ReturnType<typeof setTimeout>
   // eslint-disable-next-line @typescript-eslint/no-inferrable-types
@@ -89,11 +86,10 @@ export default class GoTrueClient {
    * Create a new client for use in the browser.
    * @param options.url The URL of the GoTrue server.
    * @param options.headers Any additional headers to send to the GoTrue server.
-   * @param options.storageKey Optional key name used for storing tokens in local storage
    * @param options.detectSessionInUrl Set to "true" if you want to automatically detects OAuth grants in the URL and signs in the user.
    * @param options.autoRefreshToken Set to "true" if you want to automatically refresh the token before expiring.
    * @param options.persistSession Set to "true" if you want to automatically save the user session into local storage. If set to false, session will just be saved in memory.
-   * @param options.localStorage Provide your own local storage implementation to use instead of the browser's local storage.
+   * @param options.storage Provide your own storage implementation to use instead of the browser's local storage.
    * @param options.multiTab Set to "false" if you want to disable multi-tab/window events.
    * @param options.cookieOptions
    * @param options.fetch A custom fetch implementation.
@@ -101,21 +97,19 @@ export default class GoTrueClient {
   constructor(options: {
     url?: string
     headers?: { [key: string]: string }
-    storageKey?: string
     detectSessionInUrl?: boolean
     autoRefreshToken?: boolean
     persistSession?: boolean
-    localStorage?: SupportedStorage
+    storage?: SupportedStorage
     multiTab?: boolean
     cookieOptions?: CookieOptions
     fetch?: Fetch
   }) {
     const settings = { ...DEFAULT_OPTIONS, ...options }
     this.inMemorySession = null
-    this.storageKey = settings.storageKey
     this.autoRefreshToken = settings.autoRefreshToken
     this.persistSession = settings.persistSession
-    this.localStorage = settings.localStorage || globalThis.localStorage
+    this.storage = new LocalStorage({ key: PERSISTENCE_KEY })
     this.api = new GoTrueApi({
       url: settings.url,
       headers: settings.headers,
@@ -360,7 +354,7 @@ export default class GoTrueClient {
     let currentSession: Session | null = null
 
     if (this.persistSession) {
-      const maybeSession = await getItemAsync(this.localStorage, this.storageKey)
+      const maybeSession = await getItemAsync(this.storage)
 
       if (this._doesSessionExist(maybeSession)) {
         currentSession = maybeSession
@@ -734,7 +728,7 @@ export default class GoTrueClient {
    */
   private async _recoverAndRefresh() {
     try {
-      const currentSession = await getItemAsync(this.localStorage, this.storageKey)
+      const currentSession = await getItemAsync(this.storage)
       if (!this._doesSessionExist(currentSession)) {
         await this._removeSession()
         return null
@@ -846,12 +840,12 @@ export default class GoTrueClient {
   }
 
   private _persistSession(currentSession: Session) {
-    setItemAsync(this.localStorage, this.storageKey, currentSession)
+    setItemAsync(this.storage, currentSession)
   }
 
   private async _removeSession() {
     if (this.persistSession) {
-      removeItemAsync(this.localStorage, this.storageKey)
+      removeItemAsync(this.storage)
     } else {
       this.inMemorySession = null
     }
