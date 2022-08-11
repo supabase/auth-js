@@ -78,7 +78,7 @@ describe('GoTrueClient', () => {
       }
 
       // wait 1 seconds before calling getSession()
-      await new Promise(r => setTimeout(r, 1000))
+      await new Promise((r) => setTimeout(r, 1000))
       const { session: userSession, error: userError } = await authWithSession.getSession()
 
       expect(userError).toBeNull()
@@ -100,8 +100,12 @@ describe('GoTrueClient', () => {
       expect(session).not.toBeNull()
 
       const [{ session: session1, error: error1 }, { session: session2, error: error2 }] =
-        // @ts-expect-error 'Allow access to private _callRefreshToken()'
-        await Promise.all([authWithSession._callRefreshToken(session?.refresh_token), authWithSession._callRefreshToken(session?.refresh_token)])
+        await Promise.all([
+          // @ts-expect-error 'Allow access to private _callRefreshToken()'
+          authWithSession._callRefreshToken(session?.refresh_token),
+          // @ts-expect-error 'Allow access to private _callRefreshToken()'
+          authWithSession._callRefreshToken(session?.refresh_token),
+        ])
 
       expect(error1).toBeNull()
       expect(error2).toBeNull()
@@ -171,13 +175,12 @@ describe('GoTrueClient', () => {
       expect(error).toBeNull()
       expect(session).not.toBeNull()
 
-      const [error1, error2] =
-        await Promise.allSettled([
-          // @ts-expect-error 'Allow access to private _callRefreshToken()'
-          authWithSession._callRefreshToken(session?.refresh_token),
-          // @ts-expect-error 'Allow access to private _callRefreshToken()'
-          authWithSession._callRefreshToken(session?.refresh_token),
-        ])
+      const [error1, error2] = await Promise.allSettled([
+        // @ts-expect-error 'Allow access to private _callRefreshToken()'
+        authWithSession._callRefreshToken(session?.refresh_token),
+        // @ts-expect-error 'Allow access to private _callRefreshToken()'
+        authWithSession._callRefreshToken(session?.refresh_token),
+      ])
 
       expect(error1.status).toEqual('rejected')
       expect(error2.status).toEqual('rejected')
@@ -528,43 +531,37 @@ describe('The auth client can signin with third-party oAuth providers', () => {
   })
 
   test('signIn() with Provider can append a redirectUrl ', async () => {
-    const { error, url, provider } = await auth.signInWithOAuth(
-      {
-        provider: 'google',
-        options: {
-          redirectTo: 'https://localhost:9000/welcome',
-        }
+    const { error, url, provider } = await auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: 'https://localhost:9000/welcome',
       },
-    )
+    })
     expect(error).toBeNull()
     expect(url).toBeTruthy()
     expect(provider).toBeTruthy()
   })
 
   test('signIn() with Provider can append scopes', async () => {
-    const { error, url, provider } = await auth.signInWithOAuth(
-      {
-        provider: 'github',
-        options: {
-          scopes: 'repo'
-        }
+    const { error, url, provider } = await auth.signInWithOAuth({
+      provider: 'github',
+      options: {
+        scopes: 'repo',
       },
-    )
+    })
     expect(error).toBeNull()
     expect(url).toBeTruthy()
     expect(provider).toBeTruthy()
   })
 
   test('signIn() with Provider can append multiple options', async () => {
-    const { error, url, provider } = await auth.signInWithOAuth(
-      {
-        provider: 'github',
-        options: {
-          redirectTo: 'https://localhost:9000/welcome',
-          scopes: 'repo',
-        }
+    const { error, url, provider } = await auth.signInWithOAuth({
+      provider: 'github',
+      options: {
+        redirectTo: 'https://localhost:9000/welcome',
+        scopes: 'repo',
       },
-    )
+    })
     expect(error).toBeNull()
     expect(url).toBeTruthy()
     expect(provider).toBeTruthy()
