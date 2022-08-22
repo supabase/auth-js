@@ -358,14 +358,18 @@ export default class GoTrueClient {
    * Updates user data, if there is a logged in user.
    */
   async update(
-    attributes: UserAttributes
+    attributes: UserAttributes,
+    options?: {
+      redirectTo?: string
+    }
   ): Promise<{ data: User | null; user: User | null; error: ApiError | null }> {
     try {
       if (!this.currentSession?.access_token) throw new Error('Not logged in.')
 
       const { user, error } = await this.api.updateUser(
         this.currentSession.access_token,
-        attributes
+        attributes,
+        options
       )
       if (error) throw error
       if (!user) throw Error('Invalid user data.')

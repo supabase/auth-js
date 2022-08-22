@@ -843,10 +843,17 @@ export default class GoTrueApi {
    */
   async updateUser(
     jwt: string,
-    attributes: UserAttributes
+    attributes: UserAttributes,
+    options?: {
+      redirectTo?: string
+    }
   ): Promise<{ user: User | null; data: User | null; error: ApiError | null }> {
     try {
-      const data: any = await put(this.fetch, `${this.url}/user`, attributes, {
+      const urlParams: string[] = []
+      if (options?.redirectTo) {
+        urlParams.push(`redirect_to=${encodeURIComponent(options.redirectTo)}`)
+      }
+      const data: any = await put(this.fetch, `${this.url}/user?${urlParams.join('&')}`, attributes, {
         headers: this._createRequestHeaders(jwt),
       })
       return { user: data, data, error: null }
