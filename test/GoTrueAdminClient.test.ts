@@ -15,7 +15,7 @@ import {
 
 import type { GenerateLinkProperties, User } from '../src/lib/types'
 
-describe('GoTrueAdminApi', () => {
+describe('GoTrueAdminClient', () => {
   describe('User creation', () => {
     test('createUser() should create a new user', async () => {
       const { email } = mockUserCredentials()

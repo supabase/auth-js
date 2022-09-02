@@ -188,7 +188,7 @@ export interface AdminUserAttributes extends UserAttributes {
    *
    * The `user_metadata` should be a JSON object that includes user-specific info, such as their first and last name.
    *
-   * Note: When using the GoTrueAdminApi and wanting to modify a user's metadata,
+   * Note: When using the GoTrueAdminClient and wanting to modify a user's metadata,
    * this attribute is used instead of UserAttributes data.
    *
    */

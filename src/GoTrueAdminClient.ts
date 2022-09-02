@@ -9,7 +9,7 @@ import {
 } from './lib/types'
 import { AuthError, isAuthError } from './lib/errors'
 
-export default class GoTrueAdminApi {
+export default class GoTrueAdminClient {
   protected url: string
   protected headers: {
     [key: string]: string

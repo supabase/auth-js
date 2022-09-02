@@ -1,4 +1,4 @@
-import GoTrueAdminApi from './GoTrueAdminApi'
+import GoTrueAdminClient from './GoTrueAdminClient'
 import {
   DEFAULT_HEADERS,
   EXPIRY_MARGIN,
@@ -65,7 +65,7 @@ export default class GoTrueClient {
    * Namespace for the GoTrue admin methods.
    * These methods should only be used in a trusted server-side environment.
    */
-  admin: GoTrueAdminApi
+  admin: GoTrueAdminClient
   /**
    * The storage key used to identify the values saved in localStorage
    */
@@ -108,7 +108,7 @@ export default class GoTrueClient {
     this.autoRefreshToken = settings.autoRefreshToken
     this.persistSession = settings.persistSession
     this.storage = settings.storage || localStorageAdapter
-    this.admin = new GoTrueAdminApi({
+    this.admin = new GoTrueAdminClient({
       url: settings.url,
       headers: settings.headers,
       fetch: settings.fetch,
