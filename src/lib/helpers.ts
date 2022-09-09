@@ -15,6 +15,9 @@ export function uuid() {
 
 export const isBrowser = () => typeof window !== 'undefined'
 
+export const supportsLocalStorage = () =>
+  isBrowser() && typeof globalThis.localStorage !== 'undefined'
+
 export function getParameterByName(name: string, url?: string) {
   if (!url) url = window?.location?.href || ''
   // eslint-disable-next-line no-useless-escape
