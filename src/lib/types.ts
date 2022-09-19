@@ -465,6 +465,11 @@ type PromisifyMethods<T> = {
     : T[K]
 }
 
+export interface SyncTokenRefreshStorage {
+  refresh_token: string
+  status: 'TOKEN_REFRESHING' | 'TOKEN_REFRESHED'
+}
+
 export type SupportedStorage = PromisifyMethods<Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>>
 
 export type InitializeResult = { error: AuthError | null }

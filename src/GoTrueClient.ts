@@ -43,6 +43,7 @@ import type {
   SignUpWithPasswordCredentials,
   Subscription,
   SupportedStorage,
+  SyncTokenRefreshStorage,
   User,
   UserAttributes,
   UserResponse,
@@ -70,6 +71,11 @@ export default class GoTrueClient {
    * The storage key used to identify the values saved in localStorage
    */
   protected storageKey: string
+
+  /**
+   * The storage key used to keep the refresh token synced with tabs
+   */
+  protected refreshTokenSyncStorageKey: string
 
   /**
    * The session object for the currently logged in user. If null, it means there isn't a logged-in user.
@@ -105,6 +111,7 @@ export default class GoTrueClient {
     const settings = { ...DEFAULT_OPTIONS, ...options }
     this.inMemorySession = null
     this.storageKey = settings.storageKey
+    this.refreshTokenSyncStorageKey = `${this.storageKey}-rts`
     this.autoRefreshToken = settings.autoRefreshToken
     this.persistSession = settings.persistSession
     this.storage = settings.storage || localStorageAdapter
@@ -822,19 +829,55 @@ export default class GoTrueClient {
     }
 
     try {
+      let syncedSession: Session | null = null
+      const refreshTokenSync = (await getItemAsync(
+        this.storage,
+        this.refreshTokenSyncStorageKey
+      )) as SyncTokenRefreshStorage | undefined
+
+      if (
+        refreshTokenSync?.refresh_token === refreshToken &&
+        refreshTokenSync?.status === 'TOKEN_REFRESHING'
+      ) {
+        await this._waitOnRefreshTokenSync()
+        const latestSession = (await getItemAsync(this.storage, this.storageKey)) as Session | null
+        if (this._isSessionValid(latestSession)) {
+          syncedSession = latestSession
+        }
+      } else if (refreshTokenSync?.status === 'TOKEN_REFRESHED') {
+        const latestSession = (await getItemAsync(this.storage, this.storageKey)) as Session | null
+        if (this._isSessionValid(latestSession)) {
+          syncedSession = latestSession
+        }
+      }
+
       this.refreshingDeferred = new Deferred<CallRefreshTokenResult>()
 
       if (!refreshToken) {
         throw new AuthSessionMissingError()
       }
-      const { data, error } = await this._refreshAccessToken(refreshToken)
-      if (error) throw error
-      if (!data.session) throw new AuthSessionMissingError()
 
-      await this._saveSession(data.session)
-      this._notifyAllSubscribers('TOKEN_REFRESHED', data.session)
+      if (!syncedSession) {
+        await setItemAsync(this.storage, this.refreshTokenSyncStorageKey, {
+          refresh_token: refreshToken,
+          status: 'TOKEN_REFRESHING',
+        })
 
-      const result = { session: data.session, error: null }
+        const { data, error } = await this._refreshAccessToken(refreshToken)
+        if (error) throw error
+        if (!data.session) throw new AuthSessionMissingError()
+        syncedSession = data.session
+
+        await setItemAsync(this.storage, this.refreshTokenSyncStorageKey, {
+          refresh_token: syncedSession.refresh_token,
+          status: 'TOKEN_REFRESHED',
+        })
+      }
+
+      await this._saveSession(syncedSession)
+      this._notifyAllSubscribers('TOKEN_REFRESHED', syncedSession)
+
+      const result = { session: syncedSession, error: null }
 
       this.refreshingDeferred.resolve(result)
 
@@ -853,6 +896,36 @@ export default class GoTrueClient {
     } finally {
       this.refreshingDeferred = null
     }
+  }
+
+  private async _waitOnRefreshTokenSync(): Promise<void> {
+    return new Promise((resolve) => {
+      const refreshTokenInterval = setInterval(async () => {
+        const refreshTokenSync = (await getItemAsync(
+          this.storage,
+          this.refreshTokenSyncStorageKey
+        )) as SyncTokenRefreshStorage | undefined
+
+        if (refreshTokenSync?.status === 'TOKEN_REFRESHED') {
+          clearInterval(refreshTokenInterval)
+          clearTimeout(refreshTokenTimeout)
+          resolve()
+        }
+      }, 100)
+
+      // Stop interval if tokenSync.status does not change
+      const refreshTokenTimeout = setTimeout(async () => {
+        await removeItemAsync(this.storage, this.refreshTokenSyncStorageKey)
+        clearInterval(refreshTokenInterval)
+        resolve()
+      }, 1500)
+    })
+  }
+
+  private _isSessionValid(session: Session | null): boolean {
+    return session?.expires_at
+      ? session.expires_at - (EXPIRY_MARGIN + 0.5) >= Date.now() / 1000
+      : false
   }
 
   private _notifyAllSubscribers(event: AuthChangeEvent, session: Session | null) {
