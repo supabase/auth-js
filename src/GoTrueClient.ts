@@ -88,6 +88,8 @@ export default class GoTrueClient {
   protected storage: SupportedStorage
   protected stateChangeEmitters: Map<string, Subscription> = new Map()
   protected refreshTokenTimer?: ReturnType<typeof setTimeout>
+  protected refreshTokenSyncIntervalTimer?: ReturnType<typeof setTimeout>
+  protected refreshTokenSyncTimeoutTimer?: ReturnType<typeof setTimeout>
   protected networkRetries = 0
   protected refreshingDeferred: Deferred<CallRefreshTokenResult> | null = null
   /**
@@ -900,23 +902,23 @@ export default class GoTrueClient {
 
   private async _waitOnRefreshTokenSync(): Promise<void> {
     return new Promise((resolve) => {
-      const refreshTokenInterval = setInterval(async () => {
+      this.refreshTokenSyncIntervalTimer = setInterval(async () => {
         const refreshTokenSync = (await getItemAsync(
           this.storage,
           this.refreshTokenSyncStorageKey
         )) as SyncTokenRefreshStorage | undefined
 
         if (refreshTokenSync?.status === 'TOKEN_REFRESHED') {
-          clearInterval(refreshTokenInterval)
-          clearTimeout(refreshTokenTimeout)
+          clearInterval(this.refreshTokenSyncIntervalTimer)
+          clearTimeout(this.refreshTokenSyncTimeoutTimer)
           resolve()
         }
       }, 100)
 
       // Stop interval if tokenSync.status does not change
-      const refreshTokenTimeout = setTimeout(async () => {
+      this.refreshTokenSyncTimeoutTimer = setTimeout(async () => {
         await removeItemAsync(this.storage, this.refreshTokenSyncStorageKey)
-        clearInterval(refreshTokenInterval)
+        clearInterval(this.refreshTokenSyncIntervalTimer)
         resolve()
       }, 1500)
     })
@@ -967,6 +969,14 @@ export default class GoTrueClient {
 
     if (this.refreshTokenTimer) {
       clearTimeout(this.refreshTokenTimer)
+    }
+
+    if (this.refreshTokenSyncIntervalTimer) {
+      clearInterval(this.refreshTokenSyncIntervalTimer)
+    }
+
+    if (this.refreshTokenSyncTimeoutTimer) {
+      clearTimeout(this.refreshTokenSyncTimeoutTimer)
     }
   }
 
