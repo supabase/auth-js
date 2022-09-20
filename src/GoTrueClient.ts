@@ -860,6 +860,7 @@ export default class GoTrueClient {
       }
 
       if (!syncedSession) {
+        // Cache refresh token status for other tabs
         await setItemAsync(this.storage, this.refreshTokenSyncStorageKey, {
           refresh_token: refreshToken,
           status: 'TOKEN_REFRESHING',
@@ -885,6 +886,8 @@ export default class GoTrueClient {
 
       return result
     } catch (error) {
+      await removeItemAsync(this.storage, this.refreshTokenSyncStorageKey)
+
       if (isAuthError(error)) {
         const result = { session: null, error }
 
@@ -963,6 +966,7 @@ export default class GoTrueClient {
   private async _removeSession() {
     if (this.persistSession) {
       await removeItemAsync(this.storage, this.storageKey)
+      await removeItemAsync(this.storage, this.refreshTokenSyncStorageKey)
     } else {
       this.inMemorySession = null
     }
