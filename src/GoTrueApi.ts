@@ -736,6 +736,7 @@ export default class GoTrueApi {
 
       const { user, error: getUserError } = await this.getUser(access_token)
       if (getUserError) {
+        console.error('getUserByCookie failed with error', getUserError)
         if (!refresh_token) throw new Error('No refresh_token cookie found!')
         if (!res)
           throw new Error('You need to pass the res object to automatically refresh the session!')
