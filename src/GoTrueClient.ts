@@ -308,6 +308,7 @@ export default class GoTrueClient {
     return this._handleProviderSignIn(credentials.provider, {
       redirectTo: credentials.options?.redirectTo,
       scopes: credentials.options?.scopes,
+      proxy: credentials.options?.proxy,
       queryParams: credentials.options?.queryParams,
     })
   }
@@ -750,12 +751,14 @@ export default class GoTrueClient {
     options: {
       redirectTo?: string
       scopes?: string
+      proxy?: string
       queryParams?: { [key: string]: string }
     } = {}
   ) {
     const url: string = this._getUrlForProvider(provider, {
       redirectTo: options.redirectTo,
       scopes: options.scopes,
+      proxy: options.proxy,
       queryParams: options.queryParams,
     })
     // try to open on the browser
@@ -945,6 +948,7 @@ export default class GoTrueClient {
    * Generates the relevant login URL for a third-party provider.
    * @param options.redirectTo A URL or mobile address to send the user to after they are confirmed.
    * @param options.scopes A space-separated list of scopes granted to the OAuth application.
+   * @param options.proxy A custom OAuth callback URL. The proxy must redirect (with query params retained) to the Authorize end-point
    * @param options.queryParams An object of key-value pairs containing query parameters granted to the OAuth application.
    */
   private _getUrlForProvider(
@@ -952,6 +956,7 @@ export default class GoTrueClient {
     options: {
       redirectTo?: string
       scopes?: string
+      proxy?: string
       queryParams?: { [key: string]: string }
     }
   ) {
@@ -961,6 +966,9 @@ export default class GoTrueClient {
     }
     if (options?.scopes) {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
+    }
+    if (options?.proxy) {
+      urlParams.push(`proxy=${encodeURIComponent(options.proxy)}`)
     }
     if (options?.queryParams) {
       const query = new URLSearchParams(options.queryParams)

@@ -347,6 +347,8 @@ export type SignInWithOAuthCredentials = {
     redirectTo?: string
     /** A space-separated list of scopes granted to the OAuth application. */
     scopes?: string
+    /** A custom OAuth callback URL. The proxy must redirect (with query params retained) to the Authorize end-point */
+    proxy?: string,
     /** An object of query params */
     queryParams?: { [key: string]: string }
   }
