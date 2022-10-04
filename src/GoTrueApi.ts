@@ -626,6 +626,7 @@ export default class GoTrueApi {
       password?: string
       data?: object
       redirectTo?: string
+      newEmail?: string
     } = {}
   ): Promise<{ data: Session | User | null; error: ApiError | null }> {
     try {
@@ -635,6 +636,7 @@ export default class GoTrueApi {
         {
           type,
           email,
+          new_email: options.newEmail,
           password: options.password,
           data: options.data,
           redirect_to: options.redirectTo,
