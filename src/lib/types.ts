@@ -188,11 +188,11 @@ export interface UserIdentity {
 
 export interface Factor {
   id: string
-  created_at: string
-  updated_at: string
-  status: string
   friendly_name?: string
   factor_type: string
+  created_at: string
+  updated_at: string
+  status: 'verified' | 'unverified'
 }
 
 export interface UserAppMetadata {
@@ -559,9 +559,9 @@ export type GenerateLinkType =
 
 // MFA related types
 export type MFAEnrollParams = {
+  factorType: 'totp'
+  issuer?: string
   friendlyName?: string
-  factorType: 'TOTP'
-  issuer: string
 }
 
 export type MFAChallengeAndVerifyParams = {
@@ -588,18 +588,102 @@ export type DeleteFactorParams = {
   factorId: string
 }
 
+export type AuthMFAVerifyResponse =
+  | {
+      data: {
+        access_token: string
+        token_type: string
+        expires_in: number
+        refresh_token: string
+        user: Session
+      }
+      error: null
+    }
+  | {
+      data: null
+      error: AuthError
+    }
+
+export type AuthMFAEnrollResponse =
+  | {
+      data: {
+        id: string
+        type: 'totp'
+        TOTP: {
+          qr_code: string
+          secret: string
+          uri: string
+        }
+      }
+      error: null
+    }
+  | {
+      data: null
+      error: AuthError
+    }
+
+export type AuthMFAUnenrollResponse =
+  | {
+      data: {
+        id: string
+      }
+      error: null
+    }
+  | { data: null; error: AuthError }
+
+export type AuthMFAChallengeResponse =
+  | {
+      data: {
+        id: string
+        expires_at: number
+      }
+      error: null
+    }
+  | { data: null; error: AuthError }
+
+export type AuthMFAListFactorsResponse =
+  | {
+      data: {
+        all: Factor[]
+        TOTP: Factor[]
+      }
+      error: null
+    }
+  | { data: null; error: AuthError }
+
+export type AuthenticatorAssuranceLevels = 'aal1' | 'aal2'
+
+export type AuthMFAGetAuthenticatorAssuranceLevelResponse =
+  | {
+      data: {
+        currentLevel: AuthenticatorAssuranceLevels | null
+        possibleLevel: AuthenticatorAssuranceLevels | null
+      }
+      error: null
+    }
+  | { data: null; error: AuthError }
+
 export interface GoTrueMFAApi {
-  verify(params: MFAVerifyParams): Promise<AuthResponse>
-  enroll(params: MFAEnrollParams): Promise<AuthMFAResponse>
-  unenroll(params: MFAUnenrollParams): Promise<AuthMFAResponse>
-  challenge(params: MFAChallengeParams): Promise<AuthMFAResponse>
-  listFactors(): Promise<AuthMFAResponse>
+  verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse>
+  enroll(params: MFAEnrollParams): Promise<AuthMFAEnrollResponse>
+  unenroll(params: MFAUnenrollParams): Promise<AuthMFAUnenrollResponse>
+  challenge(params: MFAChallengeParams): Promise<AuthMFAChallengeResponse>
+  listFactors(): Promise<AuthMFAListFactorsResponse>
   getAMR(jwt?: string): Promise<AuthMFAResponse>
   getAAL(jwt?: string): Promise<AuthMFAResponse>
+  getAuthenticatorAssuranceLevel(): Promise<AuthMFAGetAuthenticatorAssuranceLevelResponse>
+}
+
+export type AuthMFAAdminDeleteFactorResponse =
+  | { data: { id: string }; error: null }
+  | { data: null; error: AuthError }
+
+export type AuthMFAAdminDeleteFactorParams = {
+  id: string
 }
 
 export interface GoTrueAdminMFAApi {
-  deleteFactor(factorID: string): Promise<string>
+  deleteFactor(params: AuthMFAAdminDeleteFactorParams): Promise<AuthMFAAdminDeleteFactorResponse>
 }
 
 type AnyFunction = (...args: any[]) => any
