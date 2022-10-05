@@ -180,11 +180,11 @@ export interface UserIdentity {
 
 export interface Factor {
   id: string
-  created_at: string
-  updated_at: string
-  status: string
   friendly_name?: string
   factor_type: string
+  created_at: string
+  updated_at: string
+  status: 'verified' | 'unverified'
 }
 
 export interface User {
@@ -608,7 +608,20 @@ export type AuthMFAChallengeResponse =
 export type AuthMFAListFactorsResponse =
   | {
       data: {
-        // TODO
+        all: Factor[]
+        TOTP: Factor[]
+      }
+      error: null
+    }
+  | { data: null; error: AuthError }
+
+export type AuthenticatorAssuranceLevels = 'aal1' | 'aal2'
+
+export type AuthMFAGetAuthenticatorAssuranceLevelResponse =
+  | {
+      data: {
+        currentLevel: AuthenticatorAssuranceLevels | null
+        possibleLevel: AuthenticatorAssuranceLevels | null
       }
       error: null
     }
@@ -622,6 +635,7 @@ export interface GoTrueMFAApi {
   listFactors(): Promise<AuthMFAListFactorsResponse>
   getAMR(jwt?: string): Promise<AuthMFAResponse>
   getAAL(jwt?: string): Promise<AuthMFAResponse>
+  getAuthenticatorAssuranceLevel(): Promise<AuthMFAGetAuthenticatorAssuranceLevelResponse>
 }
 
 export type AuthMFAAdminDeleteFactorResponse =

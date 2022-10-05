@@ -59,6 +59,8 @@ import type {
   AuthMFAVerifyResponse,
   AuthMFAListFactorsResponse,
   AMREntry,
+  AuthMFAGetAuthenticatorAssuranceLevelResponse,
+  AuthenticatorAssuranceLevels,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -144,6 +146,7 @@ export default class GoTrueClient {
       listFactors: this._listFactors.bind(this),
       getAMR: this._getAMR.bind(this),
       getAAL: this._getAAL.bind(this),
+      getAuthenticatorAssuranceLevel: this._getAuthenticatorAssuranceLevel.bind(this),
     }
   }
 
@@ -1055,7 +1058,48 @@ export default class GoTrueClient {
    * Displays all devices for a given user
    */
   private async _listFactors(): Promise<AuthMFAListFactorsResponse> {
-    throw new Error('not implemented')
+    const { data, error } = await this.getSession()
+    if (error) {
+      return { data: null, error }
+    }
+
+    const all = data?.session?.user?.factors || []
+    const TOTP = all.filter(
+      (factor) => 'TOTP' === factor.factor_type && 'verified' === factor.status
+    )
+
+    return {
+      data: {
+        all,
+        TOTP,
+      },
+      error: null,
+    }
+  }
+
+  private async _getAuthenticatorAssuranceLevel(): Promise<AuthMFAGetAuthenticatorAssuranceLevelResponse> {
+    const { data, error } = await this.getSession()
+    if (error) {
+      return { data: null, error }
+    }
+
+    const body = JSON.parse(
+      data!.session!.access_token!.split('.')[1].replace(/[-]/g, '+').replace(/[_]/g, '/')
+    )
+
+    let currentLevel: AuthenticatorAssuranceLevels | null = null
+
+    if (body.aal) {
+      currentLevel = body.aal as AuthenticatorAssuranceLevels
+    }
+
+    let possibleLevel: AuthenticatorAssuranceLevels | null = currentLevel
+
+    if (!data?.session?.user?.factors?.filter((factor) => factor.status === 'verified')?.length) {
+      possibleLevel = 'aal2'
+    }
+
+    return { data: { currentLevel, possibleLevel }, error: null }
   }
 
   /**
