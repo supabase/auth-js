@@ -70,7 +70,7 @@ function App() {
   async function handleEnrollMfa(e) {
     if (!e) {
       let params = {
-        factorType: 'TOTP',
+        factorType: 'totp',
         issuer: 'supabase.com',
       }
       let { data, error } = await auth.mfa.enroll(params)
