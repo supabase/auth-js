@@ -9,6 +9,8 @@ import {
   GoTrueAdminMFAApi,
   DeleteFactorParams,
   UpdatableFactorAttributes,
+  AuthMFAAdminDeleteFactorParams,
+  AuthMFAAdminDeleteFactorResponse,
 } from './lib/types'
 import { AuthError, isAuthError } from './lib/errors'
 
@@ -237,22 +239,11 @@ export default class GoTrueAdminApi {
       throw error
     }
   }
-  /**
-   *1G
-   */
-  private async _deleteFactor(factorID: string) {
-    return ''
-  }
-  private async _listFactors() {
-    return ''
-  }
-  private async _deleteRecoveryCodes(uid: string) {
-    return ''
-  }
-  private async _updateFactor(factorID: string, attributes: UpdatableFactorAttributes) {
-    return ''
-  }
-  private async _listFactor() {
-    return ''
+
+  private async _deleteFactor(
+    params: AuthMFAAdminDeleteFactorParams
+  ): Promise<AuthMFAAdminDeleteFactorResponse> {
+    // TODO
+    throw new Error('not implemented')
   }
 }

@@ -523,9 +523,9 @@ export type GenerateLinkType =
 
 // MFA related types
 export type MFAEnrollParams = {
-  friendlyName?: string
   factorType: 'TOTP'
-  issuer: string
+  issuer?: string
+  friendlyName?: string
 }
 
 export type MFAChallengeAndVerifyParams = {
@@ -552,18 +552,88 @@ export type DeleteFactorParams = {
   factorId: string
 }
 
+export type AuthMFAVerifyResponse =
+  | {
+      data: {
+        access_token: string
+        token_type: string
+        expires_in: number
+        refresh_token: string
+        user: Session
+      }
+      error: null
+    }
+  | {
+      data: null
+      error: AuthError
+    }
+
+export type AuthMFAEnrollResponse =
+  | {
+      data: {
+        id: string
+        type: 'TOTP'
+        TOTP: {
+          qr_code: string
+          secret: string
+          uri: string
+        }
+      }
+      error: null
+    }
+  | {
+      data: null
+      error: AuthError
+    }
+
+export type AuthMFAUnenrollResponse =
+  | {
+      data: {
+        id: string
+      }
+      error: null
+    }
+  | { data: null; error: AuthError }
+
+export type AuthMFAChallengeResponse =
+  | {
+      data: {
+        id: string
+        expires_at: number
+      }
+      error: null
+    }
+  | { data: null; error: AuthError }
+
+export type AuthMFAListFactorsResponse =
+  | {
+      data: {
+        // TODO
+      }
+      error: null
+    }
+  | { data: null; error: AuthError }
+
 export interface GoTrueMFAApi {
-  verify(params: MFAVerifyParams): Promise<AuthResponse>
-  enroll(params: MFAEnrollParams): Promise<AuthMFAResponse>
-  unenroll(params: MFAUnenrollParams): Promise<AuthMFAResponse>
-  challenge(params: MFAChallengeParams): Promise<AuthMFAResponse>
-  listFactors(): Promise<AuthMFAResponse>
+  verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse>
+  enroll(params: MFAEnrollParams): Promise<AuthMFAEnrollResponse>
+  unenroll(params: MFAUnenrollParams): Promise<AuthMFAUnenrollResponse>
+  challenge(params: MFAChallengeParams): Promise<AuthMFAChallengeResponse>
+  listFactors(): Promise<AuthMFAListFactorsResponse>
   getAMR(jwt?: string): Promise<AuthMFAResponse>
   getAAL(jwt?: string): Promise<AuthMFAResponse>
 }
 
+export type AuthMFAAdminDeleteFactorResponse =
+  | { data: { id: string }; error: null }
+  | { data: null; error: AuthError }
+
+export type AuthMFAAdminDeleteFactorParams = {
+  id: string
+}
+
 export interface GoTrueAdminMFAApi {
-  deleteFactor(factorID: string): Promise<string>
+  deleteFactor(params: AuthMFAAdminDeleteFactorParams): Promise<AuthMFAAdminDeleteFactorResponse>
 }
 
 type AnyFunction = (...args: any[]) => any
