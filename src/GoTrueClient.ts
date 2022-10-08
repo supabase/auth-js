@@ -594,6 +594,36 @@ export default class GoTrueClient {
   }
 
   /**
+   * Sets the session data from a refresh token.
+   * @param refreshToken A valid refresh token that was returned on login.
+   */
+  async setSessionFromRefreshToken(refreshToken: string): Promise<AuthResponse> {
+    try {
+      let session: Session | null = null
+      const { data, error } = await this._refreshAccessToken(refreshToken)
+      if (error) {
+        return { data: { session: null, user: null }, error: error }
+      }
+
+      if (!data.session) {
+        return { data: { session: null, user: null }, error: null }
+      }
+      session = data.session
+
+      await this._saveSession(session)
+      this._notifyAllSubscribers('TOKEN_REFRESHED', session)
+
+      return { data: { session, user: session.user }, error: null }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { session: null, user: null }, error }
+      }
+
+      throw error
+    }
+  }
+
+  /**
    * Gets the session data from a URL string
    */
   private async _getSessionFromUrl(): Promise<
