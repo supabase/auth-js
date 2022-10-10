@@ -26,7 +26,7 @@ import {
   resolveFetch,
   setItemAsync,
   uuid,
-  decodeJWT,
+  decodeJWTPayload,
 } from './lib/helpers'
 import localStorageAdapter from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
@@ -1153,7 +1153,7 @@ export default class GoTrueClient {
           throw error
         }
         // Default to Authorization header if there is no existing session
-        jwt = data.session?.access_token ?? this.headers['Authorization']
+        jwt = data.session?.access_token ?? this.headers['Authorization'].split(' ')[1]
       }
     } catch (error) {
       if (isAuthError(error)) {
@@ -1162,7 +1162,7 @@ export default class GoTrueClient {
 
       throw error
     }
-    const parsedJWT = decodeJWT(jwt)
+    const parsedJWT = decodeJWTPayload(jwt)
     const AMR: AMREntry[] = parsedJWT?.amr ?? []
 
     return { data: { AMR: AMR }, error: null }
@@ -1180,7 +1180,7 @@ export default class GoTrueClient {
           throw error
         }
         // Default to Authorization header if there is no existing session
-        jwt = data.session?.access_token ?? this.headers['Authorization']
+        jwt = data.session?.access_token ?? this.headers['Authorization'].split(' ')[1]
       }
     } catch (error) {
       if (isAuthError(error)) {
@@ -1189,7 +1189,7 @@ export default class GoTrueClient {
 
       throw error
     }
-    const parsedJWT = decodeJWT(jwt)
+    const parsedJWT = decodeJWTPayload(jwt)
     const AAL: string = parsedJWT?.aal ?? ''
     return { data: { AAL: AAL }, error: null }
   }
