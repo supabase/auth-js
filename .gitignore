@@ -106,5 +106,4 @@ typings/
 # VisualStudioCode
 .vscode/
 
-# Docs via yarn docs
-docs
+docs/v2
