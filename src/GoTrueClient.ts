@@ -1068,7 +1068,7 @@ export default class GoTrueClient {
       return { data: null, error: sessionError }
     }
 
-    return await _request(this.fetch, 'POST', `${this.url}/factors`, {
+    const { data, error } = await _request(this.fetch, 'POST', `${this.url}/factors`, {
       body: {
         friendly_name: params.friendlyName,
         factor_type: params.factorType,
@@ -1077,6 +1077,16 @@ export default class GoTrueClient {
       headers: this.headers,
       jwt: sessionData?.session?.access_token,
     })
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    if (data?.totp?.qr_code) {
+      data.totp.qr_code = `data:image/svg+xml;utf-8,${data.totp.qr_code}`
+    }
+
+    return { data, error: null }
   }
 
   /**
@@ -1135,7 +1145,7 @@ export default class GoTrueClient {
   private async _listFactors(): Promise<AuthMFAListFactorsResponse> {
     const { data: sessionData, error: sessionError } = await this.getSession()
     if (sessionError) {
-      return { data: null, error: sessionError }
+      return { data: { all: [], totp: [] }, error: sessionError }
     }
 
     const factors = sessionData?.session?.user?.factors || []

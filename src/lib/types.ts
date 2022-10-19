@@ -134,7 +134,7 @@ export interface Session {
  */
 export interface AMREntry {
   /** Authentication method name. */
-  method: string // TODO: explicit method names / types
+  method: 'password' | 'otp' | 'oauth' | 'mfa/totp' | string
 
   /**
    * Timestamp when the method was successfully used. Represents number of
@@ -734,12 +734,15 @@ export interface GoTrueMFAApi {
   unenroll(params: MFAUnenrollParams): Promise<AuthMFAUnenrollResponse>
 
   /**
-   * Fetches an up-to-date list of MFA factors enabled for this user. For most
-   * use cases you should consider using
-   * {@link GoTrueMFAApi#getAuthenticatorAssuranceLevel}.
+   * Returns the list of MFA factors enabled for this user. For most use cases
+   * you should consider using {@link
+   * GoTrueMFAApi#getAuthenticatorAssuranceLevel}. This uses a cached version
+   * of the factors and avoids incurring a network call. If you need to update
+   * this list, call {@link GoTrueClient#getUser} first.
    *
    * @see {@link GoTrueMFAApi#enroll}
    * @see {@link GoTrueMFAApi#getAuthenticatorAssuranceLevel}
+   * @see {@link GoTrueClient#getUser}
    */
   listFactors(): Promise<AuthMFAListFactorsResponse>
 
