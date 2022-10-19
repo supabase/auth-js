@@ -17,7 +17,7 @@ import {
 } from './lib/errors'
 import { Fetch, _request, _sessionResponse, _userResponse } from './lib/fetch'
 import {
-  decodeBase64URL,
+  decodeJWTPayload,
   Deferred,
   getItemAsync,
   getParameterByName,
@@ -532,43 +532,42 @@ export default class GoTrueClient {
 
   /**
    * Sets the session data from the current session. If the current session is expired, setSession will take care of refreshing it to obtain a new session.
-   * If the refresh token in the current session is invalid and the current session has expired, an error will be thrown.
-   * If the current session does not contain at expires_at field, setSession will use the exp claim defined in the access token.
-   * @param currentSession The current session that minimally contains an access token, refresh token and a user.
+   * If the refresh token or access token in the current session is invalid, an error will be thrown.
+   * @param currentSession The current session that minimally contains an access token and refresh token.
    */
-  async setSession(
-    currentSession: Pick<Session, 'access_token' | 'refresh_token'>
-  ): Promise<AuthResponse> {
+  async setSession(currentSession: {
+    access_token: string
+    refresh_token: string
+  }): Promise<AuthResponse> {
     try {
+      if (!currentSession.access_token || !currentSession.refresh_token) {
+        throw new AuthSessionMissingError()
+      }
+
       const timeNow = Date.now() / 1000
       let expiresAt = timeNow
       let hasExpired = true
       let session: Session | null = null
-      if (currentSession.access_token && currentSession.access_token.split('.')[1]) {
-        const payload = JSON.parse(decodeBase64URL(currentSession.access_token.split('.')[1]))
-        if (payload.exp) {
-          expiresAt = payload.exp
-          hasExpired = expiresAt <= timeNow
-        }
+      const payload = decodeJWTPayload(currentSession.access_token)
+      if (payload.exp) {
+        expiresAt = payload.exp
+        hasExpired = expiresAt <= timeNow
       }
 
       if (hasExpired) {
-        if (!currentSession.refresh_token) {
-          throw new AuthSessionMissingError()
-        }
-        const { data, error } = await this._refreshAccessToken(currentSession.refresh_token)
+        const { session: refreshedSession, error } = await this._callRefreshToken(currentSession.refresh_token)
         if (error) {
-          return { data: { session: null, user: null }, error: error }
+          return { data: { user: null, session: null }, error: error }
         }
 
-        if (!data.session) {
-          return { data: { session: null, user: null }, error: null }
+        if (!refreshedSession) {
+          return { data: { user: null, session: null }, error: null }
         }
-        session = data.session
+        session = refreshedSession
       } else {
         const { data, error } = await this.getUser(currentSession.access_token)
         if (error) {
-          throw error
+          return { data: { user: null, session: null }, error: error }
         }
         session = {
           access_token: currentSession.access_token,
@@ -580,10 +579,7 @@ export default class GoTrueClient {
         }
       }
 
-      await this._saveSession(session)
-      this._notifyAllSubscribers('TOKEN_REFRESHED', session)
-
-      return { data: { session, user: session.user }, error: null }
+      return { data: { user: session.user, session }, error: null }
     } catch (error) {
       if (isAuthError(error)) {
         return { data: { session: null, user: null }, error }
