@@ -49,7 +49,7 @@ function App() {
   useEffect(() => {
     async function showMfaDevices() {
       const {
-        data: { factors: currentFactors },
+        data: { all: currentFactors },
         error,
       } = await auth.mfa.listFactors()
       if (error) console.log(error)
@@ -81,9 +81,9 @@ function App() {
         setEnabled(!e)
         setEnroll({
           factor_id: data.id,
-          qr: data.TOTP.qr_code,
-          secret: data.TOTP.secret,
-          uri: data.TOTP.uri,
+          qr: data.totp.qr_code,
+          secret: data.totp.secret,
+          uri: data.totp.uri,
           type: data.type,
         })
 
@@ -256,7 +256,11 @@ function App() {
                   <div className="ml-2 bg-gray-200 px-2 py-3 rounded-md">{enrollData.secret}</div>
                 </div>
                 <div className="bg-gray-200 rounded-md text-center">
-                  <img id="totp_qr" src={enrollData.qr} alt={enrollData.uri} />
+                  <img
+                    id="totp_qr"
+                    src={'data:image/svg+xml;utf-8,' + enrollData.qr}
+                    alt={enrollData.uri}
+                  />
                   <label
                     className="py-2 text-sm font-medium leading-5 text-gray-700"
                     htmlFor="totp_qr"
