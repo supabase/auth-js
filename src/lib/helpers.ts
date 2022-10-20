@@ -121,6 +121,7 @@ export class Deferred<T = any> {
   }
 }
 
+// Taken from: https://stackoverflow.com/questions/38552003/how-to-decode-jwt-token-in-javascript-without-using-a-library
 export function decodeJWTPayload(token: string) {
   const base64Regex = /^([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))?$/
   const parts = token.split('.')
