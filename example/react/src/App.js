@@ -48,18 +48,19 @@ function App() {
 
   useEffect(() => {
     async function showMfaDevices() {
-      const {
-        data: { all: currentFactors },
-        error,
-      } = await auth.mfa.listFactors()
+      const { data, error } = await auth.mfa.listFactors()
       if (error) console.log(error)
-      setFactors([...currentFactors])
-      currentFactors.forEach((factor) => {
-        if (factor.status === 'verified') {
-          document.getElementById('enroll').checked = true
-          document.getElementById('enroll').disabled = true
-        }
-      })
+
+      const currentFactors = data?.all ?? null
+      if (currentFactors) {
+        setFactors([...currentFactors])
+        currentFactors.forEach((factor) => {
+          if (factor.status === 'verified') {
+            document.getElementById('enroll').checked = true
+            document.getElementById('enroll').disabled = true
+          }
+        })
+      }
     }
     showMfaDevices()
   }, [enrollData, isTotpVerified])
@@ -176,9 +177,21 @@ function App() {
     } else {
       localStorage.removeItem('email')
     }
-    let { error, data } = await auth.signInWithPassword({ email, password })
-    if (!error && !data) alert('Check your email for the login link!')
-    if (error) console.log('Error: ', error.message)
+    if (password) {
+      let { error } = await auth.signInWithPassword({ email, password })
+      if (error) console.log('Error: ', error.message)
+    } else {
+      let { error, data } = await auth.signInWithOtp({
+        email: email,
+        options: {
+          data: {
+            name: 'my-custom-name',
+          },
+        },
+      })
+      if (error) alert(`Error sending magic link: ${error}`)
+      if (!error && !data) alert('Check your email for the login link!')
+    }
   }
   async function handleEmailSignUp() {
     let { error } = await auth.signUp({
