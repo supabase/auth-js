@@ -123,15 +123,15 @@ export class Deferred<T = any> {
 
 // Taken from: https://stackoverflow.com/questions/38552003/how-to-decode-jwt-token-in-javascript-without-using-a-library
 export function decodeJWTPayload(token: string) {
-  const base64Regex = /^([a-z0-9_-]{4})*($|[a-z0-9_-]{3}=?$|[a-z0-9_-]{2}(==)?$)$/i
+  const base64UrlRegex = /^([a-z0-9_-]{4})*($|[a-z0-9_-]{3}=?$|[a-z0-9_-]{2}(==)?$)$/i
   const parts = token.split('.')
 
   if (parts.length !== 3) {
     throw new Error('JWT is not valid: not a JWT structure')
   }
 
-  if (!base64Regex.test(parts[1])) {
-    throw new Error('JWT is not valid: payload is not base64')
+  if (!base64UrlRegex.test(parts[1])) {
+    throw new Error('JWT is not valid: payload is not in base64url format')
   }
 
   const base64Url = parts[1]
