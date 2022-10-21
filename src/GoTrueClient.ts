@@ -51,7 +51,6 @@ import type {
   GoTrueMFAApi,
   MFAEnrollParams,
   AuthMFAEnrollResponse,
-  MFAChallengeAndVerifyParams,
   MFAChallengeParams,
   AuthMFAChallengeResponse,
   MFAUnenrollParams,
@@ -63,6 +62,7 @@ import type {
   AuthMFAGetAuthenticatorAssuranceLevelResponse,
   AuthenticatorAssuranceLevels,
   Factor,
+  MFAChallengeAndVerifyParams,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -232,7 +232,7 @@ export default class GoTrueClient {
           body: {
             email,
             password,
-            data: options?.data,
+            data: options?.data ?? {},
             gotrue_meta_security: { captcha_token: options?.captchaToken },
           },
           xform: _sessionResponse,
@@ -244,7 +244,7 @@ export default class GoTrueClient {
           body: {
             phone,
             password,
-            data: options?.data,
+            data: options?.data ?? {},
             gotrue_meta_security: { captcha_token: options?.captchaToken },
           },
           xform: _sessionResponse,
@@ -294,6 +294,7 @@ export default class GoTrueClient {
           body: {
             email,
             password,
+            data: options?.data ?? {},
             gotrue_meta_security: { captcha_token: options?.captchaToken },
           },
           xform: _sessionResponse,
@@ -305,6 +306,7 @@ export default class GoTrueClient {
           body: {
             phone,
             password,
+            data: options?.data ?? {},
             gotrue_meta_security: { captcha_token: options?.captchaToken },
           },
           xform: _sessionResponse,
@@ -622,6 +624,46 @@ export default class GoTrueClient {
     } catch (error) {
       if (isAuthError(error)) {
         return { data: { session: null, user: null }, error }
+      }
+
+      throw error
+    }
+  }
+
+  /**
+   * Returns a new session, regardless of expiry status.
+   * Takes in an optional current session. If not passed in, then refreshSession() will attempt to retrieve it from getSession().
+   * If the current session's refresh token is invalid, an error will be thrown.
+   * @param currentSession The current session. If passed in, it must contain a refresh token.
+   */
+  async refreshSession(currentSession?: { refresh_token: string }): Promise<AuthResponse> {
+    try {
+      if (!currentSession) {
+        const { data, error } = await this.getSession()
+        if (error) {
+          throw error
+        }
+
+        currentSession = data.session ?? undefined
+      }
+
+      if (!currentSession?.refresh_token) {
+        throw new AuthSessionMissingError()
+      }
+
+      const { session, error } = await this._callRefreshToken(currentSession.refresh_token)
+      if (error) {
+        return { data: { user: null, session: null }, error: error }
+      }
+
+      if (!session) {
+        return { data: { user: null, session: null }, error: null }
+      }
+
+      return { data: { user: session.user, session }, error: null }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error }
       }
 
       throw error
@@ -1135,16 +1177,20 @@ export default class GoTrueClient {
       jwt: sessionData?.session?.access_token,
     })
   }
-  private async _challengeAndVerify(params: MFAChallengeAndVerifyParams): Promise<AuthMFAVerifyResponse> {
-    const { data: sessionData, error: sessionError } = await this.getSession()
-    if (sessionError) {
-      return { data: null, error: sessionError }
-    }
-    const { data: challengeData, error: challengeError } = await this.mfa.challenge({factorId: params.factorId})
+  private async _challengeAndVerify(
+    params: MFAChallengeAndVerifyParams
+  ): Promise<AuthMFAVerifyResponse> {
+    const { data: challengeData, error: challengeError } = await this._challenge({
+      factorId: params.factorId,
+    })
     if (challengeError) {
-      return { data: null, error: challengeError}
+      return { data: null, error: challengeError }
     }
-    return this._verify({factorId: params.factorId, challengeId: challengeData.id, code: params.code})
+    return await this._verify({
+      factorId: params.factorId,
+      challengeId: challengeData.id,
+      code: params.code,
+    })
   }
 
   /**
