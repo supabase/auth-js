@@ -444,7 +444,12 @@ export interface VerifyMobileOtpParams {
   options?: {
     /** A URL to send the user to after they are confirmed. */
     redirectTo?: string
-    /** Verification token received when the user completes the captcha on the site. */
+
+    /**
+     * Verification token received when the user completes the captcha on the site.
+     *
+     * @deprecated
+     */
     captchaToken?: string
   }
 }
@@ -805,7 +810,7 @@ export interface GoTrueMFAApi {
    */
   unenroll(params: MFAUnenrollParams): Promise<AuthMFAUnenrollResponse>
 
-/**
+  /**
    * Helper method which creates a challenge and immediately uses the given code to verify against it thereafter. The verification code is
    * provided by the user by entering a code seen in their authenticator app.
    *
