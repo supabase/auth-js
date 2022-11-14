@@ -159,10 +159,14 @@ export default class GoTrueAdminApi {
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
    * @param params An object which supports `page` and `per_page` as numbers, to alter the paginated results.
    */
-  async listUsers(params: PageParams): Promise<
+  async listUsers(params?: PageParams): Promise<
     { data: { users: User[] }; error: null } | { data: { users: [] }; error: AuthError }
   > {
-    const pageParams = params.page && params.per_page ? `?page=${params.page}&per_page=${params.per_page}` : params.page ? `?page=${params.page}` : params.per_page ? `?per_page=${params.per_page}` : ''
+    let pageParams = ''
+    if (params) {
+      pageParams = params.page && params.per_page ? `?page=${params.page}&per_page=${params.per_page}` : params.page ? `?page=${params.page}` : params.per_page ? `?per_page=${params.per_page}` : ''
+    }
+    
     try {
      const { data, error } = await _request(this.fetch, 'GET', `${this.url}/admin/users${pageParams}`, {
         headers: this.headers,
