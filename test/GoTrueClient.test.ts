@@ -545,9 +545,13 @@ describe('Signout behaviour', () => {
       password,
     })
 
-    const res = await authWithSession.signOut()
+    const { error } = await authWithSession.signOut()
 
-    expect(res).toBeTruthy()
+    expect(error).toBe(null)
+    const {
+      data: { user },
+    } = await authWithSession.getUser()
+    expect(user).toBe(null)
   })
 
   test('signOut should remove session if user is not found or jwt is invalid', async () => {
