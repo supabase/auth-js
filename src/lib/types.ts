@@ -972,6 +972,6 @@ export type CallRefreshTokenResult =
     }
 
 export type PageParams = {
-  page?: number,
-  per_page?: number
+  page?: string,
+  per_page?: string
 }
