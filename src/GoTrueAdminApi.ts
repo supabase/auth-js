@@ -161,7 +161,6 @@ export default class GoTrueAdminApi {
   async listUsers(params?: PageParams): Promise<
     { data: { users: User[] }; error: null } | { data: { users: [] }; error: AuthError }
   > {
-    
     try {
       const { data, error } = await _request(this.fetch, 'GET', `${this.url}/admin/users`, {
         headers: this.headers,
