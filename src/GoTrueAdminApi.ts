@@ -157,7 +157,7 @@ export default class GoTrueAdminApi {
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
    */
   async listUsers(): Promise<
-    { data: { users: User[] }; error: null } | { data: { users: [] }; error: AuthError }
+    { data: { users: User[], aud: string, next?: string | null, last?: string, total?: number }; error: null } | { data: { users: [] }; error: AuthError }
   > {
     try {
       const { data, error } = await _request(this.fetch, 'GET', `${this.url}/admin/users`, {
