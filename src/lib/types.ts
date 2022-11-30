@@ -21,7 +21,6 @@ export type Provider =
   | 'workos'
 
 /**
- * @experimental
  */
 export type AuthChangeEventMFA = 'MFA_CHALLENGE_VERIFIED'
 
@@ -593,7 +592,6 @@ export type GenerateLinkType =
   | 'email_change_new'
 
 /**
- * @experimental
  */
 export type MFAEnrollParams = {
   factorType: 'totp'
@@ -602,7 +600,6 @@ export type MFAEnrollParams = {
 }
 
 /**
- * @experimental
  */
 export type MFAUnenrollParams = {
   /** ID of the factor being unenrolled. */
@@ -610,7 +607,6 @@ export type MFAUnenrollParams = {
 }
 
 /**
- * @experimental
  */
 export type MFAVerifyParams = {
   /** ID of the factor being verified. */
@@ -624,7 +620,6 @@ export type MFAVerifyParams = {
 }
 
 /**
- * @experimental
  */
 export type MFAChallengeParams = {
   /** ID of the factor to be challenged. */
@@ -632,7 +627,6 @@ export type MFAChallengeParams = {
 }
 
 /**
- * @experimental
  */
 export type MFAChallengeAndVerifyParams = {
   /** ID of the factor being verified. */
@@ -642,7 +636,6 @@ export type MFAChallengeAndVerifyParams = {
 }
 
 /**
- * @experimental
  */
 export type AuthMFAVerifyResponse =
   | {
@@ -670,7 +663,6 @@ export type AuthMFAVerifyResponse =
     }
 
 /**
- * @experimental
  */
 export type AuthMFAEnrollResponse =
   | {
@@ -706,7 +698,6 @@ export type AuthMFAEnrollResponse =
     }
 
 /**
- * @experimental
  */
 export type AuthMFAUnenrollResponse =
   | {
@@ -719,7 +710,6 @@ export type AuthMFAUnenrollResponse =
   | { data: null; error: AuthError }
 
 /**
- * @experimental
  */
 export type AuthMFAChallengeResponse =
   | {
@@ -735,7 +725,6 @@ export type AuthMFAChallengeResponse =
   | { data: null; error: AuthError }
 
 /**
- * @experimental
  */
 export type AuthMFAListFactorsResponse =
   | {
@@ -751,12 +740,10 @@ export type AuthMFAListFactorsResponse =
   | { data: null; error: AuthError }
 
 /**
- * @experimental
  */
 export type AuthenticatorAssuranceLevels = 'aal1' | 'aal2'
 
 /**
- * @experimental
  */
 export type AuthMFAGetAuthenticatorAssuranceLevelResponse =
   | {
@@ -786,7 +773,6 @@ export type AuthMFAGetAuthenticatorAssuranceLevelResponse =
 /**
  * Contains the full multi-factor authentication API.
  *
- * @experimental
  */
 export interface GoTrueMFAApi {
   /**
@@ -804,7 +790,6 @@ export interface GoTrueMFAApi {
    * @see {@link GoTrueMFAApi#verify}
    * @see {@link GoTrueMFAApi#getAuthenticatorAssuranceLevel}
    *
-   * @experimental
    */
   enroll(params: MFAEnrollParams): Promise<AuthMFAEnrollResponse>
 
@@ -813,7 +798,6 @@ export interface GoTrueMFAApi {
    * factor. Provide the challenge ID and verification code by calling
    * {@link GoTrueMFAApi#verify}.
    *
-   * @experimental
    */
   challenge(params: MFAChallengeParams): Promise<AuthMFAChallengeResponse>
 
@@ -823,7 +807,6 @@ export interface GoTrueMFAApi {
    *
    * @see {@link GoTrueMFAApi#challenge}
    *
-   * @experimental
    */
   verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse>
 
@@ -832,7 +815,6 @@ export interface GoTrueMFAApi {
    * and it's not necessary to unenroll them. Unenrolling a verified MFA factor
    * cannot be done from a session with an `aal1` authenticator level.
    *
-   * @experimental
    */
   unenroll(params: MFAUnenrollParams): Promise<AuthMFAUnenrollResponse>
 
@@ -842,7 +824,6 @@ export interface GoTrueMFAApi {
    *
    * @see {@link GoTrueMFAApi#challengeAndVerify}
    *
-   * @experimental
    */
   challengeAndVerify(params: MFAChallengeAndVerifyParams): Promise<AuthMFAVerifyResponse>
 
@@ -857,7 +838,6 @@ export interface GoTrueMFAApi {
    * @see {@link GoTrueMFAApi#getAuthenticatorAssuranceLevel}
    * @see {@link GoTrueClient#getUser}
    *
-   * @experimental
    */
   listFactors(): Promise<AuthMFAListFactorsResponse>
 
@@ -873,7 +853,6 @@ export interface GoTrueMFAApi {
    * and rarely uses the network. You can use this to check whether the current
    * user needs to be shown a screen to verify their MFA factors.
    *
-   * @experimental
    */
   getAuthenticatorAssuranceLevel(): Promise<AuthMFAGetAuthenticatorAssuranceLevelResponse>
 }
@@ -932,7 +911,6 @@ export interface GoTrueAdminMFAApi {
   /**
    * Lists all factors attached to a user.
    *
-   * @experimental
    */
   listFactors(params: AuthMFAAdminListFactorsParams): Promise<AuthMFAAdminListFactorsResponse>
 
