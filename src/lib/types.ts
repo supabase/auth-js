@@ -20,8 +20,6 @@ export type Provider =
   | 'twitter'
   | 'workos'
 
-/**
- */
 export type AuthChangeEventMFA = 'MFA_CHALLENGE_VERIFIED'
 
 export type AuthChangeEvent =
@@ -591,23 +589,17 @@ export type GenerateLinkType =
   | 'email_change_current'
   | 'email_change_new'
 
-/**
- */
 export type MFAEnrollParams = {
   factorType: 'totp'
   issuer?: string
   friendlyName?: string
 }
 
-/**
- */
 export type MFAUnenrollParams = {
   /** ID of the factor being unenrolled. */
   factorId: string
 }
 
-/**
- */
 export type MFAVerifyParams = {
   /** ID of the factor being verified. */
   factorId: string
@@ -619,15 +611,11 @@ export type MFAVerifyParams = {
   code: string
 }
 
-/**
- */
 export type MFAChallengeParams = {
   /** ID of the factor to be challenged. */
   factorId: string
 }
 
-/**
- */
 export type MFAChallengeAndVerifyParams = {
   /** ID of the factor being verified. */
   factorId: string
@@ -635,8 +623,6 @@ export type MFAChallengeAndVerifyParams = {
   code: string
 }
 
-/**
- */
 export type AuthMFAVerifyResponse =
   | {
       data: {
@@ -662,8 +648,6 @@ export type AuthMFAVerifyResponse =
       error: AuthError
     }
 
-/**
- */
 export type AuthMFAEnrollResponse =
   | {
       data: {
@@ -697,8 +681,6 @@ export type AuthMFAEnrollResponse =
       error: AuthError
     }
 
-/**
- */
 export type AuthMFAUnenrollResponse =
   | {
       data: {
@@ -709,8 +691,6 @@ export type AuthMFAUnenrollResponse =
     }
   | { data: null; error: AuthError }
 
-/**
- */
 export type AuthMFAChallengeResponse =
   | {
       data: {
@@ -724,8 +704,6 @@ export type AuthMFAChallengeResponse =
     }
   | { data: null; error: AuthError }
 
-/**
- */
 export type AuthMFAListFactorsResponse =
   | {
       data: {
@@ -739,12 +717,8 @@ export type AuthMFAListFactorsResponse =
     }
   | { data: null; error: AuthError }
 
-/**
- */
 export type AuthenticatorAssuranceLevels = 'aal1' | 'aal2'
 
-/**
- */
 export type AuthMFAGetAuthenticatorAssuranceLevelResponse =
   | {
       data: {
