@@ -85,6 +85,19 @@ export type OAuthResponse =
       error: AuthError
     }
 
+export type SSOResponse =
+  | {
+      data: {
+        /** URL to take the user to (in a browser) to complete SSO. */
+        url: string
+      }
+      error: null
+    }
+  | {
+      data: null
+      error: AuthError
+    }
+
 export type UserResponse =
   | {
       data: {
@@ -470,6 +483,24 @@ export interface VerifyEmailOtpParams {
 
 export type MobileOtpType = 'sms' | 'phone_change'
 export type EmailOtpType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change'
+
+export type SignInWithSSO = {
+  options?: {
+    /** A URL to send the user to after they have signed-in. */
+    redirectTo?: string
+    /** Verification token received when the user completes the captcha on the site. */
+    captchaToken?: string
+  }
+} & (
+  | {
+      /** UUID of the SSO provider to invoke single-sign on to. */
+      providerId: string
+    }
+  | {
+      /** Domain name of the organization for which to invoke single-sign on. */
+      domain: string
+    }
+)
 
 export type GenerateSignupLinkParams = {
   type: 'signup'

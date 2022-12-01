@@ -13,9 +13,10 @@ import {
   AuthRetryableFetchError,
   AuthSessionMissingError,
   AuthUnknownError,
+  isAuthApiError,
   isAuthError,
 } from './lib/errors'
-import { Fetch, _request, _sessionResponse, _userResponse } from './lib/fetch'
+import { Fetch, _request, _sessionResponse, _userResponse, _ssoResponse } from './lib/fetch'
 import {
   Deferred,
   getItemAsync,
@@ -36,11 +37,13 @@ import type {
   GoTrueClientOptions,
   InitializeResult,
   OAuthResponse,
+  SSOResponse,
   Provider,
   Session,
   SignInWithOAuthCredentials,
   SignInWithPasswordCredentials,
   SignInWithPasswordlessCredentials,
+  SignInWithSSO,
   SignUpWithPasswordCredentials,
   Subscription,
   SupportedStorage,
@@ -434,6 +437,50 @@ export default class GoTrueClient {
   }
 
   /**
+   * Attempts a single-sign on using an enterprise Identity Provider. A
+   * successful SSO attempt will redirect the current page to the identity
+   * provider authorization page. The redirect URL is implementation and SSO
+   * protocol specific.
+   *
+   * You can use it by providing a SSO domain. Typically you can extract this
+   * domain by asking users for their email address. If this domain is
+   * registered on the Auth instance the redirect will use that organization's
+   * currently active SSO Identity Provider for the login.
+   *
+   * If you have built an organization-specific login page, you can use the
+   * organization's SSO Identity Provider UUID directly instead.
+   *
+   * This API is experimental and availability is conditional on correct
+   * settings on the Auth service.
+   *
+   * @experimental
+   */
+  async signInWithSSO(params: SignInWithSSO): Promise<SSOResponse> {
+    try {
+      await this._removeSession()
+
+      return await _request(this.fetch, 'POST', `${this.url}/sso`, {
+        body: {
+          ...('providerId' in params ? { provider_id: params.providerId } : null),
+          ...('domain' in params ? { domain: params.domain } : null),
+          redirect_to: params.options?.redirectTo ?? undefined,
+          ...(params?.options?.captchaToken
+            ? { gotrue_meta_security: { captcha_token: params.options.captchaToken } }
+            : null),
+          skip_http_redirect: true, // fetch does not handle redirects
+        },
+        headers: this.headers,
+        xform: _ssoResponse,
+      })
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: null, error }
+      }
+      throw error
+    }
+  }
+
+  /**
    * Returns the session, refreshing it if necessary.
    * The session returned can be null if the session is not detected which can happen in the event a user is not signed-in or has logged out.
    */
@@ -481,9 +528,8 @@ export default class GoTrueClient {
       return { data: { session: null }, error: null }
     }
 
-    const timeNow = Math.round(Date.now() / 1000)
     const hasExpired = currentSession.expires_at
-      ? currentSession.expires_at <= timeNow + EXPIRY_MARGIN
+      ? currentSession.expires_at <= Date.now() / 1000
       : false
     if (!hasExpired) {
       return { data: { session: currentSession }, error: null }
@@ -771,7 +817,13 @@ export default class GoTrueClient {
     const accessToken = data.session?.access_token
     if (accessToken) {
       const { error } = await this.admin.signOut(accessToken)
-      if (error) return { error }
+      if (error) {
+        // ignore 404s since user might not exist anymore
+        // ignore 401s since an invalid or expired JWT should sign out the current session
+        if (!(isAuthApiError(error) && (error.status === 404 || error.status === 401))) {
+          return { error }
+        }
+      }
     }
     await this._removeSession()
     this._notifyAllSubscribers('SIGNED_OUT', null)
