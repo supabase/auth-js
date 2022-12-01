@@ -453,6 +453,7 @@ export default class GoTrueClient {
    * This API is experimental and availability is conditional on correct
    * settings on the Auth service.
    *
+   * @experimental
    */
   async signInWithSSO(params: SignInWithSSO): Promise<SSOResponse> {
     try {
