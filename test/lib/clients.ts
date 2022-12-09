@@ -56,6 +56,13 @@ export const clientApiAutoConfirmDisabledClient = new GoTrueClient({
   persistSession: true,
 })
 
+export const clientApiWithNoResolveJson = new GoTrueClient({
+  url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+  autoRefreshToken: false,
+  persistSession: true,
+  noResolveJsonOnFetchedResponse: true
+})
+
 export const authAdminApiAutoConfirmEnabledClient = new GoTrueAdminApi({
   url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
   headers: {
