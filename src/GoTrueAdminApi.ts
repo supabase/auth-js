@@ -164,7 +164,7 @@ export default class GoTrueAdminApi {
     try {
       const { data, error } = await _request(this.fetch, 'GET', `${this.url}/admin/users`, {
         headers: this.headers,
-        query: params,
+        query: { page: params?.page ?? '', per_page: params?.perPage ?? '' },
       })
       if (error) throw error
       return { data: { ...data }, error: null }
