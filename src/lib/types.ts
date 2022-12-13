@@ -915,6 +915,8 @@ export type CallRefreshTokenResult =
     }
 
 export type PageParams = {
-  page?: number,
+  /** The page number */
+  page?: number
+  /** Number of items returned per page */
   perPage?: number
 }
