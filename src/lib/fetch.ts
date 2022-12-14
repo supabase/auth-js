@@ -4,6 +4,7 @@ import {
   SSOResponse,
   GenerateLinkProperties,
   GenerateLinkResponse,
+  Pagination,
   User,
   UserResponse,
 } from './types'
@@ -112,10 +113,25 @@ async function _handleRequest(
 ): Promise<any> {
   return new Promise((resolve, reject) => {
     fetcher(url, _getRequestParams(method, options, parameters, body))
-      .then((result) => {
+      .then(async (result) => {
         if (!result.ok) throw result
         if (options?.noResolveJson) return result
-        return result.json()
+        const json = await result.json()
+        let pagination: Pagination = {}
+        const links = result.headers.get('link')?.split(',')
+
+        if (links) {
+            links.forEach(link => {
+                const url = link.split(';')[0].replace(/[\<\>\s]/g, '')
+                const rel = JSON.parse(link.split(';')[1].replace(/[\<\>\s]/g, '').split('=')[1])
+                pagination[rel] = url
+            })
+            
+            if (!pagination.next) pagination.next = null
+            const total = result.headers.get('x-total-count') ?? '0'
+            pagination.total = parseInt(total)
+        }
+        return { ...json, ...pagination }
       })
       .then((data) => resolve(data))
       .catch((error) => handleError(error, reject))

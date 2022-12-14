@@ -927,3 +927,10 @@ export type CallRefreshTokenResult =
       session: null
       error: AuthError
     }
+
+export type Pagination = {
+  [key: string]: any
+  next?: string | null,
+  last?: string,
+  total?: number
+}
