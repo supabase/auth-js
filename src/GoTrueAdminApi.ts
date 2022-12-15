@@ -12,6 +12,7 @@ import {
   AuthMFAAdminDeleteFactorResponse,
   AuthMFAAdminListFactorsParams,
   AuthMFAAdminListFactorsResponse,
+  PageParams,
 } from './lib/types'
 import { AuthError, isAuthError } from './lib/errors'
 
@@ -156,15 +157,20 @@ export default class GoTrueAdminApi {
    * Get a list of users.
    *
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
+   * @param params An object which supports `page` and `per_page` as numbers, to alter the paginated results.
    */
-  async listUsers(): Promise<
-    { data: { users: User[], aud: string } & Pagination; error: null } | { data: { users: [] }; error: AuthError }
-  > {
+  async listUsers(
+    params?: PageParams
+  ): Promise<{ data: { users: User[], aud: string } & Pagination; error: null } | { data: { users: [] }; error: AuthError }> {
     try {
       let pagination: Pagination = {}
       const response = await _request(this.fetch, 'GET', `${this.url}/admin/users`, {
         headers: this.headers,
-        noResolveJson: true
+        noResolveJson: true,
+        query: {
+          page: params?.page?.toString() ?? '',
+          per_page: params?.perPage?.toString() ?? '',
+        },
       })
       if (response.error) throw response.error
       
