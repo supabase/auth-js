@@ -157,7 +157,7 @@ export default class GoTrueAdminApi {
    * Get a list of users.
    *
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
-   * @param params An object which supports `page` and `per_page` as numbers, to alter the paginated results.
+   * @param params An object which supports `page` and `perPage` as numbers, to alter the paginated results.
    */
   async listUsers(
     params?: PageParams
