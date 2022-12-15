@@ -4,7 +4,6 @@ import {
   SSOResponse,
   GenerateLinkProperties,
   GenerateLinkResponse,
-  Pagination,
   User,
   UserResponse,
 } from './types'
@@ -100,7 +99,14 @@ export async function _request(
     {},
     options?.body
   )
-  return options?.xform ? options?.xform(data) : { data: { ...data }, error: null }
+  return options?.xform ? options?.xform(data) : 
+    options?.noResolveJson ? 
+      new Response(data.body, { 
+        headers: data.headers, 
+        status: data.status, 
+        statusText: data.statusText 
+      }) 
+      : { data: { ...data }, error: null }
 }
 
 async function _handleRequest(
@@ -116,22 +122,7 @@ async function _handleRequest(
       .then(async (result) => {
         if (!result.ok) throw result
         if (options?.noResolveJson) return result
-        const json = await result.json()
-        let pagination: Pagination = {}
-        const links = result.headers.get('link')?.split(',')
-
-        if (links) {
-            links.forEach(link => {
-                const url = link.split(';')[0].replace(/[\<\>\s]/g, '')
-                const rel = JSON.parse(link.split(';')[1].replace(/[\<\>\s]/g, '').split('=')[1])
-                pagination[rel] = url
-            })
-            
-            if (!pagination.next) pagination.next = null
-            const total = result.headers.get('x-total-count') ?? '0'
-            pagination.total = parseInt(total)
-        }
-        return { ...json, ...pagination }
+        return result.json()
       })
       .then((data) => resolve(data))
       .catch((error) => handleError(error, reject))

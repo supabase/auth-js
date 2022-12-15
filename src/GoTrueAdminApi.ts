@@ -4,6 +4,7 @@ import {
   AdminUserAttributes,
   GenerateLinkParams,
   GenerateLinkResponse,
+  Pagination,
   User,
   UserResponse,
   GoTrueAdminMFAApi,
@@ -157,14 +158,31 @@ export default class GoTrueAdminApi {
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
    */
   async listUsers(): Promise<
-    { data: { users: User[], aud: string, next?: string | null, last?: string, total?: number }; error: null } | { data: { users: [] }; error: AuthError }
+    { data: { users: User[], aud: string } & Pagination; error: null } | { data: { users: [] }; error: AuthError }
   > {
     try {
-      const { data, error } = await _request(this.fetch, 'GET', `${this.url}/admin/users`, {
+      let pagination: Pagination = {}
+      const response = await _request(this.fetch, 'GET', `${this.url}/admin/users`, {
         headers: this.headers,
+        noResolveJson: true
       })
-      if (error) throw error
-      return { data: { ...data }, error: null }
+      if (response.error) throw response.error
+      
+      const links = response.headers.get('link')?.split(',')
+
+      if (links) {
+        links.forEach((link: string) => {
+            const url = link.split(';')[0].replace(/[\<\>\s]/g, '')
+            const rel = JSON.parse(link.split(';')[1].replace(/[\<\>\s]/g, '').split('=')[1])
+            pagination[rel] = url
+        })
+        
+        if (!pagination.next) pagination.next = null
+        const total = response.headers.get('x-total-count') ?? '0'
+        pagination.total = parseInt(total)
+      }
+      const users = await response.json()
+      return { data: { ...users, ...pagination }, error: null }
     } catch (error) {
       if (isAuthError(error)) {
         return { data: { users: [] }, error }
