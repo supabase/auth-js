@@ -1,4 +1,10 @@
-import { Fetch, _generateLinkResponse, _request, _userResponse } from './lib/fetch'
+import {
+  Fetch,
+  _generateLinkResponse,
+  _noResolveJsonResponse,
+  _request,
+  _userResponse,
+} from './lib/fetch'
 import { resolveFetch } from './lib/helpers'
 import {
   AdminUserAttributes,
@@ -161,7 +167,10 @@ export default class GoTrueAdminApi {
    */
   async listUsers(
     params?: PageParams
-  ): Promise<{ data: { users: User[], aud: string } & Pagination; error: null } | { data: { users: [] }; error: AuthError }> {
+  ): Promise<
+    | { data: { users: User[]; aud: string } & Pagination; error: null }
+    | { data: { users: [] }; error: AuthError }
+  > {
     try {
       let pagination: Pagination = {}
       const response = await _request(this.fetch, 'GET', `${this.url}/admin/users`, {
@@ -171,18 +180,24 @@ export default class GoTrueAdminApi {
           page: params?.page?.toString() ?? '',
           per_page: params?.perPage?.toString() ?? '',
         },
+        xform: _noResolveJsonResponse,
       })
       if (response.error) throw response.error
-      
+
       const links = response.headers.get('link')?.split(',')
 
       if (links) {
         links.forEach((link: string) => {
-            const url = link.split(';')[0].replace(/[\<\>\s]/g, '')
-            const rel = JSON.parse(link.split(';')[1].replace(/[\<\>\s]/g, '').split('=')[1])
-            pagination[rel] = url
+          const url = link.split(';')[0].replace(/[\<\>\s]/g, '')
+          const rel = JSON.parse(
+            link
+              .split(';')[1]
+              .replace(/[\<\>\s]/g, '')
+              .split('=')[1]
+          )
+          pagination[rel] = url
         })
-        
+
         if (!pagination.next) pagination.next = null
         const total = response.headers.get('x-total-count') ?? '0'
         pagination.total = parseInt(total)

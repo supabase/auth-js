@@ -99,14 +99,7 @@ export async function _request(
     {},
     options?.body
   )
-  return options?.xform ? options?.xform(data) : 
-    options?.noResolveJson ? 
-      new Response(data.body, { 
-        headers: data.headers, 
-        status: data.status, 
-        statusText: data.statusText 
-      }) 
-      : { data: { ...data }, error: null }
+  return options?.xform ? options?.xform(data) : { data: { ...data }, error: null }
 }
 
 async function _handleRequest(
@@ -167,6 +160,10 @@ export function _generateLinkResponse(data: any): GenerateLinkResponse {
     },
     error: null,
   }
+}
+
+export function _noResolveJsonResponse(data: any): Response {
+  return data
 }
 
 /**
