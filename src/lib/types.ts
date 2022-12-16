@@ -916,9 +916,9 @@ export type CallRefreshTokenResult =
 
 export type Pagination = {
   [key: string]: any
-  next?: string | null,
-  last?: string,
-  total?: number
+  nextPage: number | null,
+  lastPage: number,
+  total: number
 }
 
 export type PageParams = {

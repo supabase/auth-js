@@ -172,7 +172,7 @@ export default class GoTrueAdminApi {
     | { data: { users: [] }; error: AuthError }
   > {
     try {
-      let pagination: Pagination = {}
+      let pagination: Pagination = { nextPage: null, lastPage: 0, total: 0 }
       const response = await _request(this.fetch, 'GET', `${this.url}/admin/users`, {
         headers: this.headers,
         noResolveJson: true,
@@ -184,25 +184,27 @@ export default class GoTrueAdminApi {
       })
       if (response.error) throw response.error
 
-      const links = response.headers.get('link')?.split(',')
-
-      if (links) {
+      const users = await response.json()
+      const total = response.headers.get('x-total-count') ?? 0
+      const links = response.headers.get('link')?.split(',') ?? []
+      if (links.length > 0) {
         links.forEach((link: string) => {
-          const url = link.split(';')[0].replace(/[\<\>\s]/g, '')
+          const page = parseInt(
+            link
+              .split(';')[0]
+              .split('=')[1]
+              .substring(0,1)
+          )
           const rel = JSON.parse(
             link
               .split(';')[1]
-              .replace(/[\<\>\s]/g, '')
               .split('=')[1]
           )
-          pagination[rel] = url
+          pagination[`${rel}Page`] = page
         })
 
-        if (!pagination.next) pagination.next = null
-        const total = response.headers.get('x-total-count') ?? '0'
         pagination.total = parseInt(total)
       }
-      const users = await response.json()
       return { data: { ...users, ...pagination }, error: null }
     } catch (error) {
       if (isAuthError(error)) {
