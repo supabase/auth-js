@@ -285,15 +285,18 @@ export default class GoTrueAdminApi {
     params: AuthMFAAdminListFactorsParams
   ): Promise<AuthMFAAdminListFactorsResponse> {
     try {
-      const data = await _request(
+      const { data, error } = await _request(
         this.fetch,
         'GET',
         `${this.url}/admin/users/${params.userId}/factors`,
         {
           headers: this.headers,
+          xform: (factors: any) => {
+            return { data: { factors }, error: null }
+          },
         }
       )
-      return { data, error: null }
+      return { data, error }
     } catch (error) {
       if (isAuthError(error)) {
         return { data: null, error }
