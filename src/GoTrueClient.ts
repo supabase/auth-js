@@ -362,7 +362,7 @@ export default class GoTrueClient {
    * If the `{{ .Token }}` variable is specified in the email template, an OTP will be sent.
    * If you're using phone sign-ins, only an OTP will be sent. You won't be able to send a magiclink for phone sign-ins.
    *
-   * Be aware that you may get back an error message that will not distingish
+   * Be aware that you may get back an error message that will not distinguish
    * between the cases where the account does not exist or, that the account
    * can only be accessed via social login.
    */
