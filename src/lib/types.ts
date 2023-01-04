@@ -794,8 +794,7 @@ export interface GoTrueMFAApi {
   challengeAndVerify(params: MFAChallengeAndVerifyParams): Promise<AuthMFAVerifyResponse>
 
   /**
-   * Returns the list of MFA factors enabled for this user. This uses a cached version
-   * of the factors retrieved from the user's access token JWT to avoid incurring a network call.
+   * Returns the list of MFA factors enabled for this user.
    *
    * @see {@link GoTrueMFAApi#enroll}
    * @see {@link GoTrueMFAApi#getAuthenticatorAssuranceLevel}
