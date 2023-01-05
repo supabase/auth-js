@@ -81,7 +81,7 @@ const DEFAULT_OPTIONS: Omit<Required<GoTrueClientOptions>, 'fetch' | 'storage'> 
   headers: DEFAULT_HEADERS,
 }
 
-/** Current session will be checked for refresh will be checked at this interval. */
+/** Current session will be checked for refresh at this interval. */
 const AUTO_REFRESH_TICK_DURATION = 10 * 1000
 
 /**
