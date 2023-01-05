@@ -222,7 +222,7 @@ export default class GoTrueClient {
         error: new AuthUnknownError('Unexpected error during initialization', error),
       }
     } finally {
-      this._handleVisibilityChange()
+      await this._handleVisibilityChange()
     }
   }
 
@@ -1141,7 +1141,9 @@ export default class GoTrueClient {
       }
 
       // session will expire in this many ticks (or has already expired if <= 0)
-      const expiresInTicks = Math.floor((now - session.expires_at) / AUTO_REFRESH_TICK_DURATION)
+      const expiresInTicks = Math.floor(
+        (session.expires_at * 1000 - now) / AUTO_REFRESH_TICK_DURATION
+      )
 
       if (expiresInTicks < AUTO_REFRESH_TICK_THRESHOLD) {
         await this._callRefreshToken(session.refresh_token)
@@ -1156,7 +1158,7 @@ export default class GoTrueClient {
    * algorithms when the browser window/tab are in foreground. On non-browser
    * platforms it assumes always foreground.
    */
-  private _handleVisibilityChange() {
+  private async _handleVisibilityChange() {
     if (!isBrowser() || !window?.addEventListener) {
       if (this.autoRefreshToken) {
         // in non-browser environments the refresh token ticker runs always
@@ -1167,24 +1169,39 @@ export default class GoTrueClient {
     }
 
     try {
-      window?.addEventListener('visibilitychange', async () => {
-        if (document.visibilityState === 'visible') {
-          await this.initializePromise
-          await this._recoverAndRefresh()
+      window?.addEventListener(
+        'visibilitychange',
+        async () => await this._onVisibilityChanged(false)
+      )
 
-          if (this.autoRefreshToken) {
-            // in browser environments the refresh token ticker runs only on focused tabs
-            // which prevents race conditions
-            this.startAutoRefresh()
-          }
-        } else if (document.visibilityState === 'hidden') {
-          if (this.autoRefreshToken) {
-            this.stopAutoRefresh()
-          }
-        }
-      })
+      // now immediately call the visbility changed callback to setup with the
+      // current visbility state
+      await this._onVisibilityChanged(true) // initial call
     } catch (error) {
       console.error('_handleVisibilityChange', error)
+    }
+  }
+
+  /**
+   * Callback registered with `window.addEventListener('visibilitychange')`.
+   */
+  private async _onVisibilityChanged(isInitial: boolean) {
+    if (document.visibilityState === 'visible') {
+      if (!isInitial) {
+        // initial visibility change setup is handled in another flow under #initialize()
+        await this.initializePromise
+        await this._recoverAndRefresh()
+      }
+
+      if (this.autoRefreshToken) {
+        // in browser environments the refresh token ticker runs only on focused tabs
+        // which prevents race conditions
+        this.startAutoRefresh()
+      }
+    } else if (document.visibilityState === 'hidden') {
+      if (this.autoRefreshToken) {
+        this.stopAutoRefresh()
+      }
     }
   }
 
