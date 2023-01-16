@@ -96,10 +96,10 @@ export function decodeBase64URL(value: string): string {
     chr3 = ((enc3 & 3) << 6) | enc4;
     base64 = base64 + String.fromCharCode(chr1);
 
-    if (enc3 != 64 && enc3 != 0) {
+    if (enc3 != 64 && chr2 != 0) {
       base64 = base64 + String.fromCharCode(chr2);
     }
-    if (enc4 != 64 && enc4 != 0) {
+    if (enc4 != 64 && chr3 != 0) {
       base64 = base64 + String.fromCharCode(chr3);
     }
   }
