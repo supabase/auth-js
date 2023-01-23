@@ -1,4 +1,5 @@
 import { AuthError } from '../src/lib/errors'
+import * as fetch from '../src/lib/fetch'
 import {
   authClient as auth,
   authClientWithSession as authWithSession,
@@ -7,6 +8,7 @@ import {
   clientApiAutoConfirmDisabledClient as signUpDisabledClient,
   clientApiAutoConfirmEnabledClient as signUpEnabledClient,
   authAdminApiAutoConfirmEnabledClient,
+  clientApiWithNoResolveJson
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
 
@@ -900,5 +902,22 @@ describe('User management', () => {
     expect(error).toBeNull()
     expect(user).not.toBeNull()
     expect(user?.email).toEqual(email)
+  })
+})
+
+describe('Any API call with noResolveJson set to true', () => {
+  test('', async () => {
+    const spiedRequest = jest.spyOn(fetch, '_request');
+
+    const { email, password } = mockUserCredentials()
+
+    const { error, data } = await clientApiWithNoResolveJson.signUp({
+      email,
+      password,
+    })
+
+    expect(error).toBeNull()
+    expect(data.session).not.toBeNull()
+    expect(spiedRequest).toHaveBeenCalled();
   })
 })

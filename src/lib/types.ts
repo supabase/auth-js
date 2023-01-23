@@ -47,7 +47,9 @@ export type GoTrueClientOptions = {
   /* Provide your own local storage implementation to use instead of the browser's local storage. */
   storage?: SupportedStorage
   /* A custom fetch implementation. */
-  fetch?: Fetch
+  fetch?: Fetch,
+  /* Set to "true" if you want your response through a custom fetch implementation to be converted to JSON through `.json()` function */
+  noResolveJsonOnFetchedResponse?: boolean
 }
 
 export type AuthResponse =

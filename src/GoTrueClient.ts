@@ -77,6 +77,7 @@ const DEFAULT_OPTIONS: Omit<Required<GoTrueClientOptions>, 'fetch' | 'storage'> 
   persistSession: true,
   detectSessionInUrl: true,
   headers: DEFAULT_HEADERS,
+  noResolveJsonOnFetchedResponse: false
 }
 
 export default class GoTrueClient {
@@ -120,6 +121,7 @@ export default class GoTrueClient {
     [key: string]: string
   }
   protected fetch: Fetch
+  protected noResolveJsonOnFetchedResponse: boolean
 
   /**
    * Create a new client for use in the browser.
@@ -140,6 +142,7 @@ export default class GoTrueClient {
     this.url = settings.url
     this.headers = settings.headers
     this.fetch = resolveFetch(settings.fetch)
+    this.noResolveJsonOnFetchedResponse = settings.noResolveJsonOnFetchedResponse || false
     this.detectSessionInUrl = settings.detectSessionInUrl
 
     this.initialize()
@@ -243,6 +246,7 @@ export default class GoTrueClient {
             gotrue_meta_security: { captcha_token: options?.captchaToken },
           },
           xform: _sessionResponse,
+          noResolveJson: this.noResolveJsonOnFetchedResponse,
         })
       } else if ('phone' in credentials) {
         const { phone, password, options } = credentials
@@ -255,6 +259,7 @@ export default class GoTrueClient {
             gotrue_meta_security: { captcha_token: options?.captchaToken },
           },
           xform: _sessionResponse,
+          noResolveJson: this.noResolveJsonOnFetchedResponse,
         })
       } else {
         throw new AuthInvalidCredentialsError(
@@ -310,6 +315,7 @@ export default class GoTrueClient {
             gotrue_meta_security: { captcha_token: options?.captchaToken },
           },
           xform: _sessionResponse,
+          noResolveJson: this.noResolveJsonOnFetchedResponse,
         })
       } else if ('phone' in credentials) {
         const { phone, password, options } = credentials
@@ -322,6 +328,7 @@ export default class GoTrueClient {
             gotrue_meta_security: { captcha_token: options?.captchaToken },
           },
           xform: _sessionResponse,
+          noResolveJson: this.noResolveJsonOnFetchedResponse,
         })
       } else {
         throw new AuthInvalidCredentialsError(
@@ -381,6 +388,7 @@ export default class GoTrueClient {
             gotrue_meta_security: { captcha_token: options?.captchaToken },
           },
           redirectTo: options?.emailRedirectTo,
+          noResolveJson: this.noResolveJsonOnFetchedResponse,
         })
         return { data: { user: null, session: null }, error }
       }
@@ -394,6 +402,7 @@ export default class GoTrueClient {
             create_user: options?.shouldCreateUser ?? true,
             gotrue_meta_security: { captcha_token: options?.captchaToken },
           },
+          noResolveJson: this.noResolveJsonOnFetchedResponse,
         })
         return { data: { user: null, session: null }, error }
       }
@@ -422,6 +431,7 @@ export default class GoTrueClient {
         },
         redirectTo: params.options?.redirectTo,
         xform: _sessionResponse,
+        noResolveJson: this.noResolveJsonOnFetchedResponse,
       })
 
       if (error) {
@@ -485,6 +495,7 @@ export default class GoTrueClient {
         },
         headers: this.headers,
         xform: _ssoResponse,
+        noResolveJson: this.noResolveJsonOnFetchedResponse,
       })
     } catch (error) {
       if (isAuthError(error)) {
@@ -577,6 +588,7 @@ export default class GoTrueClient {
         headers: this.headers,
         jwt: jwt,
         xform: _userResponse,
+        noResolveJson: this.noResolveJsonOnFetchedResponse,
       })
     } catch (error) {
       if (isAuthError(error)) {
@@ -605,6 +617,7 @@ export default class GoTrueClient {
         body: attributes,
         jwt: session.access_token,
         xform: _userResponse,
+        noResolveJson: this.noResolveJsonOnFetchedResponse,
       })
       if (userError) throw userError
       session.user = data.user as User
@@ -887,6 +900,7 @@ export default class GoTrueClient {
         body: { email, gotrue_meta_security: { captcha_token: options.captchaToken } },
         headers: this.headers,
         redirectTo: options.redirectTo,
+        noResolveJson: this.noResolveJsonOnFetchedResponse,
       })
     } catch (error) {
       if (isAuthError(error)) {
@@ -907,6 +921,7 @@ export default class GoTrueClient {
         body: { refresh_token: refreshToken },
         headers: this.headers,
         xform: _sessionResponse,
+        noResolveJson: this.noResolveJsonOnFetchedResponse,
       })
     } catch (error) {
       if (isAuthError(error)) {
@@ -1164,6 +1179,7 @@ export default class GoTrueClient {
       return await _request(this.fetch, 'DELETE', `${this.url}/factors/${params.factorId}`, {
         headers: this.headers,
         jwt: sessionData?.session?.access_token,
+        noResolveJson: this.noResolveJsonOnFetchedResponse,
       })
     } catch (error) {
       if (isAuthError(error)) {
@@ -1194,6 +1210,7 @@ export default class GoTrueClient {
         },
         headers: this.headers,
         jwt: sessionData?.session?.access_token,
+        noResolveJson: this.noResolveJsonOnFetchedResponse,
       })
 
       if (error) {
@@ -1233,6 +1250,7 @@ export default class GoTrueClient {
           body: { code: params.code, challenge_id: params.challengeId },
           headers: this.headers,
           jwt: sessionData?.session?.access_token,
+          noResolveJson: this.noResolveJsonOnFetchedResponse,
         }
       )
       if (error) {
@@ -1272,6 +1290,7 @@ export default class GoTrueClient {
         {
           headers: this.headers,
           jwt: sessionData?.session?.access_token,
+          noResolveJson: this.noResolveJsonOnFetchedResponse,
         }
       )
     } catch (error) {
