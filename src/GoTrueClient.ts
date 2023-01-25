@@ -970,6 +970,13 @@ export default class GoTrueClient {
       queryParams: options.queryParams,
       isPKCE: options.isPKCE,
     })
+    if (options.isPKCE) {
+      // TODO (Joel): redirect to the authorize URL and if that's approved
+      console.log("execute PKCE flow")
+      //. then()
+      // send the code + verifier to /oauth/token
+      // await _request(this.fetch, 'POST', `${this.url}/oauth/token`, {}
+    }
     // try to open on the browser
     if (isBrowser() && !options.skipBrowserRedirect) {
       window.location.assign(url)
@@ -1237,7 +1244,9 @@ export default class GoTrueClient {
     }
     if (options?.isPKCE) {
       // TODO(Joel): Generate the code randomly here
-      urlParams.push(`code=1234`)
+      const code = "1234"
+      setItemAsync(this.storage, this.storageKey, code)
+      urlParams.push(`code=${encodeURIComponent(code)}`)
     }
     if (options?.queryParams) {
       const query = new URLSearchParams(options.queryParams)
