@@ -442,7 +442,10 @@ export type SignInWithOAuthCredentials = {
     queryParams?: { [key: string]: string }
     /** If set to true does not immediately redirect the current browser context to visit the OAuth authorization page for the provider. */
     skipBrowserRedirect?: boolean
+    /** If Set to true uses the PKCE flow */
+    isPKCE?: boolean
   }
+
 }
 
 export type VerifyOtpParams = VerifyMobileOtpParams | VerifyEmailOtpParams

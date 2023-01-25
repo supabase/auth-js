@@ -357,11 +357,13 @@ export default class GoTrueClient {
    */
   async signInWithOAuth(credentials: SignInWithOAuthCredentials): Promise<OAuthResponse> {
     await this._removeSession()
+
     return this._handleProviderSignIn(credentials.provider, {
       redirectTo: credentials.options?.redirectTo,
       scopes: credentials.options?.scopes,
       queryParams: credentials.options?.queryParams,
       skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
+      isPKCE: credentials.options?.isPKCE,
     })
   }
 
@@ -959,17 +961,20 @@ export default class GoTrueClient {
       scopes?: string
       queryParams?: { [key: string]: string }
       skipBrowserRedirect?: boolean
+      isPKCE?: boolean
     } = {}
   ) {
     const url: string = this._getUrlForProvider(provider, {
       redirectTo: options.redirectTo,
       scopes: options.scopes,
       queryParams: options.queryParams,
+      isPKCE: options.isPKCE,
     })
     // try to open on the browser
     if (isBrowser() && !options.skipBrowserRedirect) {
       window.location.assign(url)
     }
+
     return { data: { provider, url }, error: null }
   }
 
@@ -1220,6 +1225,7 @@ export default class GoTrueClient {
       redirectTo?: string
       scopes?: string
       queryParams?: { [key: string]: string }
+      isPKCE?: boolean
     }
   ) {
     const urlParams: string[] = [`provider=${encodeURIComponent(provider)}`]
@@ -1229,10 +1235,15 @@ export default class GoTrueClient {
     if (options?.scopes) {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
+    if (options?.isPKCE) {
+      // TODO(Joel): Generate the code randomly here
+      urlParams.push(`code=1234`)
+    }
     if (options?.queryParams) {
       const query = new URLSearchParams(options.queryParams)
       urlParams.push(query.toString())
     }
+
     return `${this.url}/authorize?${urlParams.join('&')}`
   }
 
