@@ -1243,9 +1243,9 @@ export default class GoTrueClient {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
     if (options?.isPKCE) {
-      const code = this._generatePKCECodeVerifier()
-      setItemAsync(this.storage, this.storageKey, code)
-      urlParams.push(`code=${encodeURIComponent(code)}`)
+      const codeVerifier = this._generatePKCECodeVerifier()
+      setItemAsync(this.storage, this.storageKey, codeVerifier)
+      urlParams.push(`code_verifier=${encodeURIComponent(codeVerifier)}`)
     }
     if (options?.queryParams) {
       const query = new URLSearchParams(options.queryParams)
