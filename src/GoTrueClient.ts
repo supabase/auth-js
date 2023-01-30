@@ -973,7 +973,6 @@ export default class GoTrueClient {
     if (options.isPKCE) {
       // TODO (Joel): redirect to the authorize URL and if that's approved
       console.log("execute PKCE flow")
-      //. then()
       // send the code + verifier to /oauth/token
       // await _request(this.fetch, 'POST', `${this.url}/oauth/token`, {}
     }
@@ -984,6 +983,7 @@ export default class GoTrueClient {
 
     return { data: { provider, url }, error: null }
   }
+
 
   /**
    * Recovers the session from LocalStorage and refreshes
@@ -1243,8 +1243,7 @@ export default class GoTrueClient {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
     if (options?.isPKCE) {
-      // TODO(Joel): Generate the code randomly here
-      const code = "1234"
+      const code = this._generatePKCECodeVerifier()
       setItemAsync(this.storage, this.storageKey, code)
       urlParams.push(`code=${encodeURIComponent(code)}`)
     }
@@ -1254,6 +1253,24 @@ export default class GoTrueClient {
     }
 
     return `${this.url}/authorize?${urlParams.join('&')}`
+  }
+
+  private _generatePKCECodeVerifier() {
+    let code = ''
+    //See PKCE Char Set: https://www.oauth.com/oauth2-servers/pkce/authorization-request/
+    // for details on charset and length of code verifier
+    const minLength = 43
+    const maxLength = 128
+    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+    const codeLength = Math.random() * (maxLength - minLength) + minLength
+    let counter = 0;
+    while (counter < codeLength) {
+      code += characters.charAt(Math.floor(Math.random() * characters.length));
+      counter += 1;
+    }
+    return code
+
+
   }
 
   private async _unenroll(params: MFAUnenrollParams): Promise<AuthMFAUnenrollResponse> {
