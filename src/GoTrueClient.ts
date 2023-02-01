@@ -29,6 +29,7 @@ import {
   uuid,
   retryable,
   sleep,
+  generateRandomPKCECode,
 } from './lib/helpers'
 import localStorageAdapter from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
@@ -68,6 +69,7 @@ import type {
   AuthenticatorAssuranceLevels,
   Factor,
   MFAChallengeAndVerifyParams,
+  OAuthFlowType,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -363,7 +365,7 @@ export default class GoTrueClient {
       scopes: credentials.options?.scopes,
       queryParams: credentials.options?.queryParams,
       skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
-      isPKCE: credentials.options?.isPKCE,
+      flowType: credentials.options?.flowType,
     })
   }
 
@@ -961,18 +963,21 @@ export default class GoTrueClient {
       scopes?: string
       queryParams?: { [key: string]: string }
       skipBrowserRedirect?: boolean
-      isPKCE?: boolean
+      flowType?: OAuthFlowType
     } = {}
   ) {
+    if (!options.flowType) {
+      options.flowType = 'pkce'
+    }
+
     const url: string = this._getUrlForProvider(provider, {
       redirectTo: options.redirectTo,
       scopes: options.scopes,
       queryParams: options.queryParams,
-      isPKCE: options.isPKCE,
+      flowType: options.flowType,
     })
-    if (options.isPKCE) {
+    if (options.flowType === 'pkce') {
       // TODO (Joel): redirect to the authorize URL and if that's approved
-      console.log("execute PKCE flow")
       // send the code + verifier to /oauth/token
       // await _request(this.fetch, 'POST', `${this.url}/oauth/token`, {}
     }
@@ -983,7 +988,6 @@ export default class GoTrueClient {
 
     return { data: { provider, url }, error: null }
   }
-
 
   /**
    * Recovers the session from LocalStorage and refreshes
@@ -1225,6 +1229,7 @@ export default class GoTrueClient {
    * @param options.redirectTo A URL or mobile address to send the user to after they are confirmed.
    * @param options.scopes A space-separated list of scopes granted to the OAuth application.
    * @param options.queryParams An object of key-value pairs containing query parameters granted to the OAuth application.
+   * @param options.flowType The OAuth flow to use - defaults to pkce.
    */
   private _getUrlForProvider(
     provider: Provider,
@@ -1232,7 +1237,7 @@ export default class GoTrueClient {
       redirectTo?: string
       scopes?: string
       queryParams?: { [key: string]: string }
-      isPKCE?: boolean
+      flowType: OAuthFlowType
     }
   ) {
     const urlParams: string[] = [`provider=${encodeURIComponent(provider)}`]
@@ -1242,8 +1247,8 @@ export default class GoTrueClient {
     if (options?.scopes) {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
-    if (options?.isPKCE) {
-      const codeVerifier = this._generatePKCECodeVerifier()
+    if (options?.flowType) {
+      const codeVerifier = generateRandomPKCECode()
       setItemAsync(this.storage, this.storageKey, codeVerifier)
       urlParams.push(`code_verifier=${encodeURIComponent(codeVerifier)}`)
     }
@@ -1255,23 +1260,7 @@ export default class GoTrueClient {
     return `${this.url}/authorize?${urlParams.join('&')}`
   }
 
-  private _generatePKCECodeVerifier() {
-    let code = ''
-    //See PKCE Char Set: https://www.oauth.com/oauth2-servers/pkce/authorization-request/
-    // for details on charset and length of code verifier
-    const minLength = 43
-    const maxLength = 128
-    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
-    const codeLength = Math.random() * (maxLength - minLength) + minLength
-    let counter = 0;
-    while (counter < codeLength) {
-      code += characters.charAt(Math.floor(Math.random() * characters.length));
-      counter += 1;
-    }
-    return code
 
-
-  }
 
   private async _unenroll(params: MFAUnenrollParams): Promise<AuthMFAUnenrollResponse> {
     try {

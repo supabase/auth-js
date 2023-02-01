@@ -79,31 +79,31 @@ export const removeItemAsync = async (storage: SupportedStorage, key: string): P
 }
 
 export function decodeBase64URL(value: string): string {
-  const key = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-  let base64 = '';
-  let chr1, chr2, chr3;
-  let enc1, enc2, enc3, enc4;
-  let i = 0;
-  value = value.replace('-', '+').replace('_', '/');
+  const key = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
+  let base64 = ''
+  let chr1, chr2, chr3
+  let enc1, enc2, enc3, enc4
+  let i = 0
+  value = value.replace('-', '+').replace('_', '/')
 
   while (i < value.length) {
-    enc1 = key.indexOf(value.charAt(i++));
-    enc2 = key.indexOf(value.charAt(i++));
-    enc3 = key.indexOf(value.charAt(i++));
-    enc4 = key.indexOf(value.charAt(i++));
-    chr1 = (enc1 << 2) | (enc2 >> 4);
-    chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
-    chr3 = ((enc3 & 3) << 6) | enc4;
-    base64 = base64 + String.fromCharCode(chr1);
+    enc1 = key.indexOf(value.charAt(i++))
+    enc2 = key.indexOf(value.charAt(i++))
+    enc3 = key.indexOf(value.charAt(i++))
+    enc4 = key.indexOf(value.charAt(i++))
+    chr1 = (enc1 << 2) | (enc2 >> 4)
+    chr2 = ((enc2 & 15) << 4) | (enc3 >> 2)
+    chr3 = ((enc3 & 3) << 6) | enc4
+    base64 = base64 + String.fromCharCode(chr1)
 
     if (enc3 != 64 && chr2 != 0) {
-      base64 = base64 + String.fromCharCode(chr2);
+      base64 = base64 + String.fromCharCode(chr2)
     }
     if (enc4 != 64 && chr3 != 0) {
-      base64 = base64 + String.fromCharCode(chr3);
+      base64 = base64 + String.fromCharCode(chr3)
     }
   }
-  return base64;
+  return base64
 }
 
 /**
@@ -190,4 +190,30 @@ export function retryable<T>(
   })
 
   return promise
+}
+
+
+export function generateRandomPKCECode() {
+  let code = ''//See PKCE Char Set: https://www.oauth.com/oauth2-servers/pkce/authorization-request/
+    // for details on charset and length of code verifier
+  const PKCE_CODE_LENGTH = 64;
+  const CHARACTER_SET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
+  if (!window || !window?.crypto) {
+    let counter = 0
+    while (counter < PKCE_CODE_LENGTH) {
+      code += CHARACTER_SET.charAt(Math.floor(Math.random() * CHARACTER_SET.length))
+      counter += 1
+    }
+    return code
+  }
+  // Taken from: https://stackoverflow.com/questions/9719570/generate-random-password-string-with-requirements-in-javascript
+  code = new Array(PKCE_CODE_LENGTH).fill(0).map(x => (function(chars) {
+  const UNSIGNED_MAX = Math.pow(2, 32)
+  const RANDOM_VAL = new Uint32Array(1)
+  const MAX = UNSIGNED_MAX - (UNSIGNED_MAX % chars.length);
+  do {
+    crypto.getRandomValues(RANDOM_VAL);
+  } while(RANDOM_VAL[0] > MAX);
+  code =  chars[RANDOM_VAL[0] % chars.length]; })(CHARACTER_SET)).join('');
+  return code
 }
