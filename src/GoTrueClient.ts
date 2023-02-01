@@ -360,13 +360,21 @@ export default class GoTrueClient {
   async signInWithOAuth(credentials: SignInWithOAuthCredentials): Promise<OAuthResponse> {
     await this._removeSession()
 
-    return this._handleProviderSignIn(credentials.provider, {
+    const res = this._handleProviderSignIn(credentials.provider, {
       redirectTo: credentials.options?.redirectTo,
       scopes: credentials.options?.scopes,
       queryParams: credentials.options?.queryParams,
       skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
       flowType: credentials.options?.flowType,
     })
+    if (credentials.options?.flowType == 'pkce') {// if PKCE
+      // How to follow the redirect and grab the response
+      // Make get request to the url and then .then(_request('POST', to the url with code))
+      // Use a stub helper async _completePKCECodeFlow if needed.
+      console.log('successful pkce  flow')
+    }
+    return res
+
   }
 
   /**
@@ -976,13 +984,8 @@ export default class GoTrueClient {
       queryParams: options.queryParams,
       flowType: options.flowType,
     })
-    if (options.flowType === 'pkce') {
-      // TODO (Joel): redirect to the authorize URL and if that's approved
-      // send the code + verifier to /oauth/token
-      // await _request(this.fetch, 'POST', `${this.url}/oauth/token`, {}
-    }
     // try to open on the browser
-    if (isBrowser() && !options.skipBrowserRedirect) {
+    if (isBrowser() && !options.skipBrowserRedirect && options.flowType === 'implicit') {
       window.location.assign(url)
     }
 
@@ -1250,7 +1253,8 @@ export default class GoTrueClient {
     if (options?.flowType) {
       const codeVerifier = generateRandomPKCECode()
       setItemAsync(this.storage, this.storageKey, codeVerifier)
-      urlParams.push(`code_verifier=${encodeURIComponent(codeVerifier)}`)
+      const flowType = new URLSearchParams(options.flowType)
+      urlParams.push(flowType.toString())
     }
     if (options?.queryParams) {
       const query = new URLSearchParams(options.queryParams)
