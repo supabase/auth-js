@@ -198,7 +198,8 @@ export function generateRandomPKCECode() {
     // for details on charset and length of code verifier
   const PKCE_CODE_LENGTH = 64;
   const CHARACTER_SET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
-  if (!window || !window?.crypto) {
+  const isCryptoAPISupported = typeof window !== 'undefined' && window.crypto
+  if (!isCryptoAPISupported) {
     let counter = 0
     while (counter < PKCE_CODE_LENGTH) {
       code += CHARACTER_SET.charAt(Math.floor(Math.random() * CHARACTER_SET.length))
