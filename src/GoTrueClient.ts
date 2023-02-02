@@ -1129,7 +1129,7 @@ export default class GoTrueClient {
    */
   private async _startAutoRefresh() {
     await this._stopAutoRefresh()
-    
+
     const ticker = setInterval(() => this._autoRefreshTokenTick(), AUTO_REFRESH_TICK_DURATION)
     this.autoRefreshTicker = ticker
 
