@@ -377,6 +377,22 @@ export default class GoTrueClient {
 
   }
 
+ /**
+  * Log in an existing user via a third-party provider.
+  */
+  async exchangeCodeForToken(authCode): Promise<AuthResponse> {
+    // Fetched local hashed verifier
+    let codeChallenge = getItemAsync(this.storage, "pkce", codeVerifier)
+    return await _request(this.fetch, 'POST', `${this.url}/token?grant_type=pkce`, {
+          headers: this.headers,
+          body: {
+            auth_code: authCode,
+            code_challenge: codeChallenge,
+          },
+          xform: _sessionResponse,
+        })
+  }
+
   /**
    * Log in a user using magiclink or a one-time password (OTP).
    *
@@ -1252,7 +1268,7 @@ export default class GoTrueClient {
     }
     if (options?.flowType) {
       const codeVerifier = generateRandomPKCECode()
-      setItemAsync(this.storage, this.storageKey, codeVerifier)
+      setItemAsync(this.storage, "pkce", codeVerifier)
       const flowType = new URLSearchParams(options.flowType)
       urlParams.push(flowType.toString())
     }
