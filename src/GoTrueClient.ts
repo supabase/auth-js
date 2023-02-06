@@ -1266,7 +1266,8 @@ export default class GoTrueClient {
       if (options.flowType === 'pkce') {
          const codeVerifier = generatePKCEVerifier()
          setItemAsync(this.storage, "pkce", codeVerifier)
-         const codeChallenge = generatePKCEChallenge(codeVerifier)
+         // TODO (Joel) - Decide whether to allow plain in future
+         const codeChallenge = generatePKCEChallenge(codeVerifier, "S256")
       }
 
     }
