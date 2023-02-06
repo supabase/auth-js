@@ -29,7 +29,8 @@ import {
   uuid,
   retryable,
   sleep,
-  generateRandomPKCECode,
+  generatePKCEVerifier,
+  generatePKCEChallenge,
 } from './lib/helpers'
 import localStorageAdapter from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
@@ -360,21 +361,13 @@ export default class GoTrueClient {
   async signInWithOAuth(credentials: SignInWithOAuthCredentials): Promise<OAuthResponse> {
     await this._removeSession()
 
-    const res = this._handleProviderSignIn(credentials.provider, {
+    return this._handleProviderSignIn(credentials.provider, {
       redirectTo: credentials.options?.redirectTo,
       scopes: credentials.options?.scopes,
       queryParams: credentials.options?.queryParams,
       skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
       flowType: credentials.options?.flowType,
     })
-    if (credentials.options?.flowType == 'pkce') {// if PKCE
-      // How to follow the redirect and grab the response
-      // Make get request to the url and then .then(_request('POST', to the url with code))
-      // Use a stub helper async _completePKCECodeFlow if needed.
-      console.log('successful pkce  flow')
-    }
-    return res
-
   }
 
  /**
@@ -1267,10 +1260,15 @@ export default class GoTrueClient {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
     if (options?.flowType) {
-      const codeVerifier = generateRandomPKCECode()
-      setItemAsync(this.storage, "pkce", codeVerifier)
       const flowType = new URLSearchParams(options.flowType)
       urlParams.push(flowType.toString())
+      // TODO (Joel): Make this a constant across the board
+      if (options.flowType === 'pkce') {
+         const codeVerifier = generatePKCEVerifier()
+         setItemAsync(this.storage, "pkce", codeVerifier)
+         const codeChallenge = generatePKCEChallenge(codeVerifier)
+      }
+
     }
     if (options?.queryParams) {
       const query = new URLSearchParams(options.queryParams)

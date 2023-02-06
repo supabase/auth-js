@@ -193,7 +193,7 @@ export function retryable<T>(
 }
 
 
-export function generateRandomPKCECode() {
+export function generatePKCEVerifier() {
   let code = ''//See PKCE Char Set: https://www.oauth.com/oauth2-servers/pkce/authorization-request/
     // for details on charset and length of code verifier
   const PKCE_CODE_LENGTH = 64;
@@ -217,4 +217,17 @@ export function generateRandomPKCECode() {
   } while(RANDOM_VAL[0] > MAX);
   code =  chars[RANDOM_VAL[0] % chars.length]; })(CHARACTER_SET)).join('');
   return code
+}
+
+export function generatePKCEChallenge(verifier: string, method: 'plain' | 'S256') {
+    let b64Encoode =  (str) =>  btoa(String.fromCharCode.apply(null,
+    new Uint8Array(str)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+    if (method === 'plain') {
+       return b64Encode(verifier)
+    }
+    // TODO(Joel): Decide what library to use to S256 encode this -Subtle Crypto with CryptoJS as an alternative?
+    return b64Encode(verifier)
 }
