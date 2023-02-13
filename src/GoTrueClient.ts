@@ -373,14 +373,14 @@ export default class GoTrueClient {
  /**
   * Log in an existing user via a third-party provider.
   */
-  async exchangeCodeForToken(authCode): Promise<AuthResponse> {
+  async requestToken(authCode: string): Promise<AuthResponse> {
     // Fetched local hashed verifier
-    let codeChallenge = getItemAsync(this.storage, "pkce", codeVerifier)
+    let codeVerifier = getItemAsync(this.storage, "pkce", codeVerifier)
     return await _request(this.fetch, 'POST', `${this.url}/token?grant_type=pkce`, {
           headers: this.headers,
           body: {
             auth_code: authCode,
-            code_challenge: codeChallenge,
+            code_verifier: codeVerifier,
           },
           xform: _sessionResponse,
         })
