@@ -370,20 +370,20 @@ export default class GoTrueClient {
     })
   }
 
- /**
-  * Log in an existing user via a third-party provider.
-  */
+  /**
+   * Log in an existing user via a third-party provider.
+   */
   async requestToken(authCode: string): Promise<AuthResponse> {
     // Fetched local hashed verifier
-    let codeVerifier = getItemAsync(this.storage, "pkce", codeVerifier)
+    let codeVerifier = getItemAsync(this.storage, 'pkce')
     return await _request(this.fetch, 'POST', `${this.url}/token?grant_type=pkce`, {
-          headers: this.headers,
-          body: {
-            auth_code: authCode,
-            code_verifier: codeVerifier,
-          },
-          xform: _sessionResponse,
-        })
+      headers: this.headers,
+      body: {
+        auth_code: authCode,
+        code_verifier: codeVerifier,
+      },
+      xform: _sessionResponse,
+    })
   }
 
   /**
@@ -1259,17 +1259,13 @@ export default class GoTrueClient {
     if (options?.scopes) {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
-    if (options?.flowType) {
-      const flowType = new URLSearchParams(options.flowType)
-      urlParams.push(flowType.toString())
-      // TODO (Joel): Make this a constant across the board
-      if (options.flowType === 'pkce') {
-         const codeVerifier = generatePKCEVerifier()
-         setItemAsync(this.storage, "pkce", codeVerifier)
-         // TODO (Joel) - Decide whether to allow plain in future
-         const codeChallenge = generatePKCEChallenge(codeVerifier, "S256")
-      }
-
+    if (options?.flowType && options.flowType === 'pkce') {
+      urlParams.push(`flow_type=${encodeURIComponent(options.flowType)}`)
+      const codeVerifier = generatePKCEVerifier()
+      setItemAsync(this.storage, 'pkce', codeVerifier)
+      // TODO (Joel) - Decide whether to allow plain in future
+      const codeChallenge = generatePKCEChallenge(codeVerifier, 'S256')
+      urlParams.push(`code_challenge=${encodeURIComponent(codeChallenge)}`)
     }
     if (options?.queryParams) {
       const query = new URLSearchParams(options.queryParams)
@@ -1278,8 +1274,6 @@ export default class GoTrueClient {
 
     return `${this.url}/authorize?${urlParams.join('&')}`
   }
-
-
 
   private async _unenroll(params: MFAUnenrollParams): Promise<AuthMFAUnenrollResponse> {
     try {
