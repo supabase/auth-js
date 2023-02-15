@@ -611,7 +611,7 @@ export default class GoTrueClient {
     attributes: UserAttributes,
     options: {
       emailRedirectTo?: string | undefined
-    }
+    } = {}
   ): Promise<UserResponse> {
     try {
       const { data: sessionData, error: sessionError } = await this.getSession()
