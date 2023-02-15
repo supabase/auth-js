@@ -1306,7 +1306,7 @@ export default class GoTrueClient {
       urlParams.push(query.toString())
     }
     if (options?.data) {
-       const query = new URLSearchParams(options.data)
+       const query = new URLSearchParams({data: options.data})
        urlParams.push(query.toString())
     }
     return `${this.url}/authorize?${urlParams.join('&')}`
