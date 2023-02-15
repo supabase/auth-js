@@ -973,8 +973,8 @@ export default class GoTrueClient {
       scopes?: string
       queryParams?: { [key: string]: string }
       skipBrowserRedirect?: boolean
-      data?: { [key: string]: string }
-    } = {}
+      data?: object
+      } = {}
   ) {
     const url: string = this._getUrlForProvider(provider, {
       redirectTo: options.redirectTo,
@@ -1291,8 +1291,8 @@ export default class GoTrueClient {
       redirectTo?: string
       scopes?: string
       queryParams?: { [key: string]: string }
-      data?: { [key: string]: string }
-    }
+      data?: object
+      }
   ) {
     const urlParams: string[] = [`provider=${encodeURIComponent(provider)}`]
     if (options?.redirectTo) {
@@ -1306,7 +1306,7 @@ export default class GoTrueClient {
       urlParams.push(query.toString())
     }
     if (options?.data) {
-       const query = new URLSearchParams({data: options.data})
+       const query = new URLSearchParams({metadata: encodeURIComponent(JSON.stringify(options.data))})
        urlParams.push(query.toString())
     }
     return `${this.url}/authorize?${urlParams.join('&')}`

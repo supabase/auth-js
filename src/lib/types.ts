@@ -443,9 +443,9 @@ export type SignInWithOAuthCredentials = {
     queryParams?: { [key: string]: string }
     /** If set to true does not immediately redirect the current browser context to visit the OAuth authorization page for the provider. */
     skipBrowserRedirect?: boolean
-    /** JSON object that includes user-specific info, such as their first and last name. Note, nested objects are not supported at this time. */
-    data?: { [key: string]: string }
-  }
+    /** JSON object that includes user-specific info, such as their first and last name. */
+    data?:object
+    }
 }
 
 export type VerifyOtpParams = VerifyMobileOtpParams | VerifyEmailOtpParams
