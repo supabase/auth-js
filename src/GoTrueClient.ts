@@ -369,6 +369,7 @@ export default class GoTrueClient {
       scopes: credentials.options?.scopes,
       queryParams: credentials.options?.queryParams,
       skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
+      data: credentials.options?.data
     })
   }
 
@@ -972,12 +973,14 @@ export default class GoTrueClient {
       scopes?: string
       queryParams?: { [key: string]: string }
       skipBrowserRedirect?: boolean
+      data?: { [key: string]: string }
     } = {}
   ) {
     const url: string = this._getUrlForProvider(provider, {
       redirectTo: options.redirectTo,
       scopes: options.scopes,
       queryParams: options.queryParams,
+      data: options.data
     })
     // try to open on the browser
     if (isBrowser() && !options.skipBrowserRedirect) {
@@ -1280,6 +1283,7 @@ export default class GoTrueClient {
    * @param options.redirectTo A URL or mobile address to send the user to after they are confirmed.
    * @param options.scopes A space-separated list of scopes granted to the OAuth application.
    * @param options.queryParams An object of key-value pairs containing query parameters granted to the OAuth application.
+   * @param options.data JSON object containing user specific metadata such as first name and last name.
    */
   private _getUrlForProvider(
     provider: Provider,
@@ -1287,6 +1291,7 @@ export default class GoTrueClient {
       redirectTo?: string
       scopes?: string
       queryParams?: { [key: string]: string }
+      data?: { [key: string]: string }
     }
   ) {
     const urlParams: string[] = [`provider=${encodeURIComponent(provider)}`]
@@ -1299,6 +1304,10 @@ export default class GoTrueClient {
     if (options?.queryParams) {
       const query = new URLSearchParams(options.queryParams)
       urlParams.push(query.toString())
+    }
+    if (options?.data) {
+       const query = new URLSearchParams(options.data)
+       urlParams.push(query.toString())
     }
     return `${this.url}/authorize?${urlParams.join('&')}`
   }
