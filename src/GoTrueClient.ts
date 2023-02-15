@@ -1,11 +1,5 @@
 import GoTrueAdminApi from './GoTrueAdminApi'
-import {
-  DEFAULT_HEADERS,
-  EXPIRY_MARGIN,
-  GOTRUE_URL,
-  NETWORK_FAILURE,
-  STORAGE_KEY,
-} from './lib/constants'
+import { DEFAULT_HEADERS, EXPIRY_MARGIN, GOTRUE_URL, STORAGE_KEY } from './lib/constants'
 import {
   AuthError,
   AuthImplicitGrantRedirectError,
@@ -1072,11 +1066,7 @@ export default class GoTrueClient {
     }
   }
 
-  private _notifyAllSubscribers(
-    event: AuthChangeEvent,
-    session: Session | null,
-    broadcast: boolean = true
-  ) {
+  private _notifyAllSubscribers(event: AuthChangeEvent, session: Session | null, broadcast = true) {
     if (this.broadcastChannel && broadcast) {
       this.broadcastChannel.postMessage({ event, session })
     }
@@ -1215,7 +1205,6 @@ export default class GoTrueClient {
     try {
       const {
         data: { session },
-        error,
       } = await this.getSession()
 
       if (!session || !session.refresh_token || !session.expires_at) {
