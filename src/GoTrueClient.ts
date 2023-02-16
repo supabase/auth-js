@@ -986,7 +986,7 @@ export default class GoTrueClient {
     } = {}
   ) {
     if (!options.flowType) {
-      options.flowType = 'pkce'
+       options.flowType = 'implicit'
     }
 
     const url: string = await this._getUrlForProvider(provider, {
@@ -996,7 +996,7 @@ export default class GoTrueClient {
       flowType: options.flowType,
     })
     // try to open on the browser
-    if (isBrowser() && !options.skipBrowserRedirect && options.flowType === 'implicit') {
+    if (isBrowser() && !options.skipBrowserRedirect) {
       window.location.assign(url)
     }
 
@@ -1264,7 +1264,6 @@ export default class GoTrueClient {
     if (options?.flowType && options.flowType === 'pkce') {
       urlParams.push(`flow_type=${encodeURIComponent(options.flowType)}`)
       const codeVerifier = generatePKCEVerifier()
-      console.log(codeVerifier)
       localStorage.setItem('pkce', codeVerifier)
       // setItemAsync(this.storage, 'pkce', codeVerifier)
       // TODO (Joel) - Decide whether to allow plain in future
