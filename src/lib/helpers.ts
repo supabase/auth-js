@@ -1,5 +1,6 @@
 import { SupportedStorage } from './types'
 import sha256 from 'crypto-js/sha256'
+
 import CryptoJS from 'crypto-js'
 
 export function expiresAt(expiresIn: number) {
@@ -199,46 +200,19 @@ export function generatePKCEVerifier() {
   // for details on charset and length of code verifier
   const PKCE_CODE_LENGTH = 64
   const CHARACTER_SET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
-  const isCryptoAPISupported = typeof window !== 'undefined' && window.crypto
-  if (!isCryptoAPISupported) {
-    let counter = 0
-    while (counter < PKCE_CODE_LENGTH) {
-      code += CHARACTER_SET.charAt(Math.floor(Math.random() * CHARACTER_SET.length))
-      counter += 1
-    }
-    return code
+  // TODO (Joel) - switch math.random to subtle crypto if it can be used
+  let counter = 0
+  while (counter < PKCE_CODE_LENGTH) {
+    code += CHARACTER_SET.charAt(Math.floor(Math.random() * CHARACTER_SET.length))
+    counter += 1
   }
-  console.log('going with non window option')
-  // Taken from: https://stackoverflow.com/questions/9719570/generate-random-password-string-with-requirements-in-javascript
-  code = new Array(PKCE_CODE_LENGTH)
-    .fill(0)
-    .map((_) =>
-      (function (chars) {
-        const UNSIGNED_MAX = Math.pow(2, 32)
-        const RANDOM_VAL = new Uint32Array(1)
-        const MAX = UNSIGNED_MAX - (UNSIGNED_MAX % chars.length)
-        do {
-          crypto.getRandomValues(RANDOM_VAL)
-        } while (RANDOM_VAL[0] > MAX)
-        code = chars[RANDOM_VAL[0] % chars.length]
-      })(CHARACTER_SET)
-    )
-    .join('')
   return code
 }
 
 export function generatePKCEChallenge(verifier: string, method: 'plain' | 'S256') {
-  const b64Encode = (str: string) =>
-    btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const b64Encode = (str: string) => str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
   if (method === 'plain') {
     return b64Encode(verifier)
   }
-  if (window && window.crypto) {
-    // const inputBytes = new TextEncoder().encode(verifier)
-    // TODO- patch this
-    // let hashChallenge = window.crypto.subtle.digest('SHA-256', inputBytes)
-    return b64Encode(sha256(verifier).toString(CryptoJS.enc.Base64))
-  }
-  // TODO(Joel): Decide what library to use to S256 encode this -Subtle Crypto with CryptoJS as an alternative?
-  return b64Encode(verifier)
+  return b64Encode(sha256(verifier).toString(CryptoJS.enc.Base64))
 }

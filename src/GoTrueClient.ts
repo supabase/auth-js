@@ -361,7 +361,7 @@ export default class GoTrueClient {
   async signInWithOAuth(credentials: SignInWithOAuthCredentials): Promise<OAuthResponse> {
     await this._removeSession()
 
-    return this._handleProviderSignIn(credentials.provider, {
+    return await this._handleProviderSignIn(credentials.provider, {
       redirectTo: credentials.options?.redirectTo,
       scopes: credentials.options?.scopes,
       queryParams: credentials.options?.queryParams,
@@ -375,8 +375,9 @@ export default class GoTrueClient {
    */
   async requestToken(authCode: string): Promise<AuthResponse> {
     // Fetched local hashed verifier
-    let codeVerifier = getItemAsync(this.storage, 'pkce')
-    return await _request(this.fetch, 'POST', `${this.url}/token?grant_type=pkce`, {
+    let codeVerifier = localStorage.getItem('pkce')
+    // let codeVerifier = await getItemAsync(this.storage, 'pkce')
+    const res = await _request(this.fetch, 'POST', `${this.url}/token?grant_type=pkce`, {
       headers: this.headers,
       body: {
         auth_code: authCode,
@@ -384,6 +385,7 @@ export default class GoTrueClient {
       },
       xform: _sessionResponse,
     })
+    return res
   }
 
   /**
@@ -973,7 +975,7 @@ export default class GoTrueClient {
     return isValidSession
   }
 
-  private _handleProviderSignIn(
+  private async _handleProviderSignIn(
     provider: Provider,
     options: {
       redirectTo?: string
@@ -987,7 +989,7 @@ export default class GoTrueClient {
       options.flowType = 'pkce'
     }
 
-    const url: string = this._getUrlForProvider(provider, {
+    const url: string = await this._getUrlForProvider(provider, {
       redirectTo: options.redirectTo,
       scopes: options.scopes,
       queryParams: options.queryParams,
@@ -1243,7 +1245,7 @@ export default class GoTrueClient {
    * @param options.queryParams An object of key-value pairs containing query parameters granted to the OAuth application.
    * @param options.flowType The OAuth flow to use - defaults to pkce.
    */
-  private _getUrlForProvider(
+  private async _getUrlForProvider(
     provider: Provider,
     options: {
       redirectTo?: string
@@ -1262,7 +1264,9 @@ export default class GoTrueClient {
     if (options?.flowType && options.flowType === 'pkce') {
       urlParams.push(`flow_type=${encodeURIComponent(options.flowType)}`)
       const codeVerifier = generatePKCEVerifier()
-      setItemAsync(this.storage, 'pkce', codeVerifier)
+      console.log(codeVerifier)
+      localStorage.setItem('pkce', codeVerifier)
+      // setItemAsync(this.storage, 'pkce', codeVerifier)
       // TODO (Joel) - Decide whether to allow plain in future
       const codeChallenge = generatePKCEChallenge(codeVerifier, 'S256')
       urlParams.push(`code_challenge=${encodeURIComponent(codeChallenge)}`)
