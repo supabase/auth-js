@@ -215,6 +215,7 @@ export interface User {
   recovery_sent_at?: string
   email_change_sent_at?: string
   new_email?: string
+  new_phone?: string
   invited_at?: string
   action_link?: string
   email?: string
@@ -445,6 +446,21 @@ export type SignInWithOAuthCredentials = {
     skipBrowserRedirect?: boolean
     /** If Set to true uses the PKCE flow */
     flowType?: OAuthFlowType
+  }
+}
+
+export type SignInWithIdTokenCredentials = {
+  /**
+   * Only Apple and Google ID tokens are supported for use from within iOS or Android applications.
+   */
+  provider: 'google' | 'apple'
+  /** ID token issued by Apple or Google. */
+  token: string
+  /** If the ID token contains a `nonce`, then the hash of this value is compared to the value in the ID token. */
+  nonce?: string
+  options?: {
+    /** Verification token received when the user completes the captcha on the site. */
+    captchaToken?: string
   }
 }
 

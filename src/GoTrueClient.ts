@@ -1,11 +1,5 @@
 import GoTrueAdminApi from './GoTrueAdminApi'
-import {
-  DEFAULT_HEADERS,
-  EXPIRY_MARGIN,
-  GOTRUE_URL,
-  NETWORK_FAILURE,
-  STORAGE_KEY,
-} from './lib/constants'
+import { DEFAULT_HEADERS, EXPIRY_MARGIN, GOTRUE_URL, STORAGE_KEY } from './lib/constants'
 import {
   AuthError,
   AuthImplicitGrantRedirectError,
@@ -44,11 +38,12 @@ import type {
   SSOResponse,
   Provider,
   Session,
+  SignInWithIdTokenCredentials,
   SignInWithOAuthCredentials,
   SignInWithPasswordCredentials,
   SignInWithPasswordlessCredentials,
-  SignInWithSSO,
   SignUpWithPasswordCredentials,
+  SignInWithSSO,
   Subscription,
   SupportedStorage,
   User,
@@ -117,6 +112,7 @@ export default class GoTrueClient {
   protected storage: SupportedStorage
   protected stateChangeEmitters: Map<string, Subscription> = new Map()
   protected autoRefreshTicker: ReturnType<typeof setInterval> | null = null
+  protected visibilityChangedCallback: (() => Promise<any>) | null = null
   protected refreshingDeferred: Deferred<CallRefreshTokenResult> | null = null
   /**
    * Keeps track of the async client initialization.
@@ -131,6 +127,11 @@ export default class GoTrueClient {
     [key: string]: string
   }
   protected fetch: Fetch
+
+  /**
+   * Used to broadcast state change events to other tabs listening.
+   */
+  protected broadcastChannel: BroadcastChannel | null = null
 
   /**
    * Create a new client for use in the browser.
@@ -161,6 +162,13 @@ export default class GoTrueClient {
       listFactors: this._listFactors.bind(this),
       challengeAndVerify: this._challengeAndVerify.bind(this),
       getAuthenticatorAssuranceLevel: this._getAuthenticatorAssuranceLevel.bind(this),
+    }
+
+    if (isBrowser() && globalThis.BroadcastChannel && this.persistSession && this.storageKey) {
+      this.broadcastChannel = new globalThis.BroadcastChannel(this.storageKey)
+      this.broadcastChannel.addEventListener('message', (event) => {
+        this._notifyAllSubscribers(event.data.event, event.data.session, false) // broadcast = false so we don't get an endless loop of messages
+      })
     }
 
     this.initialize()
@@ -386,6 +394,43 @@ export default class GoTrueClient {
       xform: _sessionResponse,
     })
     return res
+    }
+  /**
+   * Allows signing in with an ID token issued by certain supported providers.
+   * The ID token is verified for validity and a new session is established.
+   *
+   * @experimental
+   */
+  async signInWithIdToken(credentials: SignInWithIdTokenCredentials): Promise<AuthResponse> {
+    await this._removeSession()
+
+    try {
+      const { options, provider, token, nonce } = credentials
+
+      const res = await _request(this.fetch, 'POST', `${this.url}/token?grant_type=id_token`, {
+        headers: this.headers,
+        body: {
+          provider,
+          id_token: token,
+          nonce,
+          gotrue_meta_security: { captcha_token: options?.captchaToken },
+        },
+        xform: _sessionResponse,
+      })
+
+      const { data, error } = res
+      if (error || !data) return { data: { user: null, session: null }, error }
+      if (data.session) {
+        await this._saveSession(data.session)
+        this._notifyAllSubscribers('SIGNED_IN', data.session)
+      }
+      return { data, error }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error }
+      }
+      throw error
+    }
   }
 
   /**
@@ -621,9 +666,14 @@ export default class GoTrueClient {
   }
 
   /**
-   * Updates user data, if there is a logged in user.
+   * Updates user data for a logged in user.
    */
-  async updateUser(attributes: UserAttributes): Promise<UserResponse> {
+  async updateUser(
+    attributes: UserAttributes,
+    options: {
+      emailRedirectTo?: string | undefined
+    } = {}
+  ): Promise<UserResponse> {
     try {
       const { data: sessionData, error: sessionError } = await this.getSession()
       if (sessionError) {
@@ -635,6 +685,7 @@ export default class GoTrueClient {
       const session: Session = sessionData.session
       const { data, error: userError } = await _request(this.fetch, 'PUT', `${this.url}/user`, {
         headers: this.headers,
+        redirectTo: options?.emailRedirectTo,
         body: attributes,
         jwt: session.access_token,
         xform: _userResponse,
@@ -823,8 +874,8 @@ export default class GoTrueClient {
       }
       const redirectType = getParameterByName('type')
 
-      // Remove tokens from URL and popping the URL from the back stack
-      window.location.replace(window.location.href.split('#')[0])
+      // Remove tokens from URL
+      window.location.hash = ''
 
       return { data: { session, redirectType }, error: null }
     } catch (error) {
@@ -1083,7 +1134,11 @@ export default class GoTrueClient {
     }
   }
 
-  private _notifyAllSubscribers(event: AuthChangeEvent, session: Session | null) {
+  private _notifyAllSubscribers(event: AuthChangeEvent, session: Session | null, broadcast = true) {
+    if (this.broadcastChannel && broadcast) {
+      this.broadcastChannel.postMessage({ event, session })
+    }
+
     this.stateChangeEmitters.forEach((x) => x.callback(event, session))
   }
 
@@ -1114,6 +1169,62 @@ export default class GoTrueClient {
   }
 
   /**
+   * Removes any registered visibilitychange callback.
+   *
+   * {@see #startAutoRefresh}
+   * {@see #stopAutoRefresh}
+   */
+  private _removeVisibilityChangedCallback() {
+    const callback = this.visibilityChangedCallback
+    this.visibilityChangedCallback = null
+
+    try {
+      if (callback && isBrowser() && window?.removeEventListener) {
+        window.removeEventListener('visibilitychange', callback)
+      }
+    } catch (e) {
+      console.error('removing visibilitychange callback failed', e)
+    }
+  }
+
+  /**
+   * This is the private implementation of {@link #startAutoRefresh}. Use this
+   * within the library.
+   */
+  private async _startAutoRefresh() {
+    await this._stopAutoRefresh()
+
+    const ticker = setInterval(() => this._autoRefreshTokenTick(), AUTO_REFRESH_TICK_DURATION)
+    this.autoRefreshTicker = ticker
+
+    if (ticker && typeof ticker === 'object' && typeof ticker.unref === 'function') {
+      // ticker is a NodeJS Timeout object that has an `unref` method
+      // https://nodejs.org/api/timers.html#timeoutunref
+      // When auto refresh is used in NodeJS (like for testing) the
+      // `setInterval` is preventing the process from being marked as
+      // finished and tests run endlessly. This can be prevented by calling
+      // `unref()` on the returned object.
+      ticker.unref()
+    }
+
+    // run the tick immediately
+    await this._autoRefreshTokenTick()
+  }
+
+  /**
+   * This is the private implementation of {@link #stopAutoRefresh}. Use this
+   * within the library.
+   */
+  private async _stopAutoRefresh() {
+    const ticker = this.autoRefreshTicker
+    this.autoRefreshTicker = null
+
+    if (ticker) {
+      clearInterval(ticker)
+    }
+  }
+
+  /**
    * Starts an auto-refresh process in the background. The session is checked
    * every few seconds. Close to the time of expiration a process is started to
    * refresh the session. If refreshing fails it will be retried for as long as
@@ -1124,7 +1235,9 @@ export default class GoTrueClient {
    *
    * On browsers the refresh process works only when the tab/window is in the
    * foreground to conserve resources as well as prevent race conditions and
-   * flooding auth with requests.
+   * flooding auth with requests. If you call this method any managed
+   * visibility change callback will be removed and you must manage visibility
+   * changes on your own.
    *
    * On non-browser platforms the refresh process works *continuously* in the
    * background, which may not be desireable. You should hook into your
@@ -1134,27 +1247,21 @@ export default class GoTrueClient {
    * {@see #stopAutoRefresh}
    */
   async startAutoRefresh() {
-    await this.stopAutoRefresh()
-    this.autoRefreshTicker = setInterval(
-      () => this._autoRefreshTokenTick(),
-      AUTO_REFRESH_TICK_DURATION
-    )
-
-    // run the tick immediately
-    await this._autoRefreshTokenTick()
+    this._removeVisibilityChangedCallback()
+    await this._startAutoRefresh()
   }
 
   /**
    * Stops an active auto refresh process running in the background (if any).
+   *
+   * If you call this method any managed visibility change callback will be
+   * removed and you must manage visibility changes on your own.
+   *
    * See {@link #startAutoRefresh} for more details.
    */
   async stopAutoRefresh() {
-    const ticker = this.autoRefreshTicker
-    this.autoRefreshTicker = null
-
-    if (ticker) {
-      clearInterval(ticker)
-    }
+    this._removeVisibilityChangedCallback()
+    await this._stopAutoRefresh()
   }
 
   /**
@@ -1166,7 +1273,6 @@ export default class GoTrueClient {
     try {
       const {
         data: { session },
-        error,
       } = await this.getSession()
 
       if (!session || !session.refresh_token || !session.expires_at) {
@@ -1202,10 +1308,9 @@ export default class GoTrueClient {
     }
 
     try {
-      window?.addEventListener(
-        'visibilitychange',
-        async () => await this._onVisibilityChanged(false)
-      )
+      this.visibilityChangedCallback = async () => await this._onVisibilityChanged(false)
+
+      window?.addEventListener('visibilitychange', this.visibilityChangedCallback)
 
       // now immediately call the visbility changed callback to setup with the
       // current visbility state
@@ -1229,11 +1334,11 @@ export default class GoTrueClient {
       if (this.autoRefreshToken) {
         // in browser environments the refresh token ticker runs only on focused tabs
         // which prevents race conditions
-        this.startAutoRefresh()
+        this._startAutoRefresh()
       }
     } else if (document.visibilityState === 'hidden') {
       if (this.autoRefreshToken) {
-        this.stopAutoRefresh()
+        this._stopAutoRefresh()
       }
     }
   }
