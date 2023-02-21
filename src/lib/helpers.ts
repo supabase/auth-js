@@ -1,7 +1,4 @@
 import { SupportedStorage } from './types'
-import sha256 from 'crypto-js/sha256'
-
-import CryptoJS from 'crypto-js'
 
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
@@ -195,24 +192,40 @@ export function retryable<T>(
   return promise
 }
 
-export function generatePKCEVerifier() {
-  let code = '' //See PKCE Char Set: https://www.oauth.com/oauth2-servers/pkce/authorization-request/
-  // for details on charset and length of code verifier
-  const PKCE_CODE_LENGTH = 64
-  const CHARACTER_SET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
-  // TODO (Joel) - switch math.random to subtle crypto if it can be used
-  let counter = 0
-  while (counter < PKCE_CODE_LENGTH) {
-    code += CHARACTER_SET.charAt(Math.floor(Math.random() * CHARACTER_SET.length))
-    counter += 1
-  }
-  return code
+function dec2hex(dec: number) {
+  return ('0' + dec.toString(16)).substr(-2)
 }
 
-export function generatePKCEChallenge(verifier: string, method: 'plain' | 'S256') {
-  const b64Encode = (str: string) => str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-  if (method === 'plain') {
-    return b64Encode(verifier)
+// Functions below taken from: https://stackoverflow.com/questions/63309409/creating-a-code-verifier-and-challenge-for-pkce-auth-on-spotify-api-in-reactjs
+export async function generatePKCEVerifier() {
+  const array = new Uint32Array(56 / 2)
+  window.crypto.getRandomValues(array)
+  return Array.from(array, dec2hex).join('')
+}
+
+function sha256(plain: string) {
+  // returns promise ArrayBuffer
+  const encoder = new TextEncoder()
+  const data = encoder.encode(plain)
+  return window.crypto.subtle.digest('SHA-256', data)
+}
+
+function base64urlencode(a: ArrayBuffer) {
+  let str = ''
+  const bytes = new Uint8Array(a)
+  const len = bytes.byteLength
+  for (let i = 0; i < len; i++) {
+    str += String.fromCharCode(bytes[i])
   }
-  return b64Encode(sha256(verifier).toString(CryptoJS.enc.Base64))
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+export async function generatePKCEChallenge(verifier: string, method: 'plain' | 'S256') {
+  let hashed
+  let base64encoded = ''
+  if (method === 'S256') {
+    hashed = await sha256(verifier)
+    base64encoded = base64urlencode(hashed)
+  }
+  return base64encoded
 }

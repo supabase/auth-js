@@ -986,7 +986,7 @@ export default class GoTrueClient {
     } = {}
   ) {
     if (!options.flowType) {
-       options.flowType = 'implicit'
+      options.flowType = 'implicit'
     }
 
     const url: string = await this._getUrlForProvider(provider, {
@@ -1263,11 +1263,11 @@ export default class GoTrueClient {
     }
     if (options?.flowType && options.flowType === 'pkce') {
       urlParams.push(`flow_type=${encodeURIComponent(options.flowType)}`)
-      const codeVerifier = generatePKCEVerifier()
+      const codeVerifier = await generatePKCEVerifier()
       localStorage.setItem('pkce', codeVerifier)
       // setItemAsync(this.storage, 'pkce', codeVerifier)
       // TODO (Joel) - Decide whether to allow plain in future
-      const codeChallenge = generatePKCEChallenge(codeVerifier, 'S256')
+      const codeChallenge = await generatePKCEChallenge(codeVerifier, 'S256')
       urlParams.push(`code_challenge=${encodeURIComponent(codeChallenge)}`)
     }
     if (options?.queryParams) {
