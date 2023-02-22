@@ -381,7 +381,7 @@ export default class GoTrueClient {
   /**
    * Log in an existing user via a third-party provider.
    */
-  async requestToken(authCode: string): Promise<AuthResponse> {
+  async exchangeAuthCode(authCode: string): Promise<AuthResponse> {
     // Fetched local hashed verifier
     let codeVerifier = localStorage.getItem('pkce')
     // let codeVerifier = await getItemAsync(this.storage, 'pkce')
@@ -395,6 +395,7 @@ export default class GoTrueClient {
     })
     return res
   }
+
   /**
    * Allows signing in with an ID token issued by certain supported providers.
    * The ID token is verified for validity and a new session is established.
