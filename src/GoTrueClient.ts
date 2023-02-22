@@ -393,6 +393,7 @@ export default class GoTrueClient {
       },
       xform: _sessionResponse,
     })
+    localStorage.setItem('pkce', '')
     return res
   }
 
