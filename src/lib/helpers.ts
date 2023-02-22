@@ -266,11 +266,9 @@ function base64urlencode(a: ArrayBuffer) {
 }
 
 export async function generatePKCEChallenge(verifier: string) {
-  let hashed
   let base64encoded = ''
-  if (method === 'S256') {
-    hashed = await sha256(verifier)
-    base64encoded = base64urlencode(hashed)
-  }
+  const hashed = await sha256(verifier)
+  base64encoded = base64urlencode(hashed)
+
   return base64encoded
 }

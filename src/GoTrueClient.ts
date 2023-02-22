@@ -1371,7 +1371,7 @@ export default class GoTrueClient {
       const codeVerifier = await generatePKCEVerifier()
       localStorage.setItem('pkce', codeVerifier)
       // setItemAsync(this.storage, 'pkce', codeVerifier)
-      const codeChallenge = await generatePKCEChallenge(codeVerifier, 'S256')
+      const codeChallenge = await generatePKCEChallenge(codeVerifier)
       urlParams.push(`code_challenge=${encodeURIComponent(codeChallenge)}`)
     }
     if (options?.queryParams) {
