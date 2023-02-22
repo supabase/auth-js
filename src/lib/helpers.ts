@@ -265,7 +265,7 @@ function base64urlencode(a: ArrayBuffer) {
   return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-export async function generatePKCEChallenge(verifier: string, method: 'plain' | 'S256') {
+export async function generatePKCEChallenge(verifier: string) {
   let hashed
   let base64encoded = ''
   if (method === 'S256') {

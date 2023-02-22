@@ -394,7 +394,7 @@ export default class GoTrueClient {
       xform: _sessionResponse,
     })
     return res
-    }
+  }
   /**
    * Allows signing in with an ID token issued by certain supported providers.
    * The ID token is verified for validity and a new session is established.
@@ -1371,7 +1371,6 @@ export default class GoTrueClient {
       const codeVerifier = await generatePKCEVerifier()
       localStorage.setItem('pkce', codeVerifier)
       // setItemAsync(this.storage, 'pkce', codeVerifier)
-      // TODO (Joel) - Decide whether to allow plain in future
       const codeChallenge = await generatePKCEChallenge(codeVerifier, 'S256')
       urlParams.push(`code_challenge=${encodeURIComponent(codeChallenge)}`)
     }
