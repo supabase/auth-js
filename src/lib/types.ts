@@ -422,6 +422,7 @@ export type SignInWithPasswordlessCredentials =
         data?: object
         /** Verification token received when the user completes the captcha on the site. */
         captchaToken?: string
+        channel?: string
       }
     }
 

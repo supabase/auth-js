@@ -447,6 +447,7 @@ export default class GoTrueClient {
             data: options?.data ?? {},
             create_user: options?.shouldCreateUser ?? true,
             gotrue_meta_security: { captcha_token: options?.captchaToken },
+            channel: options?.channel ?? 'sms',
           },
         })
         return { data: { user: null, session: null }, error }
