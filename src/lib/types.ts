@@ -387,7 +387,7 @@ export type SignInWithPasswordCredentials =
         /** Verification token received when the user completes the captcha on the site. */
         captchaToken?: string
         /** Messaging channel to use (e.g. whatsapp or sms) */
-        channel?: string
+        channel?: 'sms' | 'whatsapp'
       }
     }
 
@@ -425,7 +425,7 @@ export type SignInWithPasswordlessCredentials =
         /** Verification token received when the user completes the captcha on the site. */
         captchaToken?: string
         /** Messaging channel to use (e.g. whatsapp or sms) */
-        channel?: string
+        channel?: 'sms' | 'whatsapp'
       }
     }
 
