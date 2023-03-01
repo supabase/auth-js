@@ -382,9 +382,7 @@ export default class GoTrueClient {
    * Log in an existing user via a third-party provider.
    */
   async exchangeAuthCode(authCode: string): Promise<AuthResponse> {
-    // Fetched local hashed verifier
-    let codeVerifier = localStorage.getItem('pkce')
-    // let codeVerifier = await getItemAsync(this.storage, 'pkce')
+    const codeVerifier = await getItemAsync(this.storage, 'pkce')
     const res = await _request(this.fetch, 'POST', `${this.url}/token?grant_type=pkce`, {
       headers: this.headers,
       body: {
@@ -393,7 +391,8 @@ export default class GoTrueClient {
       },
       xform: _sessionResponse,
     })
-    localStorage.setItem('pkce', '')
+
+    await removeItemAsync(this.storage, 'pkce')
     return res
   }
 
@@ -1371,8 +1370,7 @@ export default class GoTrueClient {
     if (options?.flowType && options.flowType === 'pkce') {
       urlParams.push(`flow_type=${encodeURIComponent(options.flowType)}`)
       const codeVerifier = await generatePKCEVerifier()
-      localStorage.setItem('pkce', codeVerifier)
-      // setItemAsync(this.storage, 'pkce', codeVerifier)
+      await setItemAsync(this.storage, 'pkce', codeVerifier)
       const codeChallenge = await generatePKCEChallenge(codeVerifier)
       urlParams.push(`code_challenge=${encodeURIComponent(codeChallenge)}`)
     }
