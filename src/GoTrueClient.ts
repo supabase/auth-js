@@ -383,19 +383,15 @@ export default class GoTrueClient {
    */
   async exchangeAuthCode(authCode: string): Promise<AuthResponse> {
     const codeVerifier = await getItemAsync(this.storage, 'pkce')
-    const { data, error } = await _request(
-      this.fetch,
-      'POST',
-      `${this.url}/token?grant_type=pkce`,
-      {
-        headers: this.headers,
-        body: {
-          auth_code: authCode,
-          code_verifier: codeVerifier,
-        },
-        xform: _sessionResponse,
-      }
-    )
+    const { data, error } = await _request(this.fetch, 'POST', `${this.url}/oauth/token`, {
+      headers: this.headers,
+      body: {
+        auth_code: authCode,
+        code_verifier: codeVerifier,
+        grant_type: 'pkce',
+      },
+      xform: _sessionResponse,
+    })
     await removeItemAsync(this.storage, 'pkce')
     if (error || !data) return { data: { user: null, session: null }, error }
     if (data.session) {
