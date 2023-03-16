@@ -941,6 +941,14 @@ export default class GoTrueClient {
 
     this.stateChangeEmitters.set(id, subscription)
 
+    this.getSession()
+      .then(({ data: { session } }) => {
+        this.stateChangeEmitters.get(id)?.callback('INITIAL_SESSION', session)
+      })
+      .catch(() => {
+        this.stateChangeEmitters.get(id)?.callback('INITIAL_SESSION', null)
+      })
+
     return { data: { subscription } }
   }
 
