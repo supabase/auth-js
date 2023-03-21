@@ -383,6 +383,7 @@ export default class GoTrueClient {
    */
   async exchangeAuthCode(authCode: string): Promise<AuthResponse> {
     const codeVerifier = await getItemAsync(this.storage, 'pkce')
+    console.log({ authCode, codeVerifier })
     const { data, error } = await _request(
       this.fetch,
       'POST',
