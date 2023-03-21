@@ -1,4 +1,7 @@
 import { SupportedStorage } from './types'
+import sha256CryptoJS from 'crypto-js/sha256'
+import CryptoJS from 'crypto-js'
+import crypto from 'crypto'
 
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
@@ -243,16 +246,22 @@ function dec2hex(dec: number) {
 
 // Functions below taken from: https://stackoverflow.com/questions/63309409/creating-a-code-verifier-and-challenge-for-pkce-auth-on-spotify-api-in-reactjs
 export async function generatePKCEVerifier() {
-  const array = new Uint32Array(56 / 2)
-  window.crypto.getRandomValues(array)
+  const array = new Uint32Array(28)
+  if (!isBrowser()) {
+    return crypto.randomBytes(28 * 4).toString('hex')
+  }
   return Array.from(array, dec2hex).join('')
 }
 
-function sha256(plain: string) {
+async function sha256(plain: string) {
   // returns promise ArrayBuffer
   const encoder = new TextEncoder()
   const data = encoder.encode(plain)
-  return window.crypto.subtle.digest('SHA-256', data)
+  if (!isBrowser()) {
+    return sha256CryptoJS(plain).toString(CryptoJS.enc.Base64)
+  }
+  const hash = await window.crypto.subtle.digest('SHA-256', data)
+  return hash
 }
 
 function base64urlencode(a: ArrayBuffer) {
@@ -267,7 +276,7 @@ function base64urlencode(a: ArrayBuffer) {
 
 export async function generatePKCEChallenge(verifier: string) {
   let base64encoded = ''
-  const hashed = await sha256(verifier)
+  const hashed = sha256(verifier)
   base64encoded = base64urlencode(hashed)
 
   return base64encoded
