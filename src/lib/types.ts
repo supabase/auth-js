@@ -497,6 +497,24 @@ export interface VerifyEmailOtpParams {
 export type MobileOtpType = 'sms' | 'phone_change'
 export type EmailOtpType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change'
 
+export type ResendParams =
+  | {
+      type: Extract<EmailOtpType, 'signup' | 'email_change'>
+      email: string
+      options?: {
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
+    }
+  | {
+      type: Extract<MobileOtpType, 'sms' | 'phone'>
+      phone: string
+      options?: {
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
+    }
+
 export type SignInWithSSO = {
   options?: {
     /** A URL to send the user to after they have signed-in. */
