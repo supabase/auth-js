@@ -244,30 +244,30 @@ function dec2hex(dec: number) {
 
 // Functions below taken from: https://stackoverflow.com/questions/63309409/creating-a-code-verifier-and-challenge-for-pkce-auth-on-spotify-api-in-reactjs
 export async function generatePKCEVerifier() {
-  const array = new Uint32Array(28)
+  const verifierLength = 56
+  const array = new Uint32Array(verifierLength)
   if (!isBrowser()) {
-    return crypto.randomBytes(28 * 4).toString('hex')
+    return crypto.randomBytes(verifierLength * array.BYTES_PER_ELEMENT).toString('hex')
   }
   return Array.from(array, dec2hex).join('')
 }
 
-async function sha256(plain: string) {
-  // returns promise ArrayBuffer
+async function sha256(randomString: string) {
   const encoder = new TextEncoder()
-  const data = encoder.encode(plain)
+  const encodedData = encoder.encode(randomString)
   if (!isBrowser()) {
     const sha256 = crypto.createHash('sha256')
-    sha256.update(plain)
+    sha256.update(randomString)
     return sha256.digest('hex')
   }
-  const hash = await window.crypto.subtle.digest('SHA-256', data)
-  let str = ''
+  const hash = await window.crypto.subtle.digest('SHA-256', encodedData)
+  let hashedString = ''
   const bytes = new Uint8Array(hash)
   const len = bytes.byteLength
   for (let i = 0; i < len; i++) {
-    str += String.fromCharCode(bytes[i])
+    hashedString += String.fromCharCode(bytes[i])
   }
-  return str
+  return hashedString
 }
 
 function base64urlencode(str: string) {
@@ -275,9 +275,6 @@ function base64urlencode(str: string) {
 }
 
 export async function generatePKCEChallenge(verifier: string) {
-  let base64encoded = ''
   const hashed = await sha256(verifier)
-  base64encoded = base64urlencode(hashed)
-
-  return base64encoded
+  return base64urlencode(hashed)
 }
