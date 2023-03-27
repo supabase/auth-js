@@ -1,6 +1,5 @@
 import { SupportedStorage } from './types'
-import crypto from 'crypto'
-
+import sha256CryptoJS from 'crypto-js/sha256'
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
   return timeNow + expiresIn
@@ -247,7 +246,9 @@ export async function generatePKCEVerifier() {
   const verifierLength = 56
   const array = new Uint32Array(verifierLength)
   if (!isBrowser()) {
-    return crypto.randomBytes(verifierLength * array.BYTES_PER_ELEMENT).toString('hex')
+    for (let i = 0; i < verifierLength; i++) {
+      array[i] = Math.floor(Math.random() * 256)
+    }
   }
   return Array.from(array, dec2hex).join('')
 }
@@ -256,9 +257,7 @@ async function sha256(randomString: string) {
   const encoder = new TextEncoder()
   const encodedData = encoder.encode(randomString)
   if (!isBrowser()) {
-    const sha256 = crypto.createHash('sha256')
-    sha256.update(randomString)
-    return sha256.digest('hex')
+    return sha256CryptoJS(randomString).toString()
   }
   const hash = await window.crypto.subtle.digest('SHA-256', encodedData)
   let hashedString = ''
