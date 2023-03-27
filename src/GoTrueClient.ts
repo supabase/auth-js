@@ -28,6 +28,7 @@ import {
 } from './lib/helpers'
 import localStorageAdapter from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
+
 import type {
   AuthChangeEvent,
   AuthResponse,

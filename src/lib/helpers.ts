@@ -1,6 +1,4 @@
 import { SupportedStorage } from './types'
-import sha256CryptoJS from 'crypto-js/sha256'
-import CryptoJS from 'crypto-js'
 import crypto from 'crypto'
 
 export function expiresAt(expiresIn: number) {
@@ -258,25 +256,27 @@ async function sha256(plain: string) {
   const encoder = new TextEncoder()
   const data = encoder.encode(plain)
   if (!isBrowser()) {
-    return sha256CryptoJS(plain).toString(CryptoJS.enc.Base64)
+    const sha256 = crypto.createHash('sha256')
+    sha256.update(plain)
+    return sha256.digest('hex')
   }
   const hash = await window.crypto.subtle.digest('SHA-256', data)
-  return hash
-}
-
-function base64urlencode(a: ArrayBuffer) {
   let str = ''
-  const bytes = new Uint8Array(a)
+  const bytes = new Uint8Array(hash)
   const len = bytes.byteLength
   for (let i = 0; i < len; i++) {
     str += String.fromCharCode(bytes[i])
   }
+  return str
+}
+
+function base64urlencode(str: string) {
   return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 export async function generatePKCEChallenge(verifier: string) {
   let base64encoded = ''
-  const hashed = sha256(verifier)
+  const hashed = await sha256(verifier)
   base64encoded = base64urlencode(hashed)
 
   return base64encoded
