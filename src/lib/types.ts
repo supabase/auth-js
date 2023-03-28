@@ -444,7 +444,7 @@ export type SignInWithOAuthCredentials = {
     queryParams?: { [key: string]: string }
     /** If set to true does not immediately redirect the current browser context to visit the OAuth authorization page for the provider. */
     skipBrowserRedirect?: boolean
-    /** If Set to true uses the PKCE flow */
+    /** If set to 'pkce' PKCE flow. Defaults to the 'implicit' flow otherwise */
     flowType?: OAuthFlowType
   }
 }

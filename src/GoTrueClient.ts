@@ -1378,12 +1378,15 @@ export default class GoTrueClient {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
     if (options?.flowType === 'pkce') {
-      urlParams.push(`flow_type=${encodeURIComponent(options.flowType)}`)
       const codeVerifier = await generatePKCEVerifier()
       await setItemAsync(this.storage, `${this.storageKey}-oauth-code-verifier`, codeVerifier)
       const codeChallenge = await generatePKCEChallenge(codeVerifier)
-      urlParams.push(`code_challenge=${encodeURIComponent(codeChallenge)}`)
-      urlParams.push(`code_challenge_method=${encodeURIComponent('s256')}`)
+      const flowParams = new URLSearchParams({
+        flow_type: `${encodeURIComponent(options.flowType)}`,
+        code_challenge: `${encodeURIComponent(codeChallenge)}`,
+        code_challenge_method: `${encodeURIComponent('s256')}`,
+      })
+      urlParams.push(flowParams.toString())
     }
     if (options?.queryParams) {
       const query = new URLSearchParams(options.queryParams)

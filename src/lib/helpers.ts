@@ -260,12 +260,13 @@ async function sha256(randomString: string) {
     return sha256CryptoJS(randomString).toString()
   }
   const hash = await window.crypto.subtle.digest('SHA-256', encodedData)
-  let hashedString = ''
   const bytes = new Uint8Array(hash)
+  let hashedString = ''
   const len = bytes.byteLength
   for (let i = 0; i < len; i++) {
     hashedString += String.fromCharCode(bytes[i])
   }
+
   return hashedString
 }
 
