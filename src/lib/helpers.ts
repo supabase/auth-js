@@ -261,13 +261,10 @@ async function sha256(randomString: string) {
   }
   const hash = await window.crypto.subtle.digest('SHA-256', encodedData)
   const bytes = new Uint8Array(hash)
-  let hashedString = ''
-  const len = bytes.byteLength
-  for (let i = 0; i < len; i++) {
-    hashedString += String.fromCharCode(bytes[i])
-  }
 
-  return hashedString
+  return Array.from(bytes)
+    .map((c) => String.fromCharCode(c))
+    .join('')
 }
 
 function base64urlencode(str: string) {
