@@ -1377,7 +1377,7 @@ export default class GoTrueClient {
     if (options?.scopes) {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
-    if (options?.flowType && options.flowType === 'pkce') {
+    if (options?.flowType === 'pkce') {
       urlParams.push(`flow_type=${encodeURIComponent(options.flowType)}`)
       const codeVerifier = await generatePKCEVerifier()
       await setItemAsync(this.storage, `${this.storageKey}-oauth-code-verifier`, codeVerifier)
