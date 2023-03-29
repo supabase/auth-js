@@ -1047,9 +1047,6 @@ export default class GoTrueClient {
       flowType?: OAuthFlowType
     } = {}
   ) {
-    if (!options.flowType) {
-      options.flowType = 'implicit'
-    }
 
     const url: string = await this._getUrlForProvider(provider, {
       redirectTo: options.redirectTo,
