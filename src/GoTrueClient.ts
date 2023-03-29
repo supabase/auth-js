@@ -375,7 +375,7 @@ export default class GoTrueClient {
       scopes: credentials.options?.scopes,
       queryParams: credentials.options?.queryParams,
       skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
-      flowType: credentials.options?.flowType,
+      flowType: credentials.options?.flowType ?? 'implicit',
     })
   }
 
