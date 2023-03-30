@@ -23,9 +23,12 @@ import {
   uuid,
   retryable,
   sleep,
+  generatePKCEVerifier,
+  generatePKCEChallenge,
 } from './lib/helpers'
 import localStorageAdapter from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
+
 import type {
   AuthChangeEvent,
   AuthResponse,
@@ -63,6 +66,7 @@ import type {
   AuthenticatorAssuranceLevels,
   Factor,
   MFAChallengeAndVerifyParams,
+  OAuthFlowType,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -162,8 +166,16 @@ export default class GoTrueClient {
     }
 
     if (isBrowser() && globalThis.BroadcastChannel && this.persistSession && this.storageKey) {
-      this.broadcastChannel = new globalThis.BroadcastChannel(this.storageKey)
-      this.broadcastChannel.addEventListener('message', (event) => {
+      try {
+        this.broadcastChannel = new globalThis.BroadcastChannel(this.storageKey)
+      } catch (e: any) {
+        console.error(
+          'Failed to create a new BroadcastChannel, multi-tab state changes will not be available',
+          e
+        )
+      }
+
+      this.broadcastChannel?.addEventListener('message', (event) => {
         this._notifyAllSubscribers(event.data.event, event.data.session, false) // broadcast = false so we don't get an endless loop of messages
       })
     }
@@ -210,10 +222,13 @@ export default class GoTrueClient {
         const { session, redirectType } = data
 
         await this._saveSession(session)
-        this._notifyAllSubscribers('SIGNED_IN', session)
-        if (redirectType === 'recovery') {
-          this._notifyAllSubscribers('PASSWORD_RECOVERY', session)
-        }
+
+        setTimeout(() => {
+          this._notifyAllSubscribers('SIGNED_IN', session)
+          if (redirectType === 'recovery') {
+            this._notifyAllSubscribers('PASSWORD_RECOVERY', session)
+          }
+        }, 0)
 
         return { error: null }
       }
@@ -309,7 +324,10 @@ export default class GoTrueClient {
    * Be aware that you may get back an error message that will not distingish
    * between the cases where the account does not exist or that the
    * email/phone and password combination is wrong or that the account can only
-   * be accessed via social login.
+   * be accessed via social login. Do note that you will need
+   * to configure a Whatsapp sender on Twilio if you are using phone sign in
+   * with 'whatsapp'. The whatsapp channel is not supported on other providers
+   * at this time.
    */
   async signInWithPassword(credentials: SignInWithPasswordCredentials): Promise<AuthResponse> {
     try {
@@ -335,6 +353,7 @@ export default class GoTrueClient {
             phone,
             password,
             gotrue_meta_security: { captcha_token: options?.captchaToken },
+            channel: options?.channel ?? 'sms',
           },
           xform: _sessionResponse,
         })
@@ -363,12 +382,41 @@ export default class GoTrueClient {
    */
   async signInWithOAuth(credentials: SignInWithOAuthCredentials): Promise<OAuthResponse> {
     await this._removeSession()
-    return this._handleProviderSignIn(credentials.provider, {
+
+    return await this._handleProviderSignIn(credentials.provider, {
       redirectTo: credentials.options?.redirectTo,
       scopes: credentials.options?.scopes,
       queryParams: credentials.options?.queryParams,
       skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
+      flowType: credentials.options?.flowType ?? 'implicit',
     })
+  }
+
+  /**
+   * Log in an existing user via a third-party provider.
+   */
+  async exchangeCodeForSession(authCode: string): Promise<AuthResponse> {
+    const codeVerifier = await getItemAsync(this.storage, `${this.storageKey}-oauth-code-verifier`)
+    const { data, error } = await _request(
+      this.fetch,
+      'POST',
+      `${this.url}/token?grant_type=oauth_pkce`,
+      {
+        headers: this.headers,
+        body: {
+          auth_code: authCode,
+          code_verifier: codeVerifier,
+        },
+        xform: _sessionResponse,
+      }
+    )
+    await removeItemAsync(this.storage, `${this.storageKey}-oauth-code-verifier`)
+    if (error || !data) return { data: { user: null, session: null }, error }
+    if (data.session) {
+      await this._saveSession(data.session)
+      this._notifyAllSubscribers('SIGNED_IN', data.session)
+    }
+    return { data, error }
   }
 
   /**
@@ -419,6 +467,11 @@ export default class GoTrueClient {
    * Be aware that you may get back an error message that will not distinguish
    * between the cases where the account does not exist or, that the account
    * can only be accessed via social login.
+   *
+   * Do note that you will need to configure a Whatsapp sender on Twilio
+   * if you are using phone sign in with the 'whatsapp' channel. The whatsapp
+   * channel is not supported on other providers
+   * at this time.
    */
   async signInWithOtp(credentials: SignInWithPasswordlessCredentials): Promise<AuthResponse> {
     try {
@@ -447,6 +500,7 @@ export default class GoTrueClient {
             data: options?.data ?? {},
             create_user: options?.shouldCreateUser ?? true,
             gotrue_meta_security: { captcha_token: options?.captchaToken },
+            channel: options?.channel ?? 'sms',
           },
         })
         return { data: { user: null, session: null }, error }
@@ -920,7 +974,24 @@ export default class GoTrueClient {
 
     this.stateChangeEmitters.set(id, subscription)
 
+    this.emitInitialSession(id)
+
     return { data: { subscription } }
+  }
+
+  private async emitInitialSession(id: string): Promise<void> {
+    try {
+      const {
+        data: { session },
+        error,
+      } = await this.getSession()
+      if (error) throw error
+
+      this.stateChangeEmitters.get(id)?.callback('INITIAL_SESSION', session)
+    } catch (err) {
+      this.stateChangeEmitters.get(id)?.callback('INITIAL_SESSION', null)
+      console.error(err)
+    }
   }
 
   /**
@@ -1002,24 +1073,28 @@ export default class GoTrueClient {
     return isValidSession
   }
 
-  private _handleProviderSignIn(
+  private async _handleProviderSignIn(
     provider: Provider,
     options: {
       redirectTo?: string
       scopes?: string
       queryParams?: { [key: string]: string }
       skipBrowserRedirect?: boolean
+      flowType?: OAuthFlowType
     } = {}
   ) {
-    const url: string = this._getUrlForProvider(provider, {
+
+    const url: string = await this._getUrlForProvider(provider, {
       redirectTo: options.redirectTo,
       scopes: options.scopes,
       queryParams: options.queryParams,
+      flowType: options.flowType,
     })
     // try to open on the browser
     if (isBrowser() && !options.skipBrowserRedirect) {
       window.location.assign(url)
     }
+
     return { data: { provider, url }, error: null }
   }
 
@@ -1317,13 +1392,15 @@ export default class GoTrueClient {
    * @param options.redirectTo A URL or mobile address to send the user to after they are confirmed.
    * @param options.scopes A space-separated list of scopes granted to the OAuth application.
    * @param options.queryParams An object of key-value pairs containing query parameters granted to the OAuth application.
+   * @param options.flowType OAuth flow to use - defaults to implicit flow. PKCE is recommended for mobile and server-side applications.
    */
-  private _getUrlForProvider(
+  private async _getUrlForProvider(
     provider: Provider,
     options: {
       redirectTo?: string
       scopes?: string
       queryParams?: { [key: string]: string }
+      flowType: OAuthFlowType
     }
   ) {
     const urlParams: string[] = [`provider=${encodeURIComponent(provider)}`]
@@ -1333,10 +1410,22 @@ export default class GoTrueClient {
     if (options?.scopes) {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
+    if (options?.flowType === 'pkce') {
+      const codeVerifier = await generatePKCEVerifier()
+      await setItemAsync(this.storage, `${this.storageKey}-oauth-code-verifier`, codeVerifier)
+      const codeChallenge = await generatePKCEChallenge(codeVerifier)
+      const flowParams = new URLSearchParams({
+        flow_type: `${encodeURIComponent(options.flowType)}`,
+        code_challenge: `${encodeURIComponent(codeChallenge)}`,
+        code_challenge_method: `${encodeURIComponent('s256')}`,
+      })
+      urlParams.push(flowParams.toString())
+    }
     if (options?.queryParams) {
       const query = new URLSearchParams(options.queryParams)
       urlParams.push(query.toString())
     }
+
     return `${this.url}/authorize?${urlParams.join('&')}`
   }
 
