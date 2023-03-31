@@ -400,7 +400,7 @@ export default class GoTrueClient {
     const { data, error } = await _request(
       this.fetch,
       'POST',
-      `${this.url}/token?grant_type=oauth_pkce`,
+      `${this.url}/token?grant_type=pkce`,
       {
         headers: this.headers,
         body: {
