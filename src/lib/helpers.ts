@@ -1,5 +1,5 @@
 import { SupportedStorage } from './types'
-import nodeCrypto from 'node:crypto'
+import { sha256 as sha256Ohash } from 'ohash'
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
   return timeNow + expiresIn
@@ -259,7 +259,7 @@ async function sha256(randomString: string) {
   const encoder = new TextEncoder()
   const encodedData = encoder.encode(randomString)
   if (!isBrowser()) {
-    return nodeCrypto.createHash('sha256').update(randomString).digest('hex')
+	return sha256Ohash(randomString).toString()
   }
   const hash = await window.crypto.subtle.digest('SHA-256', encodedData)
   const bytes = new Uint8Array(hash)
