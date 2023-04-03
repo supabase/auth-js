@@ -224,9 +224,10 @@ export default class GoTrueClient {
         await this._saveSession(session)
 
         setTimeout(() => {
-          this._notifyAllSubscribers('SIGNED_IN', session)
           if (redirectType === 'recovery') {
             this._notifyAllSubscribers('PASSWORD_RECOVERY', session)
+          } else {
+            this._notifyAllSubscribers('SIGNED_IN', session)
           }
         }, 0)
 
@@ -1080,10 +1081,9 @@ export default class GoTrueClient {
       scopes?: string
       queryParams?: { [key: string]: string }
       skipBrowserRedirect?: boolean
-      flowType?: OAuthFlowType
-    } = {}
+      flowType: OAuthFlowType
+    }
   ) {
-
     const url: string = await this._getUrlForProvider(provider, {
       redirectTo: options.redirectTo,
       scopes: options.scopes,
@@ -1411,7 +1411,7 @@ export default class GoTrueClient {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
     if (options?.flowType === 'pkce') {
-      const codeVerifier = await generatePKCEVerifier()
+      const codeVerifier = generatePKCEVerifier()
       await setItemAsync(this.storage, `${this.storageKey}-oauth-code-verifier`, codeVerifier)
       const codeChallenge = await generatePKCEChallenge(codeVerifier)
       const flowParams = new URLSearchParams({

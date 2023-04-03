@@ -242,13 +242,15 @@ function dec2hex(dec: number) {
 }
 
 // Functions below taken from: https://stackoverflow.com/questions/63309409/creating-a-code-verifier-and-challenge-for-pkce-auth-on-spotify-api-in-reactjs
-export async function generatePKCEVerifier() {
+export function generatePKCEVerifier() {
   const verifierLength = 56
   const array = new Uint32Array(verifierLength)
   if (!isBrowser()) {
     for (let i = 0; i < verifierLength; i++) {
       array[i] = Math.floor(Math.random() * 256)
     }
+  } else {
+    window.crypto.getRandomValues(array)
   }
   return Array.from(array, dec2hex).join('')
 }
