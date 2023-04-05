@@ -49,6 +49,8 @@ export type GoTrueClientOptions = {
   storage?: SupportedStorage
   /* A custom fetch implementation. */
   fetch?: Fetch
+  /* If set to 'pkce' PKCE flow. Defaults to the 'implicit' flow otherwise */
+  flowType?: OAuthFlowType
 }
 
 export type AuthResponse =
@@ -448,8 +450,6 @@ export type SignInWithOAuthCredentials = {
     queryParams?: { [key: string]: string }
     /** If set to true does not immediately redirect the current browser context to visit the OAuth authorization page for the provider. */
     skipBrowserRedirect?: boolean
-    /** If set to 'pkce' PKCE flow. Defaults to the 'implicit' flow otherwise */
-    flowType?: OAuthFlowType
   }
 }
 

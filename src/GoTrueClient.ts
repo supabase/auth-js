@@ -78,6 +78,7 @@ const DEFAULT_OPTIONS: Omit<Required<GoTrueClientOptions>, 'fetch' | 'storage'> 
   persistSession: true,
   detectSessionInUrl: true,
   headers: DEFAULT_HEADERS,
+  flowType: 'implicit',
 }
 
 /** Current session will be checked for refresh at this interval. */
@@ -107,6 +108,8 @@ export default class GoTrueClient {
    * Only used if persistSession is false.
    */
   protected inMemorySession: Session | null
+
+  protected flowType: OAuthFlowType
 
   protected autoRefreshToken: boolean
   protected persistSession: boolean
@@ -154,6 +157,7 @@ export default class GoTrueClient {
     this.headers = settings.headers
     this.fetch = resolveFetch(settings.fetch)
     this.detectSessionInUrl = settings.detectSessionInUrl
+    this.flowType = settings.flowType
 
     this.mfa = {
       verify: this._verify.bind(this),
@@ -389,7 +393,7 @@ export default class GoTrueClient {
       scopes: credentials.options?.scopes,
       queryParams: credentials.options?.queryParams,
       skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
-      flowType: credentials.options?.flowType ?? 'implicit',
+      flowType: this.flowType ?? 'implicit',
     })
   }
 
