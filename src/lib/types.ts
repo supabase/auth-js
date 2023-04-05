@@ -86,7 +86,13 @@ export type OAuthResponse =
 export type SSOResponse =
   | {
       data: {
-        /** URL to take the user to (in a browser) to complete SSO. */
+        /**
+         * URL to open in a browser which will complete the sign-in flow by
+         * taking the user to the identity provider's authentication flow.
+         *
+         * On browsers you can set the URL to `window.location.href` to take
+         * the user to the authentication flow.
+         */
         url: string
       }
       error: null
@@ -498,25 +504,31 @@ export interface VerifyEmailOtpParams {
 }
 
 export type MobileOtpType = 'sms' | 'phone_change'
-export type EmailOtpType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change'
+export type EmailOtpType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change' | 'email'
 
-export type SignInWithSSO = {
-  options?: {
-    /** A URL to send the user to after they have signed-in. */
-    redirectTo?: string
-    /** Verification token received when the user completes the captcha on the site. */
-    captchaToken?: string
-  }
-} & (
+export type SignInWithSSO =
   | {
       /** UUID of the SSO provider to invoke single-sign on to. */
       providerId: string
+
+      options?: {
+        /** A URL to send the user to after they have signed-in. */
+        redirectTo?: string
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
     }
   | {
       /** Domain name of the organization for which to invoke single-sign on. */
       domain: string
+
+      options?: {
+        /** A URL to send the user to after they have signed-in. */
+        redirectTo?: string
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
     }
-)
 
 export type GenerateSignupLinkParams = {
   type: 'signup'

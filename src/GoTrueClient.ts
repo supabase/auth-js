@@ -224,9 +224,10 @@ export default class GoTrueClient {
         await this._saveSession(session)
 
         setTimeout(() => {
-          this._notifyAllSubscribers('SIGNED_IN', session)
           if (redirectType === 'recovery') {
             this._notifyAllSubscribers('PASSWORD_RECOVERY', session)
+          } else {
+            this._notifyAllSubscribers('SIGNED_IN', session)
           }
         }, 0)
 
@@ -400,7 +401,7 @@ export default class GoTrueClient {
     const { data, error } = await _request(
       this.fetch,
       'POST',
-      `${this.url}/token?grant_type=oauth_pkce`,
+      `${this.url}/token?grant_type=pkce`,
       {
         headers: this.headers,
         body: {
@@ -537,7 +538,7 @@ export default class GoTrueClient {
       }
 
       if (!data) {
-        throw 'An error occurred on token verification.'
+        throw new Error('An error occurred on token verification.')
       }
 
       const session: Session | null = data.session
@@ -571,11 +572,6 @@ export default class GoTrueClient {
    *
    * If you have built an organization-specific login page, you can use the
    * organization's SSO Identity Provider UUID directly instead.
-   *
-   * This API is experimental and availability is conditional on correct
-   * settings on the Auth service.
-   *
-   * @experimental
    */
   async signInWithSSO(params: SignInWithSSO): Promise<SSOResponse> {
     try {
@@ -1080,10 +1076,9 @@ export default class GoTrueClient {
       scopes?: string
       queryParams?: { [key: string]: string }
       skipBrowserRedirect?: boolean
-      flowType?: OAuthFlowType
-    } = {}
+      flowType: OAuthFlowType
+    }
   ) {
-
     const url: string = await this._getUrlForProvider(provider, {
       redirectTo: options.redirectTo,
       scopes: options.scopes,
@@ -1411,7 +1406,7 @@ export default class GoTrueClient {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
     if (options?.flowType === 'pkce') {
-      const codeVerifier = await generatePKCEVerifier()
+      const codeVerifier = generatePKCEVerifier()
       await setItemAsync(this.storage, `${this.storageKey}-oauth-code-verifier`, codeVerifier)
       const codeChallenge = await generatePKCEChallenge(codeVerifier)
       const flowParams = new URLSearchParams({
