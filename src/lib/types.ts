@@ -50,7 +50,7 @@ export type GoTrueClientOptions = {
   /* A custom fetch implementation. */
   fetch?: Fetch
   /* If set to 'pkce' PKCE flow. Defaults to the 'implicit' flow otherwise */
-  flowType?: OAuthFlowType
+  flowType?: AuthFlowType
 }
 
 export type AuthResponse =
@@ -437,7 +437,7 @@ export type SignInWithPasswordlessCredentials =
       }
     }
 
-export type OAuthFlowType = 'implicit' | 'pkce'
+export type AuthFlowType = 'implicit' | 'pkce'
 export type SignInWithOAuthCredentials = {
   /** One of the providers supported by GoTrue. */
   provider: Provider

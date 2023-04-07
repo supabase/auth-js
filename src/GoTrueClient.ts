@@ -67,7 +67,7 @@ import type {
   AuthenticatorAssuranceLevels,
   Factor,
   MFAChallengeAndVerifyParams,
-  OAuthFlowType,
+  AuthFlowType,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -110,7 +110,7 @@ export default class GoTrueClient {
    */
   protected inMemorySession: Session | null
 
-  protected flowType: OAuthFlowType
+  protected flowType: AuthFlowType
 
   protected autoRefreshToken: boolean
   protected persistSession: boolean
@@ -1098,7 +1098,7 @@ export default class GoTrueClient {
       scopes?: string
       queryParams?: { [key: string]: string }
       skipBrowserRedirect?: boolean
-      flowType: OAuthFlowType
+      flowType: AuthFlowType
     }
   ) {
     const url: string = await this._getUrlForProvider(provider, {
@@ -1417,7 +1417,7 @@ export default class GoTrueClient {
       redirectTo?: string
       scopes?: string
       queryParams?: { [key: string]: string }
-      flowType: OAuthFlowType
+      flowType: AuthFlowType
     }
   ) {
     const urlParams: string[] = [`provider=${encodeURIComponent(provider)}`]
