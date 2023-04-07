@@ -3,6 +3,7 @@ import { DEFAULT_HEADERS, EXPIRY_MARGIN, GOTRUE_URL, STORAGE_KEY } from './lib/c
 import {
   AuthError,
   AuthImplicitGrantRedirectError,
+  AuthPKCEGrantCodeExchangeError,
   AuthInvalidCredentialsError,
   AuthRetryableFetchError,
   AuthSessionMissingError,
@@ -861,8 +862,19 @@ export default class GoTrueClient {
   > {
     try {
       if (!isBrowser()) throw new AuthImplicitGrantRedirectError('No browser detected.')
-      if (!this._isImplicitGrantFlow()) {
+      if (this.flowType == 'implict' && !this._isImplicitGrantFlow()) {
         throw new AuthImplicitGrantRedirectError('Not a valid implicit grant flow url.')
+      } else if (this.flowType == 'pkce' && !this._isPKCEFlow()) {
+        throw new AuthPKCEGrantCodeExchangeError('Not a valid PKCE flow url.')
+      }
+      if (await this._isPKCEFlow()) {
+        const authCode = getParameterByName('code')
+        if (!authCode) throw new AuthPKCEGrantCodeExchangeError('No code detected.')
+        const { data, error } = await this.exchangeCodeForSession(authCode)
+        window.location.search = ''
+        if (error) throw error
+        if (!data.session) throw new AuthPKCEGrantCodeExchangeError('No session detected.')
+        return { data: { session: data.session, redirectType: null }, error: null }
       }
 
       const error_description = getParameterByName('error_description')
@@ -926,6 +938,16 @@ export default class GoTrueClient {
       (Boolean(getParameterByName('access_token')) ||
         Boolean(getParameterByName('error_description')))
     )
+  }
+  /**
+   * Checks if the current URL and backing storage contain parameters given by a PKCE flow
+   */
+  private async _isPKCEFlow(): Promise<boolean> {
+    const currentStorageContent = await getItemAsync(
+      this.storage,
+      `${this.storageKey}-code-verifier`
+    )
+    return isBrowser() && Boolean(getParameterByName('code')) && Boolean(currentStorageContent)
   }
 
   /**
