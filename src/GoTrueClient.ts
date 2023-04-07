@@ -213,7 +213,7 @@ export default class GoTrueClient {
     }
 
     try {
-      if (this.detectSessionInUrl && this._isImplicitGrantFlow()) {
+      if (this.detectSessionInUrl && (this._isImplicitGrantFlow()) || this._isPKCEFlow()) {
         const { data, error } = await this._getSessionFromUrl()
 
         if (error) {
