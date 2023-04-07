@@ -1,15 +1,31 @@
-import { Fetch, _generateLinkResponse, _request, _userResponse } from './lib/fetch'
+import {
+  Fetch,
+  _generateLinkResponse,
+  _noResolveJsonResponse,
+  _request,
+  _userResponse,
+} from './lib/fetch'
 import { resolveFetch } from './lib/helpers'
 import {
   AdminUserAttributes,
   GenerateLinkParams,
   GenerateLinkResponse,
+  Pagination,
   User,
   UserResponse,
+  GoTrueAdminMFAApi,
+  AuthMFAAdminDeleteFactorParams,
+  AuthMFAAdminDeleteFactorResponse,
+  AuthMFAAdminListFactorsParams,
+  AuthMFAAdminListFactorsResponse,
+  PageParams,
 } from './lib/types'
 import { AuthError, isAuthError } from './lib/errors'
 
 export default class GoTrueAdminApi {
+  /** Contains all MFA administration methods. */
+  mfa: GoTrueAdminMFAApi
+
   protected url: string
   protected headers: {
     [key: string]: string
@@ -30,23 +46,27 @@ export default class GoTrueAdminApi {
     this.url = url
     this.headers = headers
     this.fetch = resolveFetch(fetch)
+    this.mfa = {
+      listFactors: this._listFactors.bind(this),
+      deleteFactor: this._deleteFactor.bind(this),
+    }
   }
 
   /**
    * Removes a logged-in session.
    * @param jwt A valid, logged-in JWT.
    */
-  async signOut(jwt: string): Promise<{ error: AuthError | null }> {
+  async signOut(jwt: string): Promise<{ data: null; error: AuthError | null }> {
     try {
       await _request(this.fetch, 'POST', `${this.url}/logout`, {
         headers: this.headers,
         jwt,
         noResolveJson: true,
       })
-      return { error: null }
+      return { data: null, error: null }
     } catch (error) {
       if (isAuthError(error)) {
-        return { error }
+        return { data: null, error }
       }
 
       throw error
@@ -143,16 +163,40 @@ export default class GoTrueAdminApi {
    * Get a list of users.
    *
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
+   * @param params An object which supports `page` and `perPage` as numbers, to alter the paginated results.
    */
-  async listUsers(): Promise<
-    { data: { users: User[] }; error: null } | { data: { users: [] }; error: AuthError }
+  async listUsers(
+    params?: PageParams
+  ): Promise<
+    | { data: { users: User[]; aud: string } & Pagination; error: null }
+    | { data: { users: [] }; error: AuthError }
   > {
     try {
-      const { data, error } = await _request(this.fetch, 'GET', `${this.url}/admin/users`, {
+      const pagination: Pagination = { nextPage: null, lastPage: 0, total: 0 }
+      const response = await _request(this.fetch, 'GET', `${this.url}/admin/users`, {
         headers: this.headers,
+        noResolveJson: true,
+        query: {
+          page: params?.page?.toString() ?? '',
+          per_page: params?.perPage?.toString() ?? '',
+        },
+        xform: _noResolveJsonResponse,
       })
-      if (error) throw error
-      return { data: { ...data }, error: null }
+      if (response.error) throw response.error
+
+      const users = await response.json()
+      const total = response.headers.get('x-total-count') ?? 0
+      const links = response.headers.get('link')?.split(',') ?? []
+      if (links.length > 0) {
+        links.forEach((link: string) => {
+          const page = parseInt(link.split(';')[0].split('=')[1].substring(0, 1))
+          const rel = JSON.parse(link.split(';')[1].split('=')[1])
+          pagination[`${rel}Page`] = page
+        })
+
+        pagination.total = parseInt(total)
+      }
+      return { data: { ...users, ...pagination }, error: null }
     } catch (error) {
       if (isAuthError(error)) {
         return { data: { users: [] }, error }
@@ -210,18 +254,71 @@ export default class GoTrueAdminApi {
    * Delete a user. Requires a `service_role` key.
    *
    * @param id The user id you want to remove.
+   * @param shouldSoftDelete If true, then the user will be soft-deleted from the auth schema.
+   * Defaults to false for backward compatibility.
    *
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
    */
-  async deleteUser(id: string): Promise<UserResponse> {
+  async deleteUser(id: string, shouldSoftDelete = false): Promise<UserResponse> {
     try {
       return await _request(this.fetch, 'DELETE', `${this.url}/admin/users/${id}`, {
         headers: this.headers,
+        body: {
+          should_soft_delete: shouldSoftDelete,
+        },
         xform: _userResponse,
       })
     } catch (error) {
       if (isAuthError(error)) {
         return { data: { user: null }, error }
+      }
+
+      throw error
+    }
+  }
+
+  private async _listFactors(
+    params: AuthMFAAdminListFactorsParams
+  ): Promise<AuthMFAAdminListFactorsResponse> {
+    try {
+      const { data, error } = await _request(
+        this.fetch,
+        'GET',
+        `${this.url}/admin/users/${params.userId}/factors`,
+        {
+          headers: this.headers,
+          xform: (factors: any) => {
+            return { data: { factors }, error: null }
+          },
+        }
+      )
+      return { data, error }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: null, error }
+      }
+
+      throw error
+    }
+  }
+
+  private async _deleteFactor(
+    params: AuthMFAAdminDeleteFactorParams
+  ): Promise<AuthMFAAdminDeleteFactorResponse> {
+    try {
+      const data = await _request(
+        this.fetch,
+        'DELETE',
+        `${this.url}/admin/users/${params.userId}/factors/${params.id}`,
+        {
+          headers: this.headers,
+        }
+      )
+
+      return { data, error: null }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: null, error }
       }
 
       throw error

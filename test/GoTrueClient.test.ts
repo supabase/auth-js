@@ -6,6 +6,7 @@ import {
   clientApiAutoConfirmOffSignupsEnabledClient as phoneClient,
   clientApiAutoConfirmDisabledClient as signUpDisabledClient,
   clientApiAutoConfirmEnabledClient as signUpEnabledClient,
+  authAdminApiAutoConfirmEnabledClient,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
 
@@ -20,6 +21,73 @@ describe('GoTrueClient', () => {
   })
 
   describe('Sessions', () => {
+    test('refreshSession() should return a new session using a passed-in refresh token', async () => {
+      const { email, password } = mockUserCredentials()
+
+      const { error, data } = await authWithSession.signUp({
+        email,
+        password,
+      })
+      expect(error).toBeNull()
+      expect(data.session).not.toBeNull()
+
+      /** wait 1 second before calling refreshSession()
+       * resolves issue of tokens being equal
+       */
+      await new Promise((r) => setTimeout(r, 1000))
+
+      const {
+        data: { session },
+        error: refreshSessionError,
+      } = await authWithSession.refreshSession({
+        // @ts-expect-error 'data.session should not be null because of the assertion above'
+        refresh_token: data.session.refresh_token,
+      })
+      expect(refreshSessionError).toBeNull()
+      expect(session).not.toBeNull()
+      expect(session!.user).not.toBeNull()
+      expect(session!.expires_in).not.toBeNull()
+      expect(session!.expires_at).not.toBeNull()
+      expect(session!.access_token).not.toBeNull()
+      expect(session!.refresh_token).not.toBeNull()
+      expect(session!.token_type).toStrictEqual('bearer')
+      expect(refreshAccessTokenSpy).toBeCalledTimes(1)
+      // @ts-expect-error 'data.session and session should not be null because of the assertion above'
+      expect(data.session.refresh_token).not.toEqual(session.refresh_token)
+    })
+
+    test('refreshSession() should return a new session without a passed-in refresh token', async () => {
+      const { email, password } = mockUserCredentials()
+
+      const { error, data } = await authWithSession.signUp({
+        email,
+        password,
+      })
+      expect(error).toBeNull()
+      expect(data.session).not.toBeNull()
+
+      /** wait 1 second before calling refreshSession()
+       * resolves issue of tokens being equal
+       */
+      await new Promise((r) => setTimeout(r, 1000))
+
+      const {
+        data: { session },
+        error: refreshSessionError,
+      } = await authWithSession.refreshSession()
+      expect(refreshSessionError).toBeNull()
+      expect(session).not.toBeNull()
+      expect(session!.user).not.toBeNull()
+      expect(session!.expires_in).not.toBeNull()
+      expect(session!.expires_at).not.toBeNull()
+      expect(session!.access_token).not.toBeNull()
+      expect(session!.refresh_token).not.toBeNull()
+      expect(session!.token_type).toStrictEqual('bearer')
+      expect(refreshAccessTokenSpy).toBeCalledTimes(1)
+      // @ts-expect-error 'data.session and session should not be null because of the assertion above'
+      expect(data.session.refresh_token).not.toEqual(session.refresh_token)
+    })
+
     test('setSession should return no error', async () => {
       const { email, password } = mockUserCredentials()
 
@@ -29,6 +97,15 @@ describe('GoTrueClient', () => {
       })
       expect(error).toBeNull()
       expect(data.session).not.toBeNull()
+
+      /**
+       * Sign out the user to verify setSession, getSession and updateUser
+       * are truly working; because the signUp method will already save the session.
+       * And that session will be available to getSession and updateUser,
+       * even if setSession isn't called or fails to save the session.
+       * The tokens are still valid after logout, and therefore usable.
+       */
+      await authWithSession.signOut()
 
       const {
         data: { session },
@@ -47,6 +124,14 @@ describe('GoTrueClient', () => {
       expect(session!.access_token).not.toBeNull()
       expect(session!.refresh_token).not.toBeNull()
       expect(session!.token_type).toStrictEqual('bearer')
+
+      /**
+       * getSession has been added to verify setSession is also saving
+       * the session, not just returning it.
+       */
+      const { data: getSessionData, error: getSessionError } = await authWithSession.getSession()
+      expect(getSessionError).toBeNull()
+      expect(getSessionData).not.toBeNull()
 
       const {
         data: { user },
@@ -461,7 +546,9 @@ describe('GoTrueClient', () => {
     expect(userSession.session?.user).not.toBeNull()
     expect(userSession.session?.user?.email).toBe(email)
   })
+})
 
+describe('Signout behaviour', () => {
   test('signOut', async () => {
     const { email, password } = mockUserCredentials()
 
@@ -475,9 +562,45 @@ describe('GoTrueClient', () => {
       password,
     })
 
-    const res = await authWithSession.signOut()
+    const { error } = await authWithSession.signOut()
 
-    expect(res).toBeTruthy()
+    expect(error).toBe(null)
+    const {
+      data: { user },
+    } = await authWithSession.getUser()
+    expect(user).toBe(null)
+  })
+
+  test('signOut should remove session if user is not found or jwt is invalid', async () => {
+    const { email, password } = mockUserCredentials()
+
+    await authWithSession.signUp({
+      email,
+      password,
+    })
+
+    const {
+      data: { user },
+      error: signInError,
+    } = await authWithSession.signInWithPassword({
+      email,
+      password,
+    })
+    expect(signInError).toBe(null)
+    expect(user).not.toBe(null)
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await authWithSession.getSession()
+    expect(session).not.toBe(null)
+    expect(sessionError).toBe(null)
+
+    const id = user ? user.id : '' // user should not be null
+    await authAdminApiAutoConfirmEnabledClient.deleteUser(id)
+
+    const { error } = await authWithSession.signOut()
+    expect(error).toBe(null)
   })
 })
 

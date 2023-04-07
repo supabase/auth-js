@@ -1,5 +1,4 @@
 import { SupportedStorage } from './types'
-
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
   return timeNow + expiresIn
@@ -13,7 +12,52 @@ export function uuid() {
   })
 }
 
-export const isBrowser = () => typeof window !== 'undefined'
+export const isBrowser = () => typeof document !== 'undefined'
+
+const localStorageWriteTests = {
+  tested: false,
+  writable: false,
+}
+
+/**
+ * Checks whether localStorage is supported on this browser.
+ */
+export const supportsLocalStorage = () => {
+  if (!isBrowser()) {
+    return false
+  }
+
+  try {
+    if (typeof globalThis.localStorage !== 'object') {
+      return false
+    }
+  } catch (e) {
+    // DOM exception when accessing `localStorage`
+    return false
+  }
+
+  if (localStorageWriteTests.tested) {
+    return localStorageWriteTests.writable
+  }
+
+  const randomKey = `lswt-${Math.random()}${Math.random()}`
+
+  try {
+    globalThis.localStorage.setItem(randomKey, randomKey)
+    globalThis.localStorage.removeItem(randomKey)
+
+    localStorageWriteTests.tested = true
+    localStorageWriteTests.writable = true
+  } catch (e) {
+    // localStorage can't be written to
+    // https://www.chromium.org/for-testers/bug-reporting-guidelines/uncaught-securityerror-failed-to-read-the-localstorage-property-from-window-access-is-denied-for-this-document
+
+    localStorageWriteTests.tested = true
+    localStorageWriteTests.writable = false
+  }
+
+  return localStorageWriteTests.writable
+}
 
 export function getParameterByName(name: string, url?: string) {
   if (!url) url = window?.location?.href || ''
@@ -78,22 +122,32 @@ export const removeItemAsync = async (storage: SupportedStorage, key: string): P
   await storage.removeItem(key)
 }
 
-export const decodeBase64URL = (value: string): string => {
-  try {
-    // atob is present in all browsers and nodejs >= 16
-    // but if it is not it will throw a ReferenceError in which case we can try to use Buffer
-    // replace are here to convert the Base64-URL into Base64 which is what atob supports
-    // replace with //g regex acts like replaceAll
-    return atob(value.replace(/[-]/g, '+').replace(/[_]/g, '/'))
-  } catch (e) {
-    if (e instanceof ReferenceError) {
-      // running on nodejs < 16
-      // Buffer supports Base64-URL transparently
-      return Buffer.from(value, 'base64').toString('utf-8')
-    } else {
-      throw e
+export function decodeBase64URL(value: string): string {
+  const key = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
+  let base64 = ''
+  let chr1, chr2, chr3
+  let enc1, enc2, enc3, enc4
+  let i = 0
+  value = value.replace('-', '+').replace('_', '/')
+
+  while (i < value.length) {
+    enc1 = key.indexOf(value.charAt(i++))
+    enc2 = key.indexOf(value.charAt(i++))
+    enc3 = key.indexOf(value.charAt(i++))
+    enc4 = key.indexOf(value.charAt(i++))
+    chr1 = (enc1 << 2) | (enc2 >> 4)
+    chr2 = ((enc2 & 15) << 4) | (enc3 >> 2)
+    chr3 = ((enc3 & 3) << 6) | enc4
+    base64 = base64 + String.fromCharCode(chr1)
+
+    if (enc3 != 64 && chr2 != 0) {
+      base64 = base64 + String.fromCharCode(chr2)
+    }
+    if (enc4 != 64 && chr3 != 0) {
+      base64 = base64 + String.fromCharCode(chr3)
     }
   }
+  return base64
 }
 
 /**
@@ -119,4 +173,107 @@ export class Deferred<T = any> {
       ;(this as any).reject = rej
     })
   }
+}
+
+// Taken from: https://stackoverflow.com/questions/38552003/how-to-decode-jwt-token-in-javascript-without-using-a-library
+export function decodeJWTPayload(token: string) {
+  // Regex checks for base64url format
+  const base64UrlRegex = /^([a-z0-9_-]{4})*($|[a-z0-9_-]{3}=?$|[a-z0-9_-]{2}(==)?$)$/i
+
+  const parts = token.split('.')
+
+  if (parts.length !== 3) {
+    throw new Error('JWT is not valid: not a JWT structure')
+  }
+
+  if (!base64UrlRegex.test(parts[1])) {
+    throw new Error('JWT is not valid: payload is not in base64url format')
+  }
+
+  const base64Url = parts[1]
+  return JSON.parse(decodeBase64URL(base64Url))
+}
+
+/**
+ * Creates a promise that resolves to null after some time.
+ */
+export function sleep(time: number): Promise<null> {
+  return new Promise((accept) => {
+    setTimeout(() => accept(null), time)
+  })
+}
+
+/**
+ * Converts the provided async function into a retryable function. Each result
+ * or thrown error is sent to the isRetryable function which should return true
+ * if the function should run again.
+ */
+export function retryable<T>(
+  fn: (attempt: number) => Promise<T>,
+  isRetryable: (attempt: number, error: any | null, result?: T) => boolean
+): Promise<T> {
+  const promise = new Promise<T>((accept, reject) => {
+    // eslint-disable-next-line @typescript-eslint/no-extra-semi
+    ;(async () => {
+      for (let attempt = 0; attempt < Infinity; attempt++) {
+        try {
+          const result = await fn(attempt)
+
+          if (!isRetryable(attempt, null, result)) {
+            accept(result)
+            return
+          }
+        } catch (e: any) {
+          if (!isRetryable(attempt, e)) {
+            reject(e)
+            return
+          }
+        }
+      }
+    })()
+  })
+
+  return promise
+}
+
+function dec2hex(dec: number) {
+  return ('0' + dec.toString(16)).substr(-2)
+}
+
+// Functions below taken from: https://stackoverflow.com/questions/63309409/creating-a-code-verifier-and-challenge-for-pkce-auth-on-spotify-api-in-reactjs
+export function generatePKCEVerifier() {
+  const verifierLength = 56
+  const array = new Uint32Array(verifierLength)
+  if (typeof window.crypto === 'undefined') {
+    throw new Error(
+      'PKCE is not supported on devices without WebCrypto API support, please add polyfills'
+    )
+  }
+  window.crypto.getRandomValues(array)
+  return Array.from(array, dec2hex).join('')
+}
+
+async function sha256(randomString: string) {
+  const encoder = new TextEncoder()
+  const encodedData = encoder.encode(randomString)
+  if (typeof window.crypto === 'undefined') {
+    throw new Error(
+      'PKCE is not supported on devices without WebCrypto API support, please add polyfills'
+    )
+  }
+  const hash = await window.crypto.subtle.digest('SHA-256', encodedData)
+  const bytes = new Uint8Array(hash)
+
+  return Array.from(bytes)
+    .map((c) => String.fromCharCode(c))
+    .join('')
+}
+
+function base64urlencode(str: string) {
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+export async function generatePKCEChallenge(verifier: string) {
+  const hashed = await sha256(verifier)
+  return base64urlencode(hashed)
 }

@@ -1,6 +1,7 @@
 import { expiresAt, looksLikeFetchResponse } from './helpers'
 import {
   AuthResponse,
+  SSOResponse,
   GenerateLinkProperties,
   GenerateLinkResponse,
   User,
@@ -81,7 +82,7 @@ export async function _request(
   url: string,
   options?: GotrueRequestOptions
 ) {
-  const headers = options?.headers ?? {}
+  const headers = { ...options?.headers }
   if (options?.jwt) {
     headers['Authorization'] = `Bearer ${options.jwt}`
   }
@@ -136,6 +137,10 @@ export function _userResponse(data: any): UserResponse {
   return { data: { user }, error: null }
 }
 
+export function _ssoResponse(data: any): SSOResponse {
+  return { data, error: null }
+}
+
 export function _generateLinkResponse(data: any): GenerateLinkResponse {
   const { action_link, email_otp, hashed_token, redirect_to, verification_type, ...rest } = data
 
@@ -155,6 +160,10 @@ export function _generateLinkResponse(data: any): GenerateLinkResponse {
     },
     error: null,
   }
+}
+
+export function _noResolveJsonResponse(data: any): Response {
+  return data
 }
 
 /**
