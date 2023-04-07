@@ -365,8 +365,10 @@ export type SignUpWithPasswordCredentials =
          * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
          */
         data?: object
-        /** Verification token received when the user completes the captcha on the site. */
+        /** Verification token received when the user completes the captcha on the site. Requires a configured WhatsApp sender on Twilio */
         captchaToken?: string
+        /** Messaging channel to use (e.g. whatsapp or sms) */
+        channel?: 'sms' | 'whatsapp'
       }
     }
 export type SignInWithPasswordCredentials =
@@ -394,8 +396,6 @@ export type SignInWithPasswordCredentials =
         data?: object
         /** Verification token received when the user completes the captcha on the site. */
         captchaToken?: string
-        /** Messaging channel to use (e.g. whatsapp or sms) */
-        channel?: 'sms' | 'whatsapp'
       }
     }
 
