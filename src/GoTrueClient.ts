@@ -862,7 +862,7 @@ export default class GoTrueClient {
   > {
     try {
       if (!isBrowser()) throw new AuthImplicitGrantRedirectError('No browser detected.')
-      if (this.flowType == 'implict' && !this._isImplicitGrantFlow()) {
+      if (this.flowType == 'implicit' && !this._isImplicitGrantFlow()) {
         throw new AuthImplicitGrantRedirectError('Not a valid implicit grant flow url.')
       } else if (this.flowType == 'pkce' && !this._isPKCEFlow()) {
         throw new AuthPKCEGrantCodeExchangeError('Not a valid PKCE flow url.')
