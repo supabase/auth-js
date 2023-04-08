@@ -25,6 +25,7 @@ import {
   sleep,
   generatePKCEVerifier,
   generatePKCEChallenge,
+  multiTabLock,
 } from './lib/helpers'
 import localStorageAdapter from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
@@ -1136,38 +1137,40 @@ export default class GoTrueClient {
       return this.refreshingDeferred.promise
     }
 
-    try {
-      this.refreshingDeferred = new Deferred<CallRefreshTokenResult>()
+    return await multiTabLock(`rt-${refreshToken}`, async () => {
+      try {
+        this.refreshingDeferred = new Deferred<CallRefreshTokenResult>()
 
-      if (!refreshToken) {
-        throw new AuthSessionMissingError()
-      }
-      const { data, error } = await this._refreshAccessToken(refreshToken)
-      if (error) throw error
-      if (!data.session) throw new AuthSessionMissingError()
+        if (!refreshToken) {
+          throw new AuthSessionMissingError()
+        }
+        const { data, error } = await this._refreshAccessToken(refreshToken)
+        if (error) throw error
+        if (!data.session) throw new AuthSessionMissingError()
 
-      await this._saveSession(data.session)
-      this._notifyAllSubscribers('TOKEN_REFRESHED', data.session)
+        await this._saveSession(data.session)
+        this._notifyAllSubscribers('TOKEN_REFRESHED', data.session)
 
-      const result = { session: data.session, error: null }
+        const result = { session: data.session, error: null }
 
-      this.refreshingDeferred.resolve(result)
-
-      return result
-    } catch (error) {
-      if (isAuthError(error)) {
-        const result = { session: null, error }
-
-        this.refreshingDeferred?.resolve(result)
+        this.refreshingDeferred.resolve(result)
 
         return result
-      }
+      } catch (error) {
+        if (isAuthError(error)) {
+          const result = { session: null, error }
 
-      this.refreshingDeferred?.reject(error)
-      throw error
-    } finally {
-      this.refreshingDeferred = null
-    }
+          this.refreshingDeferred?.resolve(result)
+
+          return result
+        }
+
+        this.refreshingDeferred?.reject(error)
+        throw error
+      } finally {
+        this.refreshingDeferred = null
+      }
+    })
   }
 
   private _notifyAllSubscribers(event: AuthChangeEvent, session: Session | null, broadcast = true) {

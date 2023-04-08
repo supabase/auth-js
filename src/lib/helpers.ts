@@ -277,3 +277,77 @@ export async function generatePKCEChallenge(verifier: string) {
   const hashed = await sha256(verifier)
   return base64urlencode(hashed)
 }
+
+const currentTabLocks: { [operation: string]: Promise<any> } = {}
+
+function receiveReply(bc: BroadcastChannel, message: any) {
+  const promise = new Promise<boolean>((accept, reject) => {
+    let accepted = false
+
+    const el = (reply: any) => {
+      if (message === reply) {
+        accepted = true
+        accept(true)
+      }
+    }
+
+    ;(async () => {
+      try {
+        bc.addEventListener('message', el)
+
+        bc.postMessage(message)
+        await sleep(10)
+
+        if (!accepted) {
+          accept(false)
+        }
+      } finally {
+        bc.removeEventListener('message', el)
+      }
+    })()
+  })
+
+  return promise
+}
+
+export async function multiTabLock<R>(operation: string, fn: () => Promise<R>): Promise<R> {
+  let broadcastChannel: BroadcastChannel | null = null
+
+  try {
+    // wait for previous operation registered in this tab to finish
+    await currentTabLocks[operation]
+
+    currentTabLocks[operation] = (async () => {
+      if (isBrowser() && globalThis.BroadcastChannel) {
+        broadcastChannel = new globalThis.BroadcastChannel(`mtl-${operation}`)
+        broadcastChannel.onmessage = (message: any) => {
+          broadcastChannel.postMessage(message)
+        }
+      }
+
+      if (broadcastChannel) {
+        while (true) {
+          const received = await receiveReply(broadcastChannel, `${Math.random()}${Math.random()}`)
+
+          if (!received) {
+            // no reply, we're the owners of this operation
+            break
+          }
+
+          // someone else has acquired the operation, keep checking until they are done
+          await sleep(100)
+        }
+      }
+
+      return await fn()
+    })()
+
+    return await currentTabLocks[operation]
+  } finally {
+    if (broadcastChannel) {
+      // we no longer acquire this operation
+      broadcastChannel.onmessage = null
+      broadcastChannel.close()
+    }
+  }
+}
