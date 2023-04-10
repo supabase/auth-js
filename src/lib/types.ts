@@ -49,6 +49,8 @@ export type GoTrueClientOptions = {
   storage?: SupportedStorage
   /* A custom fetch implementation. */
   fetch?: Fetch
+  /* If set to 'pkce' PKCE flow. Defaults to the 'implicit' flow otherwise */
+  flowType?: AuthFlowType
 }
 
 export type AuthResponse =
@@ -363,8 +365,10 @@ export type SignUpWithPasswordCredentials =
          * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
          */
         data?: object
-        /** Verification token received when the user completes the captcha on the site. */
+        /** Verification token received when the user completes the captcha on the site. Requires a configured WhatsApp sender on Twilio */
         captchaToken?: string
+        /** Messaging channel to use (e.g. whatsapp or sms) */
+        channel?: 'sms' | 'whatsapp'
       }
     }
 export type SignInWithPasswordCredentials =
@@ -392,8 +396,6 @@ export type SignInWithPasswordCredentials =
         data?: object
         /** Verification token received when the user completes the captcha on the site. */
         captchaToken?: string
-        /** Messaging channel to use (e.g. whatsapp or sms) */
-        channel?: 'sms' | 'whatsapp'
       }
     }
 
@@ -435,7 +437,7 @@ export type SignInWithPasswordlessCredentials =
       }
     }
 
-export type OAuthFlowType = 'implicit' | 'pkce'
+export type AuthFlowType = 'implicit' | 'pkce'
 export type SignInWithOAuthCredentials = {
   /** One of the providers supported by GoTrue. */
   provider: Provider
@@ -448,8 +450,6 @@ export type SignInWithOAuthCredentials = {
     queryParams?: { [key: string]: string }
     /** If set to true does not immediately redirect the current browser context to visit the OAuth authorization page for the provider. */
     skipBrowserRedirect?: boolean
-    /** If set to 'pkce' PKCE flow. Defaults to the 'implicit' flow otherwise */
-    flowType?: OAuthFlowType
   }
 }
 
