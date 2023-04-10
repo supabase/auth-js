@@ -483,7 +483,7 @@ export default class GoTrueClient {
       if ('email' in credentials) {
         const { email, options } = credentials
         let codeChallenge: string | null = null
-        if (this.flowType == 'pkce') {
+        if (this.flowType === 'pkce') {
           const codeVerifier = generatePKCEVerifier()
           await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
           codeChallenge = await generatePKCEChallenge(codeVerifier)
@@ -866,9 +866,9 @@ export default class GoTrueClient {
   > {
     try {
       if (!isBrowser()) throw new AuthImplicitGrantRedirectError('No browser detected.')
-      if (this.flowType == 'implicit' && !this._isImplicitGrantFlow()) {
+      if (this.flowType === 'implicit' && !this._isImplicitGrantFlow()) {
         throw new AuthImplicitGrantRedirectError('Not a valid implicit grant flow url.')
-      } else if (this.flowType == 'pkce' && !(await this._isPKCEFlow())) {
+      } else if (this.flowType === 'pkce' && !(await this._isPKCEFlow())) {
         throw new AuthPKCEGrantCodeExchangeError('Not a valid PKCE flow url.')
       }
       if (await this._isPKCEFlow()) {
