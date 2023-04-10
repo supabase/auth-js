@@ -213,7 +213,7 @@ export default class GoTrueClient {
     }
 
     try {
-      if (this.detectSessionInUrl && (this._isImplicitGrantFlow()) || this._isPKCEFlow()) {
+      if ((this.detectSessionInUrl && this._isImplicitGrantFlow()) || this._isPKCEFlow()) {
         const { data, error } = await this._getSessionFromUrl()
 
         if (error) {
@@ -1427,7 +1427,6 @@ export default class GoTrueClient {
       await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
       const codeChallenge = await generatePKCEChallenge(codeVerifier)
       const flowParams = new URLSearchParams({
-        flow_type: `${encodeURIComponent(options.flowType)}`,
         code_challenge: `${encodeURIComponent(codeChallenge)}`,
         code_challenge_method: `${encodeURIComponent('s256')}`,
       })
