@@ -1406,7 +1406,6 @@ export default class GoTrueClient {
    * @param options.redirectTo A URL or mobile address to send the user to after they are confirmed.
    * @param options.scopes A space-separated list of scopes granted to the OAuth application.
    * @param options.queryParams An object of key-value pairs containing query parameters granted to the OAuth application.
-   * @param options.flowType OAuth flow to use - defaults to implicit flow. PKCE is recommended for mobile and server-side applications.
    */
   private async _getUrlForProvider(
     provider: Provider,
@@ -1414,7 +1413,6 @@ export default class GoTrueClient {
       redirectTo?: string
       scopes?: string
       queryParams?: { [key: string]: string }
-      flowType: AuthFlowType
     }
   ) {
     const urlParams: string[] = [`provider=${encodeURIComponent(provider)}`]
