@@ -399,7 +399,7 @@ export default class GoTrueClient {
    * Log in an existing user via a third-party provider.
    */
   async exchangeCodeForSession(authCode: string): Promise<AuthResponse> {
-    const codeVerifier = await getItemAsync(this.storage, `${this.storageKey}-oauth-code-verifier`)
+    const codeVerifier = await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)
     const { data, error } = await _request(
       this.fetch,
       'POST',
@@ -413,7 +413,7 @@ export default class GoTrueClient {
         xform: _sessionResponse,
       }
     )
-    await removeItemAsync(this.storage, `${this.storageKey}-oauth-code-verifier`)
+    await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
     if (error || !data) return { data: { user: null, session: null }, error }
     if (data.session) {
       await this._saveSession(data.session)
@@ -1429,7 +1429,7 @@ export default class GoTrueClient {
     }
     if (options?.flowType === 'pkce') {
       const codeVerifier = generatePKCEVerifier()
-      await setItemAsync(this.storage, `${this.storageKey}-oauth-code-verifier`, codeVerifier)
+      await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
       const codeChallenge = await generatePKCEChallenge(codeVerifier)
       const flowParams = new URLSearchParams({
         flow_type: `${encodeURIComponent(options.flowType)}`,
