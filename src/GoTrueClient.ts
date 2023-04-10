@@ -1049,7 +1049,7 @@ export default class GoTrueClient {
         body: {
           email,
           code_challenge: codeChallenge,
-          code_challenge_method: codeChallenge ? 'S256' : null,
+          code_challenge_method: codeChallenge ? 's256' : null,
           gotrue_meta_security: { captcha_token: options.captchaToken },
         },
         headers: this.headers,
