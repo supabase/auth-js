@@ -329,7 +329,7 @@ export default class GoTrueClient {
   /**
    * Log in an existing user with an email and password or phone and password.
    *
-   * Be aware that you may get back an error message that will not distingish
+   * Be aware that you may get back an error message that will not distinguish
    * between the cases where the account does not exist or that the
    * email/phone and password combination is wrong or that the account can only
    * be accessed via social login.
