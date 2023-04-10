@@ -391,7 +391,6 @@ export default class GoTrueClient {
       scopes: credentials.options?.scopes,
       queryParams: credentials.options?.queryParams,
       skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
-      flowType: this.flowType ?? 'implicit',
     })
   }
 
@@ -1098,14 +1097,12 @@ export default class GoTrueClient {
       scopes?: string
       queryParams?: { [key: string]: string }
       skipBrowserRedirect?: boolean
-      flowType: AuthFlowType
     }
   ) {
     const url: string = await this._getUrlForProvider(provider, {
       redirectTo: options.redirectTo,
       scopes: options.scopes,
       queryParams: options.queryParams,
-      flowType: options.flowType,
     })
     // try to open on the browser
     if (isBrowser() && !options.skipBrowserRedirect) {
@@ -1427,7 +1424,7 @@ export default class GoTrueClient {
     if (options?.scopes) {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
-    if (options?.flowType === 'pkce') {
+    if (this.flowType === 'pkce') {
       const codeVerifier = generatePKCEVerifier()
       await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
       const codeChallenge = await generatePKCEChallenge(codeVerifier)
