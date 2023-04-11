@@ -216,7 +216,6 @@ export default class GoTrueClient {
       const isPKCEFlow = await this._isPKCEFlow()
       if ((this.detectSessionInUrl && this._isImplicitGrantFlow()) || isPKCEFlow) {
         const { data, error } = await this._getSessionFromUrl(isPKCEFlow)
-
         if (error) {
           // failed login attempt via url,
           // remove old session as in verifyOtp, signUp and signInWith*
@@ -392,7 +391,6 @@ export default class GoTrueClient {
       scopes: credentials.options?.scopes,
       queryParams: credentials.options?.queryParams,
       skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
-      flowType: this.flowType ?? 'implicit',
     })
   }
 
@@ -483,6 +481,12 @@ export default class GoTrueClient {
 
       if ('email' in credentials) {
         const { email, options } = credentials
+        let codeChallenge: string | null = null
+        if (this.flowType === 'pkce') {
+          const codeVerifier = generatePKCEVerifier()
+          await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
+          codeChallenge = await generatePKCEChallenge(codeVerifier)
+        }
         const { error } = await _request(this.fetch, 'POST', `${this.url}/otp`, {
           headers: this.headers,
           body: {
@@ -490,6 +494,8 @@ export default class GoTrueClient {
             data: options?.data ?? {},
             create_user: options?.shouldCreateUser ?? true,
             gotrue_meta_security: { captcha_token: options?.captchaToken },
+            code_challenge: codeChallenge,
+            code_challenge_method: codeChallenge ? 's256' : null,
           },
           redirectTo: options?.emailRedirectTo,
         })
@@ -525,7 +531,6 @@ export default class GoTrueClient {
   async verifyOtp(params: VerifyOtpParams): Promise<AuthResponse> {
     try {
       await this._removeSession()
-
       const { data, error } = await _request(this.fetch, 'POST', `${this.url}/verify`, {
         headers: this.headers,
         body: {
@@ -860,7 +865,7 @@ export default class GoTrueClient {
   > {
     try {
       if (!isBrowser()) throw new AuthImplicitGrantRedirectError('No browser detected.')
-      if (this.flowType == 'implicit' && !this._isImplicitGrantFlow()) {
+      if (this.flowType === 'implicit' && !this._isImplicitGrantFlow()) {
         throw new AuthImplicitGrantRedirectError('Not a valid implicit grant flow url.')
       } else if (this.flowType == 'pkce' && !isPKCEFlow) {
         throw new AuthPKCEGrantCodeExchangeError('Not a valid PKCE flow url.')
@@ -1032,9 +1037,20 @@ export default class GoTrueClient {
       }
     | { data: null; error: AuthError }
   > {
+    let codeChallenge = null
+    if (this.flowType === 'pkce') {
+      const codeVerifier = generatePKCEVerifier()
+      await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
+      codeChallenge = await generatePKCEChallenge(codeVerifier)
+    }
     try {
       return await _request(this.fetch, 'POST', `${this.url}/recover`, {
-        body: { email, gotrue_meta_security: { captcha_token: options.captchaToken } },
+        body: {
+          email,
+          code_challenge: codeChallenge,
+          code_challenge_method: codeChallenge ? 's256' : null,
+          gotrue_meta_security: { captcha_token: options.captchaToken },
+        },
         headers: this.headers,
         redirectTo: options.redirectTo,
       })
@@ -1099,14 +1115,12 @@ export default class GoTrueClient {
       scopes?: string
       queryParams?: { [key: string]: string }
       skipBrowserRedirect?: boolean
-      flowType: AuthFlowType
     }
   ) {
     const url: string = await this._getUrlForProvider(provider, {
       redirectTo: options.redirectTo,
       scopes: options.scopes,
       queryParams: options.queryParams,
-      flowType: options.flowType,
     })
     // try to open on the browser
     if (isBrowser() && !options.skipBrowserRedirect) {
@@ -1268,7 +1282,7 @@ export default class GoTrueClient {
       // finished and tests run endlessly. This can be prevented by calling
       // `unref()` on the returned object.
       ticker.unref()
-    } else if (Deno && typeof Deno !== undefined && typeof Deno.unrefTimer === 'function') {
+    } else if (Deno && typeof Deno !== "undefined" && typeof Deno.unrefTimer === 'function') {
       // similar like for NodeJS, but with the Deno API
       // https://deno.land/api@latest?unstable&s=Deno.unrefTimer
       Deno.unrefTimer(ticker)
@@ -1415,7 +1429,6 @@ export default class GoTrueClient {
    * @param options.redirectTo A URL or mobile address to send the user to after they are confirmed.
    * @param options.scopes A space-separated list of scopes granted to the OAuth application.
    * @param options.queryParams An object of key-value pairs containing query parameters granted to the OAuth application.
-   * @param options.flowType OAuth flow to use - defaults to implicit flow. PKCE is recommended for mobile and server-side applications.
    */
   private async _getUrlForProvider(
     provider: Provider,
@@ -1423,7 +1436,6 @@ export default class GoTrueClient {
       redirectTo?: string
       scopes?: string
       queryParams?: { [key: string]: string }
-      flowType: AuthFlowType
     }
   ) {
     const urlParams: string[] = [`provider=${encodeURIComponent(provider)}`]
@@ -1433,12 +1445,11 @@ export default class GoTrueClient {
     if (options?.scopes) {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
-    if (options?.flowType === 'pkce') {
+    if (this.flowType === 'pkce') {
       const codeVerifier = generatePKCEVerifier()
       await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
       const codeChallenge = await generatePKCEChallenge(codeVerifier)
       const flowParams = new URLSearchParams({
-        flow_type: `${encodeURIComponent(options.flowType)}`,
         code_challenge: `${encodeURIComponent(codeChallenge)}`,
         code_challenge_method: `${encodeURIComponent('s256')}`,
       })
