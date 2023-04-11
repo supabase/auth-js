@@ -1259,6 +1259,7 @@ export default class GoTrueClient {
     const ticker = setInterval(() => this._autoRefreshTokenTick(), AUTO_REFRESH_TICK_DURATION)
     this.autoRefreshTicker = ticker
 
+
     if (ticker && typeof ticker === 'object' && typeof ticker.unref === 'function') {
       // ticker is a NodeJS Timeout object that has an `unref` method
       // https://nodejs.org/api/timers.html#timeoutunref
@@ -1267,7 +1268,7 @@ export default class GoTrueClient {
       // finished and tests run endlessly. This can be prevented by calling
       // `unref()` on the returned object.
       ticker.unref()
-    } else if (typeof Deno !== undefined && typeof Deno.unrefTimer === 'function') {
+    } else if (Deno && typeof Deno !== undefined && typeof Deno.unrefTimer === 'function') {
       // similar like for NodeJS, but with the Deno API
       // https://deno.land/api@latest?unstable&s=Deno.unrefTimer
       Deno.unrefTimer(ticker)
