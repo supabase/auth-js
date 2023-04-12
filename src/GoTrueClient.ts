@@ -1283,7 +1283,7 @@ export default class GoTrueClient {
       // `unref()` on the returned object.
       ticker.unref()
     // @ts-ignore
-    } else if (Deno && typeof Deno !== "undefined" && typeof Deno.unrefTimer === 'function') {
+    } else if (typeof Deno !== "undefined" && typeof Deno.unrefTimer === 'function') {
       // similar like for NodeJS, but with the Deno API
       // https://deno.land/api@latest?unstable&s=Deno.unrefTimer
       // @ts-ignore
