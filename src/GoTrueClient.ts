@@ -271,6 +271,13 @@ export default class GoTrueClient {
       let res: AuthResponse
       if ('email' in credentials) {
         const { email, password, options } = credentials
+        // TODO(joel): Refactor pkce check into helper
+        let codeChallenge: string | null = null
+        if (this.flowType === 'pkce') {
+          const codeVerifier = generatePKCEVerifier()
+          await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
+          const codeChallenge = await generatePKCEChallenge(codeVerifier)
+        }
         res = await _request(this.fetch, 'POST', `${this.url}/signup`, {
           headers: this.headers,
           redirectTo: options?.emailRedirectTo,
@@ -279,6 +286,8 @@ export default class GoTrueClient {
             password,
             data: options?.data ?? {},
             gotrue_meta_security: { captcha_token: options?.captchaToken },
+            code_challenge: codeChallenge,
+            code_challenge_method: codeChallenge ? 's256' : null,
           },
           xform: _sessionResponse,
         })
