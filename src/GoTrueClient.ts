@@ -725,6 +725,14 @@ export default class GoTrueClient {
       if (!sessionData.session) {
         throw new AuthSessionMissingError()
       }
+      let codeChallenge: string | null = null
+      let codeChallengeMethod: string | null = null
+      if (this.flowType === 'pkce') {
+        const codeVerifier = generatePKCEVerifier()
+        await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
+        codeChallenge = await generatePKCEChallenge(codeVerifier)
+        codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
+      }
       const session: Session = sessionData.session
       const { data, error: userError } = await _request(this.fetch, 'PUT', `${this.url}/user`, {
         headers: this.headers,
@@ -732,6 +740,8 @@ export default class GoTrueClient {
         body: attributes,
         jwt: session.access_token,
         xform: _userResponse,
+        code_challenge: codeChallenge,
+        code_challenge_method: codeChallengeMethod,
       })
       if (userError) throw userError
       session.user = data.user as User
