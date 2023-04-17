@@ -737,11 +737,13 @@ export default class GoTrueClient {
       const { data, error: userError } = await _request(this.fetch, 'PUT', `${this.url}/user`, {
         headers: this.headers,
         redirectTo: options?.emailRedirectTo,
-        body: attributes,
+        body: {
+          ...attributes,
+          code_challenge: codeChallenge,
+          code_challenge_method: codeChallengeMethod,
+        },
         jwt: session.access_token,
         xform: _userResponse,
-        code_challenge: codeChallenge,
-        code_challenge_method: codeChallengeMethod,
       })
       if (userError) throw userError
       session.user = data.user as User
