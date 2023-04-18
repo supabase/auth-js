@@ -491,10 +491,12 @@ export default class GoTrueClient {
       if ('email' in credentials) {
         const { email, options } = credentials
         let codeChallenge: string | null = null
+        let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce') {
           const codeVerifier = generatePKCEVerifier()
           await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
           codeChallenge = await generatePKCEChallenge(codeVerifier)
+          codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
         }
         const { error } = await _request(this.fetch, 'POST', `${this.url}/otp`, {
           headers: this.headers,
@@ -504,7 +506,7 @@ export default class GoTrueClient {
             create_user: options?.shouldCreateUser ?? true,
             gotrue_meta_security: { captcha_token: options?.captchaToken },
             code_challenge: codeChallenge,
-            code_challenge_method: codeChallenge ? 's256' : null,
+            code_challenge_method: codeChallengeMethod,
           },
           redirectTo: options?.emailRedirectTo,
         })
@@ -997,6 +999,7 @@ export default class GoTrueClient {
       }
     }
     await this._removeSession()
+    await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
     this._notifyAllSubscribers('SIGNED_OUT', null)
     return { error: null }
   }
@@ -1058,18 +1061,20 @@ export default class GoTrueClient {
       }
     | { data: null; error: AuthError }
   > {
-    let codeChallenge = null
+    let codeChallenge: string | null = null
+    let codeChallengeMethod: string | null = null
     if (this.flowType === 'pkce') {
       const codeVerifier = generatePKCEVerifier()
       await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
       codeChallenge = await generatePKCEChallenge(codeVerifier)
+      codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
     }
     try {
       return await _request(this.fetch, 'POST', `${this.url}/recover`, {
         body: {
           email,
           code_challenge: codeChallenge,
-          code_challenge_method: codeChallenge ? 's256' : null,
+          code_challenge_method: codeChallengeMethod,
           gotrue_meta_security: { captcha_token: options.captchaToken },
         },
         headers: this.headers,
@@ -1302,6 +1307,12 @@ export default class GoTrueClient {
       // finished and tests run endlessly. This can be prevented by calling
       // `unref()` on the returned object.
       ticker.unref()
+      // @ts-ignore
+    } else if (typeof Deno !== 'undefined' && typeof Deno.unrefTimer === 'function') {
+      // similar like for NodeJS, but with the Deno API
+      // https://deno.land/api@latest?unstable&s=Deno.unrefTimer
+      // @ts-ignore
+      Deno.unrefTimer(ticker)
     }
 
     // run the tick immediately
@@ -1465,9 +1476,10 @@ export default class GoTrueClient {
       const codeVerifier = generatePKCEVerifier()
       await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
       const codeChallenge = await generatePKCEChallenge(codeVerifier)
+      const codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
       const flowParams = new URLSearchParams({
         code_challenge: `${encodeURIComponent(codeChallenge)}`,
-        code_challenge_method: `${encodeURIComponent('s256')}`,
+        code_challenge_method: `${encodeURIComponent(codeChallengeMethod)}`,
       })
       urlParams.push(flowParams.toString())
     }
