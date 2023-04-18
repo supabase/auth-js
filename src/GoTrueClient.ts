@@ -288,7 +288,7 @@ export default class GoTrueClient {
             data: options?.data ?? {},
             gotrue_meta_security: { captcha_token: options?.captchaToken },
             code_challenge: codeChallenge,
-            code_challenge_method: codeChallenge ? 's256' : null,
+            code_challenge_method: codeChallengeMethod,
           },
           xform: _sessionResponse,
         })
