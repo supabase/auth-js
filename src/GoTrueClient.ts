@@ -271,12 +271,12 @@ export default class GoTrueClient {
       let res: AuthResponse
       if ('email' in credentials) {
         const { email, password, options } = credentials
-        // TODO(joel): Refactor pkce check into helper
         let codeChallenge: string | null = null
+        let codeVerifier: string | null = null
         if (this.flowType === 'pkce') {
-          const codeVerifier = generatePKCEVerifier()
+          codeVerifier = generatePKCEVerifier()
           await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
-          const codeChallenge = await generatePKCEChallenge(codeVerifier)
+          codeChallenge = await generatePKCEChallenge(codeVerifier)
         }
         res = await _request(this.fetch, 'POST', `${this.url}/signup`, {
           headers: this.headers,
