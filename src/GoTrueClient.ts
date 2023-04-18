@@ -272,11 +272,12 @@ export default class GoTrueClient {
       if ('email' in credentials) {
         const { email, password, options } = credentials
         let codeChallenge: string | null = null
-        let codeVerifier: string | null = null
+        let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce') {
-          codeVerifier = generatePKCEVerifier()
+          const codeVerifier = generatePKCEVerifier()
           await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
           codeChallenge = await generatePKCEChallenge(codeVerifier)
+          codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
         }
         res = await _request(this.fetch, 'POST', `${this.url}/signup`, {
           headers: this.headers,
