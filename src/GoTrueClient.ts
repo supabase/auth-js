@@ -888,6 +888,7 @@ export default class GoTrueClient {
         const { data, error } = await this.exchangeCodeForSession(authCode)
         if (error) throw error
         if (!data.session) throw new AuthPKCEGrantCodeExchangeError('No session detected.')
+        window.location.search = ''
         return { data: { session: data.session, redirectType: null }, error: null }
       }
 
