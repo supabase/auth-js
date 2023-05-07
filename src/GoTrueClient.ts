@@ -41,6 +41,7 @@ import type {
   Provider,
   Session,
   SignInWithIdTokenCredentials,
+  SignInWithRefreshTokenCredentials,
   SignInWithOAuthCredentials,
   SignInWithPasswordCredentials,
   SignInWithPasswordlessCredentials,
@@ -402,6 +403,24 @@ export default class GoTrueClient {
       queryParams: credentials.options?.queryParams,
       skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
     })
+  }
+
+  /**
+   * Log in a user with a refresh_token.
+   */
+  async signInWithRefreshToken(credentials: SignInWithRefreshTokenCredentials): Promise<AuthResponse> {
+    try {
+      await this._removeSession()
+      const { refreshToken } = credentials
+      const { session, error } = await this._callRefreshToken(refreshToken)
+      if (error || !session) return { data: { user: null, session: null }, error }
+      return { data: { user: session.user, session }, error: null }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error }
+      }
+      throw error
+    }
   }
 
   /**

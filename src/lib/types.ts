@@ -467,6 +467,11 @@ export type SignInWithIdTokenCredentials = {
   }
 }
 
+export type SignInWithRefreshTokenCredentials = {
+  /** The user's refresh token. */
+  refreshToken: string
+}
+
 export type VerifyOtpParams = VerifyMobileOtpParams | VerifyEmailOtpParams
 export interface VerifyMobileOtpParams {
   /** The user's phone number. */
