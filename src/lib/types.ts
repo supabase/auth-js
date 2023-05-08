@@ -29,7 +29,6 @@ export type AuthChangeEvent =
   | 'SIGNED_OUT'
   | 'TOKEN_REFRESHED'
   | 'USER_UPDATED'
-  | 'USER_DELETED'
   | AuthChangeEventMFA
 
 export type GoTrueClientOptions = {
@@ -49,6 +48,8 @@ export type GoTrueClientOptions = {
   storage?: SupportedStorage
   /* A custom fetch implementation. */
   fetch?: Fetch
+  /* If set to 'pkce' PKCE flow. Defaults to the 'implicit' flow otherwise */
+  flowType?: AuthFlowType
 }
 
 export type AuthResponse =
@@ -86,7 +87,13 @@ export type OAuthResponse =
 export type SSOResponse =
   | {
       data: {
-        /** URL to take the user to (in a browser) to complete SSO. */
+        /**
+         * URL to open in a browser which will complete the sign-in flow by
+         * taking the user to the identity provider's authentication flow.
+         *
+         * On browsers you can set the URL to `window.location.href` to take
+         * the user to the authentication flow.
+         */
         url: string
       }
       error: null
@@ -357,8 +364,10 @@ export type SignUpWithPasswordCredentials =
          * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
          */
         data?: object
-        /** Verification token received when the user completes the captcha on the site. */
+        /** Verification token received when the user completes the captcha on the site. Requires a configured WhatsApp sender on Twilio */
         captchaToken?: string
+        /** Messaging channel to use (e.g. whatsapp or sms) */
+        channel?: 'sms' | 'whatsapp'
       }
     }
 export type SignInWithPasswordCredentials =
@@ -386,8 +395,6 @@ export type SignInWithPasswordCredentials =
         data?: object
         /** Verification token received when the user completes the captcha on the site. */
         captchaToken?: string
-        /** Messaging channel to use (e.g. whatsapp or sms) */
-        channel?: 'sms' | 'whatsapp'
       }
     }
 
@@ -429,6 +436,7 @@ export type SignInWithPasswordlessCredentials =
       }
     }
 
+export type AuthFlowType = 'implicit' | 'pkce'
 export type SignInWithOAuthCredentials = {
   /** One of the providers supported by GoTrue. */
   provider: Provider
@@ -495,7 +503,7 @@ export interface VerifyEmailOtpParams {
 }
 
 export type MobileOtpType = 'sms' | 'phone_change'
-export type EmailOtpType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change'
+export type EmailOtpType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change' | 'email'
 
 export type ResendParams =
   | {
@@ -515,23 +523,29 @@ export type ResendParams =
       }
     }
 
-export type SignInWithSSO = {
-  options?: {
-    /** A URL to send the user to after they have signed-in. */
-    redirectTo?: string
-    /** Verification token received when the user completes the captcha on the site. */
-    captchaToken?: string
-  }
-} & (
+export type SignInWithSSO =
   | {
       /** UUID of the SSO provider to invoke single-sign on to. */
       providerId: string
+
+      options?: {
+        /** A URL to send the user to after they have signed-in. */
+        redirectTo?: string
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
     }
   | {
       /** Domain name of the organization for which to invoke single-sign on. */
       domain: string
+
+      options?: {
+        /** A URL to send the user to after they have signed-in. */
+        redirectTo?: string
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
     }
-)
 
 export type GenerateSignupLinkParams = {
   type: 'signup'

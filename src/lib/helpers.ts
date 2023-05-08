@@ -1,5 +1,4 @@
 import { SupportedStorage } from './types'
-
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
   return timeNow + expiresIn
@@ -235,4 +234,51 @@ export function retryable<T>(
   })
 
   return promise
+}
+
+function dec2hex(dec: number) {
+  return ('0' + dec.toString(16)).substr(-2)
+}
+
+// Functions below taken from: https://stackoverflow.com/questions/63309409/creating-a-code-verifier-and-challenge-for-pkce-auth-on-spotify-api-in-reactjs
+export function generatePKCEVerifier() {
+  const verifierLength = 56
+  const array = new Uint32Array(verifierLength)
+  if (typeof crypto === 'undefined') {
+    const charSet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
+    const charSetLen = charSet.length
+    let verifier = ''
+    for (let i = 0; i < verifierLength; i++) {
+      verifier += charSet.charAt(Math.floor(Math.random() * charSetLen))
+    }
+    return verifier
+  }
+  crypto.getRandomValues(array)
+  return Array.from(array, dec2hex).join('')
+}
+
+async function sha256(randomString: string) {
+  const encoder = new TextEncoder()
+  const encodedData = encoder.encode(randomString)
+  const hash = await crypto.subtle.digest('SHA-256', encodedData)
+  const bytes = new Uint8Array(hash)
+
+  return Array.from(bytes)
+    .map((c) => String.fromCharCode(c))
+    .join('')
+}
+
+function base64urlencode(str: string) {
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+export async function generatePKCEChallenge(verifier: string) {
+  if (typeof crypto === 'undefined') {
+    console.warn(
+      'WebCrypto API is not supported. Code challenge method will default to use plain instead of sha256.'
+    )
+    return verifier
+  }
+  const hashed = await sha256(verifier)
+  return base64urlencode(hashed)
 }
