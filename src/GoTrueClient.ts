@@ -398,6 +398,7 @@ export default class GoTrueClient {
     await this._removeSession()
 
     return await this._handleProviderSignIn(credentials.provider, {
+      inviteToken: credentials.options?.inviteToken,
       redirectTo: credentials.options?.redirectTo,
       scopes: credentials.options?.scopes,
       queryParams: credentials.options?.queryParams,
@@ -930,9 +931,9 @@ export default class GoTrueClient {
         const { data, error } = await this.exchangeCodeForSession(authCode)
         if (error) throw error
         if (!data.session) throw new AuthPKCEGrantCodeExchangeError('No session detected.')
-        let url = new URL(window.location.href);
+        let url = new URL(window.location.href)
         url.searchParams.delete('code')
-        window.history.replaceState(window.history.state, "", url.toString())
+        window.history.replaceState(window.history.state, '', url.toString())
         return { data: { session: data.session, redirectType: null }, error: null }
       }
 
@@ -1171,6 +1172,7 @@ export default class GoTrueClient {
   private async _handleProviderSignIn(
     provider: Provider,
     options: {
+      inviteToken?: string
       redirectTo?: string
       scopes?: string
       queryParams?: { [key: string]: string }
@@ -1178,6 +1180,7 @@ export default class GoTrueClient {
     }
   ) {
     const url: string = await this._getUrlForProvider(provider, {
+      inviteToken: options.inviteToken,
       redirectTo: options.redirectTo,
       scopes: options.scopes,
       queryParams: options.queryParams,
@@ -1492,6 +1495,7 @@ export default class GoTrueClient {
   private async _getUrlForProvider(
     provider: Provider,
     options: {
+      inviteToken?: string
       redirectTo?: string
       scopes?: string
       queryParams?: { [key: string]: string }
@@ -1503,6 +1507,9 @@ export default class GoTrueClient {
     }
     if (options?.scopes) {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
+    }
+    if (options?.inviteToken) {
+      urlParams.push(`invite_token=${encodeURIComponent(options.inviteToken)}`)
     }
     if (this.flowType === 'pkce') {
       const codeVerifier = generatePKCEVerifier()

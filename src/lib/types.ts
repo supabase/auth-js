@@ -442,6 +442,8 @@ export type SignInWithOAuthCredentials = {
   /** One of the providers supported by GoTrue. */
   provider: Provider
   options?: {
+    /** An invite token sent to the user's email. */
+    inviteToken?: string
     /** A URL to send the user to after they are confirmed. */
     redirectTo?: string
     /** A space-separated list of scopes granted to the OAuth application. */
