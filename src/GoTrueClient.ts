@@ -715,12 +715,15 @@ export default class GoTrueClient {
       return { data: { session: currentSession }, error: null }
     }
 
-    const { session, error } = await this._callRefreshToken(currentSession.refresh_token)
-    if (error) {
-      return { data: { session: null }, error }
+    if (this.autoRefreshToken && currentSession.refresh_token) {
+      const { session, error } = await this._callRefreshToken(currentSession.refresh_token)
+      if (error) {
+        return { data: { session: null }, error }
+      }
+      return { data: { session }, error: null }
     }
 
-    return { data: { session }, error: null }
+    return { data: { session: null }, error: null }
   }
 
   /**
@@ -930,9 +933,9 @@ export default class GoTrueClient {
         const { data, error } = await this.exchangeCodeForSession(authCode)
         if (error) throw error
         if (!data.session) throw new AuthPKCEGrantCodeExchangeError('No session detected.')
-        let url = new URL(window.location.href);
+        let url = new URL(window.location.href)
         url.searchParams.delete('code')
-        window.history.replaceState(window.history.state, "", url.toString())
+        window.history.replaceState(window.history.state, '', url.toString())
         return { data: { session: data.session, redirectType: null }, error: null }
       }
 
