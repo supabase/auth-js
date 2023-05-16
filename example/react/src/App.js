@@ -20,6 +20,7 @@ function App() {
   let [password, setPassword] = useState('')
   let [otp, setOtp] = useState('')
   let [rememberMe, setRememberMe] = useState(false)
+  let [inviteToken, setInviteToken] = useState()
 
   useEffect(() => {
     async function session() {
@@ -50,10 +51,17 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const inviteToken = params.get('invite_token')
+    setInviteToken(inviteToken)
+  }, [])
+
   async function handleOAuthLogin(provider) {
     let { error } = await auth.signInWithOAuth({
       provider,
       options: {
+        inviteToken: inviteToken ?? null,
         redirectTo: 'http://localhost:3000/welcome',
       },
     })
