@@ -241,7 +241,7 @@ export default class GoTrueClient {
       }
 
       // no login attempt via callback url try to recover session from storage
-      await this._recoverAndRefresh()
+      await this._recoverAndRefresh(true)
       return { error: null }
     } catch (error) {
       if (isAuthError(error)) {
@@ -660,10 +660,6 @@ export default class GoTrueClient {
     }
   }
 
-  /**
-   * Returns the session, refreshing it if necessary.
-   * The session returned can be null if the session is not detected which can happen in the event a user is not signed-in or has logged out.
-   */
   async getSession(): Promise<
     | {
         data: {
@@ -688,6 +684,32 @@ export default class GoTrueClient {
     // save to just await, as long we make sure _initialize() never throws
     await this.initializePromise
 
+    return await this._getSession()
+  }
+
+  /**
+   * Private version of {@link #getSession()} safe to reuse in private methods.
+   */
+  private async _getSession(): Promise<
+    | {
+        data: {
+          session: Session
+        }
+        error: null
+      }
+    | {
+        data: {
+          session: null
+        }
+        error: AuthError
+      }
+    | {
+        data: {
+          session: null
+        }
+        error: null
+      }
+  > {
     let currentSession: Session | null = null
 
     if (this.persistSession) {
@@ -709,7 +731,7 @@ export default class GoTrueClient {
     }
 
     const hasExpired = currentSession.expires_at
-      ? currentSession.expires_at <= Date.now() / 1000
+      ? currentSession.expires_at - EXPIRY_MARGIN <= Date.now() / 1000
       : false
     if (!hasExpired) {
       return { data: { session: currentSession }, error: null }
@@ -930,9 +952,9 @@ export default class GoTrueClient {
         const { data, error } = await this.exchangeCodeForSession(authCode)
         if (error) throw error
         if (!data.session) throw new AuthPKCEGrantCodeExchangeError('No session detected.')
-        let url = new URL(window.location.href);
+        let url = new URL(window.location.href)
         url.searchParams.delete('code')
-        window.history.replaceState(window.history.state, "", url.toString())
+        window.history.replaceState(window.history.state, '', url.toString())
         return { data: { session: data.session, redirectType: null }, error: null }
       }
 
@@ -1194,32 +1216,17 @@ export default class GoTrueClient {
    * Recovers the session from LocalStorage and refreshes
    * Note: this method is async to accommodate for AsyncStorage e.g. in React native.
    */
-  private async _recoverAndRefresh() {
+  private async _recoverAndRefresh(isInitial: boolean) {
     try {
-      const currentSession = await getItemAsync(this.storage, this.storageKey)
-      if (!this._isValidSession(currentSession)) {
-        if (currentSession !== null) {
-          await this._removeSession()
-        }
-
-        return
+      const {
+        data: { session: currentSession },
+        error,
+      } = await this._getSession()
+      if (error) {
+        throw error
       }
 
-      const timeNow = Math.round(Date.now() / 1000)
-
-      if ((currentSession.expires_at ?? Infinity) < timeNow + EXPIRY_MARGIN) {
-        if (this.autoRefreshToken && currentSession.refresh_token) {
-          const { error } = await this._callRefreshToken(currentSession.refresh_token)
-
-          if (error) {
-            console.log(error.message)
-            await this._removeSession()
-          }
-        }
-      } else {
-        if (this.persistSession) {
-          await this._saveSession(currentSession)
-        }
+      if (isInitial && currentSession) {
         this._notifyAllSubscribers('SIGNED_IN', currentSession)
       }
     } catch (err) {
@@ -1468,7 +1475,7 @@ export default class GoTrueClient {
       if (!isInitial) {
         // initial visibility change setup is handled in another flow under #initialize()
         await this.initializePromise
-        await this._recoverAndRefresh()
+        await this._recoverAndRefresh(false)
       }
 
       if (this.autoRefreshToken) {
