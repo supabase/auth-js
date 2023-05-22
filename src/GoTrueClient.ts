@@ -487,7 +487,7 @@ export default class GoTrueClient {
    * if you are using phone sign in with the 'whatsapp' channel. The whatsapp
    * channel is not supported on other providers
    * at this time.
-   * This method supports PKCE on the magic link flow.
+   * This method supports PKCE when an email is passed.
    */
   async signInWithOtp(credentials: SignInWithPasswordlessCredentials): Promise<AuthResponse> {
     try {
