@@ -721,7 +721,7 @@ export default class GoTrueClient {
       const session: Session = sessionData.session
       let codeChallenge: string | null = null
       let codeChallengeMethod: string | null = null
-      if (this.flowType === 'pkce' && attributes.email != null) {
+      if (this.flowType === 'pkce' && attributes.email) {
         const codeVerifier = generatePKCEVerifier()
         await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
         codeChallenge = await generatePKCEChallenge(codeVerifier)
