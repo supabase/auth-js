@@ -33,6 +33,7 @@ import { polyfillGlobalThis } from './lib/polyfills'
 import type {
   AuthChangeEvent,
   AuthResponse,
+  AuthSessionResponse,
   CallRefreshTokenResult,
   GoTrueClientOptions,
   InitializeResult,
@@ -314,15 +315,17 @@ export default class GoTrueClient {
 
       const { data, error } = res
 
-      if (error || !data) {
+      if (error) {
         return { data: { user: null, session: null }, error: error }
+      } else if (!data || !data.user) {
+        return { data: { user: null, session: null }, error: null }
       }
 
       const session: Session | null = data.session
-      const user: User | null = data.user
+      const user: User = data.user
 
-      if (data.session) {
-        await this._saveSession(data.session)
+      if (session) {
+        await this._saveSession(session)
         this._notifyAllSubscribers('SIGNED_IN', session)
       }
 
@@ -344,7 +347,9 @@ export default class GoTrueClient {
    * email/phone and password combination is wrong or that the account can only
    * be accessed via social login.
    */
-  async signInWithPassword(credentials: SignInWithPasswordCredentials): Promise<AuthResponse> {
+  async signInWithPassword(
+    credentials: SignInWithPasswordCredentials
+  ): Promise<AuthSessionResponse> {
     try {
       await this._removeSession()
 
@@ -377,12 +382,18 @@ export default class GoTrueClient {
         )
       }
       const { data, error } = res
-      if (error || !data) return { data: { user: null, session: null }, error }
+
+      if (error) {
+        return { data: { user: null, session: null }, error }
+      } else if (!data || !data.user || !data.session) {
+        return { data: { user: null, session: null }, error: null }
+      }
+
       if (data.session) {
         await this._saveSession(data.session)
         this._notifyAllSubscribers('SIGNED_IN', data.session)
       }
-      return { data, error }
+      return { data: { user: data.user, session: data.session }, error }
     } catch (error) {
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
@@ -408,7 +419,7 @@ export default class GoTrueClient {
   /**
    * Log in an existing user by exchanging an Auth Code issued during the PKCE flow.
    */
-  async exchangeCodeForSession(authCode: string): Promise<AuthResponse> {
+  async exchangeCodeForSession(authCode: string): Promise<AuthSessionResponse> {
     const codeVerifier = await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)
     const { data, error } = await _request(
       this.fetch,
@@ -438,7 +449,7 @@ export default class GoTrueClient {
    *
    * @experimental
    */
-  async signInWithIdToken(credentials: SignInWithIdTokenCredentials): Promise<AuthResponse> {
+  async signInWithIdToken(credentials: SignInWithIdTokenCredentials): Promise<AuthSessionResponse> {
     await this._removeSession()
 
     try {
@@ -930,9 +941,9 @@ export default class GoTrueClient {
         const { data, error } = await this.exchangeCodeForSession(authCode)
         if (error) throw error
         if (!data.session) throw new AuthPKCEGrantCodeExchangeError('No session detected.')
-        let url = new URL(window.location.href);
+        let url = new URL(window.location.href)
         url.searchParams.delete('code')
-        window.history.replaceState(window.history.state, "", url.toString())
+        window.history.replaceState(window.history.state, '', url.toString())
         return { data: { session: data.session, redirectType: null }, error: null }
       }
 
