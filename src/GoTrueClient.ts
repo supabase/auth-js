@@ -67,6 +67,7 @@ import type {
   AuthenticatorAssuranceLevels,
   Factor,
   MFAChallengeAndVerifyParams,
+  ResendParams,
   AuthFlowType,
 } from './lib/types'
 
@@ -83,7 +84,7 @@ const DEFAULT_OPTIONS: Omit<Required<GoTrueClientOptions>, 'fetch' | 'storage'> 
 }
 
 /** Current session will be checked for refresh at this interval. */
-const AUTO_REFRESH_TICK_DURATION = 10 * 1000
+const AUTO_REFRESH_TICK_DURATION = 30 * 1000
 
 /**
  * A token refresh will be attempted this many ticks before the current session expires. */
@@ -271,6 +272,14 @@ export default class GoTrueClient {
       let res: AuthResponse
       if ('email' in credentials) {
         const { email, password, options } = credentials
+        let codeChallenge: string | null = null
+        let codeChallengeMethod: string | null = null
+        if (this.flowType === 'pkce') {
+          const codeVerifier = generatePKCEVerifier()
+          await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
+          codeChallenge = await generatePKCEChallenge(codeVerifier)
+          codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
+        }
         res = await _request(this.fetch, 'POST', `${this.url}/signup`, {
           headers: this.headers,
           redirectTo: options?.emailRedirectTo,
@@ -279,6 +288,8 @@ export default class GoTrueClient {
             password,
             data: options?.data ?? {},
             gotrue_meta_security: { captcha_token: options?.captchaToken },
+            code_challenge: codeChallenge,
+            code_challenge_method: codeChallengeMethod,
           },
           xform: _sessionResponse,
         })
@@ -395,7 +406,7 @@ export default class GoTrueClient {
   }
 
   /**
-   * Log in an existing user via a third-party provider.
+   * Log in an existing user by exchanging an Auth Code issued during the PKCE flow.
    */
   async exchangeCodeForSession(authCode: string): Promise<AuthResponse> {
     const codeVerifier = await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)
@@ -603,6 +614,73 @@ export default class GoTrueClient {
     } catch (error) {
       if (isAuthError(error)) {
         return { data: null, error }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Sends a reauthentication OTP to the user's email or phone number.
+   * Requires the user to be signed-in.
+   */
+  async reauthenticate(): Promise<AuthResponse> {
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await this.getSession()
+      if (sessionError) throw sessionError
+      if (!session) throw new AuthSessionMissingError()
+
+      const { error } = await _request(this.fetch, 'GET', `${this.url}/reauthenticate`, {
+        headers: this.headers,
+        jwt: session.access_token,
+      })
+      return { data: { user: null, session: null }, error }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Resends an existing signup confirmation email, email change email, SMS OTP or phone change OTP.
+   */
+  async resend(credentials: ResendParams): Promise<AuthResponse> {
+    try {
+      await this._removeSession()
+      const endpoint = `${this.url}/resend`
+      if ('email' in credentials) {
+        const { email, type, options } = credentials
+        const { error } = await _request(this.fetch, 'POST', endpoint, {
+          headers: this.headers,
+          body: {
+            email,
+            type,
+            gotrue_meta_security: { captcha_token: options?.captchaToken },
+          },
+        })
+        return { data: { user: null, session: null }, error }
+      } else if ('phone' in credentials) {
+        const { phone, type, options } = credentials
+        const { error } = await _request(this.fetch, 'POST', endpoint, {
+          headers: this.headers,
+          body: {
+            phone,
+            type,
+            gotrue_meta_security: { captcha_token: options?.captchaToken },
+          },
+        })
+        return { data: { user: null, session: null }, error }
+      }
+      throw new AuthInvalidCredentialsError(
+        'You must provide either an email or phone number and a type'
+      )
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error }
       }
       throw error
     }
@@ -891,6 +969,9 @@ export default class GoTrueClient {
         const { data, error } = await this.exchangeCodeForSession(authCode)
         if (error) throw error
         if (!data.session) throw new AuthPKCEGrantCodeExchangeError('No session detected.')
+        let url = new URL(window.location.href)
+        url.searchParams.delete('code')
+        window.history.replaceState(window.history.state, '', url.toString())
         return { data: { session: data.session, redirectType: null }, error: null }
       }
 
@@ -1173,8 +1254,6 @@ export default class GoTrueClient {
             console.log(error.message)
             await this._removeSession()
           }
-        } else {
-          await this._removeSession()
         }
       } else {
         if (this.persistSession) {

@@ -19,6 +19,7 @@ export type Provider =
   | 'twitch'
   | 'twitter'
   | 'workos'
+  | 'zoom'
 
 export type AuthChangeEventMFA = 'MFA_CHALLENGE_VERIFIED'
 
@@ -254,6 +255,13 @@ export interface UserAttributes {
    * The user's password.
    */
   password?: string
+
+  /**
+   * The nonce sent for reauthentication if the user's password is to be updated.
+   *
+   * Call reauthenticate() to obtain the nonce first.
+   */
+  nonce?: string
 
   /**
    * A custom data object to store the user's metadata. This maps to the `auth.users.user_metadata` column.
@@ -504,6 +512,24 @@ export interface VerifyEmailOtpParams {
 
 export type MobileOtpType = 'sms' | 'phone_change'
 export type EmailOtpType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change' | 'email'
+
+export type ResendParams =
+  | {
+      type: Extract<EmailOtpType, 'signup' | 'email_change'>
+      email: string
+      options?: {
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
+    }
+  | {
+      type: Extract<MobileOtpType, 'sms' | 'phone_change'>
+      phone: string
+      options?: {
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
+    }
 
 export type SignInWithSSO =
   | {
