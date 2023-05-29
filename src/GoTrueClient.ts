@@ -315,17 +315,15 @@ export default class GoTrueClient {
 
       const { data, error } = res
 
-      if (error) {
+      if (error || !data) {
         return { data: { user: null, session: null }, error: error }
-      } else if (!data || !data.user) {
-        return { data: { user: null, session: null }, error: null }
       }
 
       const session: Session | null = data.session
-      const user: User = data.user
+      const user: User | null = data.user
 
-      if (session) {
-        await this._saveSession(session)
+      if (data.session) {
+        await this._saveSession(data.session)
         this._notifyAllSubscribers('SIGNED_IN', session)
       }
 
@@ -467,7 +465,11 @@ export default class GoTrueClient {
       })
 
       const { data, error } = res
-      if (error || !data) return { data: { user: null, session: null }, error }
+      if (error) {
+        return { data: { user: null, session: null }, error }
+      } else if (!data || !data.user || !data.session) {
+        return { data: { user: null, session: null }, error: null }
+      }
       if (data.session) {
         await this._saveSession(data.session)
         this._notifyAllSubscribers('SIGNED_IN', data.session)
