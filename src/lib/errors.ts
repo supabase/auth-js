@@ -69,7 +69,11 @@ export class AuthSessionMissingError extends CustomAuthError {
   }
 }
 
-
+export class AuthInvalidTokenResponseError extends CustomAuthError {
+  constructor() {
+    super('Auth session or user missing', 'AuthInvalidTokenResponseError', 500)
+  }
+}
 
 export class AuthInvalidCredentialsError extends CustomAuthError {
   constructor(message: string) {

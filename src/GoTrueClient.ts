@@ -7,6 +7,7 @@ import {
   AuthInvalidCredentialsError,
   AuthRetryableFetchError,
   AuthSessionMissingError,
+  AuthInvalidTokenResponseError,
   AuthUnknownError,
   isAuthApiError,
   isAuthError,
@@ -381,12 +382,9 @@ export default class GoTrueClient {
 
       if (error) {
         return { data: { user: null, session: null }, error }
-      } else if (!data || !data.session) {
-        return { data: { user: null, session: null }, error: new AuthError('No session returned') }
-      } else if (!data.user) {
-        return { data: { user: null, session: null }, error: new AuthError('No user returned') }
+      } else if (!data || !data.session || !data.user) {
+        return { data: { user: null, session: null }, error: new AuthInvalidTokenResponseError() }
       }
-
       if (data.session) {
         await this._saveSession(data.session)
         this._notifyAllSubscribers('SIGNED_IN', data.session)
@@ -435,10 +433,8 @@ export default class GoTrueClient {
     await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
     if (error) {
       return { data: { user: null, session: null }, error }
-    } else if (!data || !data.session) {
-      return { data: { user: null, session: null }, error: new AuthError('No session returned') }
-    } else if (!data.user) {
-      return { data: { user: null, session: null }, error: new AuthError('No user returned') }
+    } else if (!data || !data.session || !data.user) {
+      return { data: { user: null, session: null }, error: new AuthInvalidTokenResponseError() }
     }
     if (data.session) {
       await this._saveSession(data.session)
@@ -471,10 +467,14 @@ export default class GoTrueClient {
       })
 
       const { data, error } = res
-      if (error || !data) {
+      if (error) {
         return { data: { user: null, session: null }, error }
+      } else if (!data || !data.session || !data.user) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthInvalidTokenResponseError(),
+        }
       }
-
       if (data.session) {
         await this._saveSession(data.session)
         this._notifyAllSubscribers('SIGNED_IN', data.session)
