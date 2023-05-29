@@ -69,7 +69,7 @@ export type AuthResponse =
       error: AuthError
     }
 
-export type AuthSessionResponse =
+export type AuthTokenResponse =
   | {
       data: {
         user: User

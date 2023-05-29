@@ -33,7 +33,7 @@ import { polyfillGlobalThis } from './lib/polyfills'
 import type {
   AuthChangeEvent,
   AuthResponse,
-  AuthSessionResponse,
+  AuthTokenResponse,
   CallRefreshTokenResult,
   GoTrueClientOptions,
   InitializeResult,
@@ -345,9 +345,7 @@ export default class GoTrueClient {
    * email/phone and password combination is wrong or that the account can only
    * be accessed via social login.
    */
-  async signInWithPassword(
-    credentials: SignInWithPasswordCredentials
-  ): Promise<AuthSessionResponse> {
+  async signInWithPassword(credentials: SignInWithPasswordCredentials): Promise<AuthTokenResponse> {
     try {
       await this._removeSession()
 
@@ -417,7 +415,7 @@ export default class GoTrueClient {
   /**
    * Log in an existing user by exchanging an Auth Code issued during the PKCE flow.
    */
-  async exchangeCodeForSession(authCode: string): Promise<AuthSessionResponse> {
+  async exchangeCodeForSession(authCode: string): Promise<AuthTokenResponse> {
     const codeVerifier = await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)
     const { data, error } = await _request(
       this.fetch,
@@ -447,7 +445,7 @@ export default class GoTrueClient {
    *
    * @experimental
    */
-  async signInWithIdToken(credentials: SignInWithIdTokenCredentials): Promise<AuthSessionResponse> {
+  async signInWithIdToken(credentials: SignInWithIdTokenCredentials): Promise<AuthTokenResponse> {
     await this._removeSession()
 
     try {
