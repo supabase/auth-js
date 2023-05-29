@@ -69,6 +69,7 @@ export class AuthSessionMissingError extends CustomAuthError {
   }
 }
 
+
 export class AuthInvalidCredentialsError extends CustomAuthError {
   constructor(message: string) {
     super(message, 'AuthInvalidCredentialsError', 400)

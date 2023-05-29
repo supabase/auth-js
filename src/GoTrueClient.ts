@@ -381,8 +381,10 @@ export default class GoTrueClient {
 
       if (error) {
         return { data: { user: null, session: null }, error }
-      } else if (!data || !data.user || !data.session) {
-        return { data: { user: null, session: null }, error: null }
+      } else if (!data || !data.session) {
+        return { data: { user: null, session: null }, error: new AuthSessionMissingError() }
+      } else if (!data.user) {
+        return { data: { user: null, session: null }, error: new AuthError('No user returned') }
       }
 
       if (data.session) {
@@ -431,7 +433,13 @@ export default class GoTrueClient {
       }
     )
     await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-    if (error || !data) return { data: { user: null, session: null }, error }
+    if (error) {
+      return { data: { user: null, session: null }, error }
+    } else if (!data || !data.session) {
+      return { data: { user: null, session: null }, error: new AuthSessionMissingError() }
+    } else if (!data.user) {
+      return { data: { user: null, session: null }, error: new AuthError('No user returned') }
+    }
     if (data.session) {
       await this._saveSession(data.session)
       this._notifyAllSubscribers('SIGNED_IN', data.session)
@@ -463,11 +471,10 @@ export default class GoTrueClient {
       })
 
       const { data, error } = res
-      if (error) {
+      if (error || !data) {
         return { data: { user: null, session: null }, error }
-      } else if (!data || !data.user || !data.session) {
-        return { data: { user: null, session: null }, error: null }
       }
+
       if (data.session) {
         await this._saveSession(data.session)
         this._notifyAllSubscribers('SIGNED_IN', data.session)
