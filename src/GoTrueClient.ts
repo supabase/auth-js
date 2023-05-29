@@ -382,7 +382,7 @@ export default class GoTrueClient {
       if (error) {
         return { data: { user: null, session: null }, error }
       } else if (!data || !data.session) {
-        return { data: { user: null, session: null }, error: new AuthSessionMissingError() }
+        return { data: { user: null, session: null }, error: new AuthError('No session returned') }
       } else if (!data.user) {
         return { data: { user: null, session: null }, error: new AuthError('No user returned') }
       }
@@ -436,7 +436,7 @@ export default class GoTrueClient {
     if (error) {
       return { data: { user: null, session: null }, error }
     } else if (!data || !data.session) {
-      return { data: { user: null, session: null }, error: new AuthSessionMissingError() }
+      return { data: { user: null, session: null }, error: new AuthError('No session returned') }
     } else if (!data.user) {
       return { data: { user: null, session: null }, error: new AuthError('No user returned') }
     }
