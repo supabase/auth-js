@@ -424,7 +424,7 @@ export default class GoTrueClient {
       }
     )
     await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-    if (error || !data) return { data: { user: null, session: null }, error }
+    if (error || !data) return { data: { user: null, session: null }, new AuthError('Code Exchange unsuccessful - please restart the flow')}
     if (data.session) {
       await this._saveSession(data.session)
       this._notifyAllSubscribers('SIGNED_IN', data.session)
