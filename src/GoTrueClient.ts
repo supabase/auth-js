@@ -7,6 +7,7 @@ import {
   AuthInvalidCredentialsError,
   AuthRetryableFetchError,
   AuthSessionMissingError,
+  AuthInvalidTokenResponseError,
   AuthUnknownError,
   isAuthApiError,
   isAuthError,
@@ -26,6 +27,7 @@ import {
   sleep,
   generatePKCEVerifier,
   generatePKCEChallenge,
+  supportsLocalStorage,
 } from './lib/helpers'
 import localStorageAdapter from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
@@ -33,6 +35,7 @@ import { polyfillGlobalThis } from './lib/polyfills'
 import type {
   AuthChangeEvent,
   AuthResponse,
+  AuthTokenResponse,
   CallRefreshTokenResult,
   GoTrueClientOptions,
   InitializeResult,
@@ -171,6 +174,13 @@ export default class GoTrueClient {
       getAuthenticatorAssuranceLevel: this._getAuthenticatorAssuranceLevel.bind(this),
     }
 
+    if (this.persistSession && this.storage === localStorageAdapter && !supportsLocalStorage()) {
+      console.warn(
+        `No storage option exists to persist the session, which may result in unexpected behavior when using auth.
+        If you want to set persistSession to true, please provide a storage option or you may set persistSession to false to disable this warning.`
+      )
+    }
+
     if (isBrowser() && globalThis.BroadcastChannel && this.persistSession && this.storageKey) {
       try {
         this.broadcastChannel = new globalThis.BroadcastChannel(this.storageKey)
@@ -261,6 +271,7 @@ export default class GoTrueClient {
    *
    * Be aware that if a user account exists in the system you may get back an
    * error message that attempts to hide this information from the user.
+   * This method has support for PKCE via email signups. The PKCE flow cannot be used when autoconfirm is enabled.
    *
    * @returns A logged-in session if the server has "autoconfirm" ON
    * @returns A user if the server has "autoconfirm" OFF
@@ -344,7 +355,7 @@ export default class GoTrueClient {
    * email/phone and password combination is wrong or that the account can only
    * be accessed via social login.
    */
-  async signInWithPassword(credentials: SignInWithPasswordCredentials): Promise<AuthResponse> {
+  async signInWithPassword(credentials: SignInWithPasswordCredentials): Promise<AuthTokenResponse> {
     try {
       await this._removeSession()
 
@@ -377,12 +388,17 @@ export default class GoTrueClient {
         )
       }
       const { data, error } = res
-      if (error || !data) return { data: { user: null, session: null }, error }
+
+      if (error) {
+        return { data: { user: null, session: null }, error }
+      } else if (!data || !data.session || !data.user) {
+        return { data: { user: null, session: null }, error: new AuthInvalidTokenResponseError() }
+      }
       if (data.session) {
         await this._saveSession(data.session)
         this._notifyAllSubscribers('SIGNED_IN', data.session)
       }
-      return { data, error }
+      return { data: { user: data.user, session: data.session }, error }
     } catch (error) {
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
@@ -393,6 +409,7 @@ export default class GoTrueClient {
 
   /**
    * Log in an existing user via a third-party provider.
+   * This method supports the PKCE flow.
    */
   async signInWithOAuth(credentials: SignInWithOAuthCredentials): Promise<OAuthResponse> {
     await this._removeSession()
@@ -408,7 +425,7 @@ export default class GoTrueClient {
   /**
    * Log in an existing user by exchanging an Auth Code issued during the PKCE flow.
    */
-  async exchangeCodeForSession(authCode: string): Promise<AuthResponse> {
+  async exchangeCodeForSession(authCode: string): Promise<AuthTokenResponse> {
     const codeVerifier = await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)
     const { data, error } = await _request(
       this.fetch,
@@ -424,7 +441,11 @@ export default class GoTrueClient {
       }
     )
     await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-    if (error || !data) return { data: { user: null, session: null }, new AuthError('Code Exchange unsuccessful - please restart the flow')}
+    if (error) {
+      return { data: { user: null, session: null }, error }
+    } else if (!data || !data.session || !data.user) {
+      return { data: { user: null, session: null }, error: new AuthInvalidTokenResponseError() }
+    }
     if (data.session) {
       await this._saveSession(data.session)
       this._notifyAllSubscribers('SIGNED_IN', data.session)
@@ -438,7 +459,7 @@ export default class GoTrueClient {
    *
    * @experimental
    */
-  async signInWithIdToken(credentials: SignInWithIdTokenCredentials): Promise<AuthResponse> {
+  async signInWithIdToken(credentials: SignInWithIdTokenCredentials): Promise<AuthTokenResponse> {
     await this._removeSession()
 
     try {
@@ -456,7 +477,14 @@ export default class GoTrueClient {
       })
 
       const { data, error } = res
-      if (error || !data) return { data: { user: null, session: null }, error }
+      if (error) {
+        return { data: { user: null, session: null }, error }
+      } else if (!data || !data.session || !data.user) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthInvalidTokenResponseError(),
+        }
+      }
       if (data.session) {
         await this._saveSession(data.session)
         this._notifyAllSubscribers('SIGNED_IN', data.session)
@@ -485,6 +513,7 @@ export default class GoTrueClient {
    * if you are using phone sign in with the 'whatsapp' channel. The whatsapp
    * channel is not supported on other providers
    * at this time.
+   * This method supports PKCE when an email is passed.
    */
   async signInWithOtp(credentials: SignInWithPasswordlessCredentials): Promise<AuthResponse> {
     try {
@@ -543,7 +572,10 @@ export default class GoTrueClient {
    */
   async verifyOtp(params: VerifyOtpParams): Promise<AuthResponse> {
     try {
-      await this._removeSession()
+      if (params.type !== 'email_change' && params.type !== 'phone_change') {
+        // we don't want to remove the authenticated session if the user is performing an email_change or phone_change verification
+        await this._removeSession()
+      }
       const { data, error } = await _request(this.fetch, 'POST', `${this.url}/verify`, {
         headers: this.headers,
         body: {
@@ -1104,6 +1136,7 @@ export default class GoTrueClient {
 
   /**
    * Sends a password reset request to an email address.
+   * This method supports the PKCE flow.
    * @param email The email address of the user.
    * @param options.redirectTo The URL to send the user to after they click the password reset link.
    * @param options.captchaToken Verification token received when the user completes the captcha on the site.
