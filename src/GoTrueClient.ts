@@ -176,7 +176,7 @@ export default class GoTrueClient {
 
     if (this.persistSession && this.storage === localStorageAdapter && !supportsLocalStorage()) {
       console.warn(
-        `No storage option exists to persist the session, which may result in unexpected behavior when using auth.
+        `[@supabase/gotrue-js] No storage option exists to persist the session, which may result in unexpected behavior when using auth.
         If you want to set persistSession to true, please provide a storage option or you may set persistSession to false to disable this warning.`
       )
     }
@@ -186,7 +186,7 @@ export default class GoTrueClient {
         this.broadcastChannel = new globalThis.BroadcastChannel(this.storageKey)
       } catch (e: any) {
         console.error(
-          'Failed to create a new BroadcastChannel, multi-tab state changes will not be available',
+          '[@supabase/gotrue-js] Failed to create a new BroadcastChannel, multi-tab state changes will not be available',
           e
         )
       }
@@ -1130,7 +1130,7 @@ export default class GoTrueClient {
       this.stateChangeEmitters.get(id)?.callback('INITIAL_SESSION', session)
     } catch (err) {
       this.stateChangeEmitters.get(id)?.callback('INITIAL_SESSION', null)
-      console.error(err)
+      console.error('[@supabase/gotrue-js]', err)
     }
   }
 
@@ -1271,7 +1271,7 @@ export default class GoTrueClient {
           const { error } = await this._callRefreshToken(currentSession.refresh_token)
 
           if (error) {
-            console.log(error.message)
+            console.log('[@supabase/gotrue-js]', error.message)
             await this._removeSession()
           }
         }
@@ -1282,7 +1282,7 @@ export default class GoTrueClient {
         this._notifyAllSubscribers('SIGNED_IN', currentSession)
       }
     } catch (err) {
-      console.error(err)
+      console.error('[@supabase/gotrue-js]', err)
       return
     }
   }
@@ -1376,7 +1376,7 @@ export default class GoTrueClient {
         window.removeEventListener('visibilitychange', callback)
       }
     } catch (e) {
-      console.error('removing visibilitychange callback failed', e)
+      console.error('[@supabase/gotrue-js] removing visibilitychange callback failed', e)
     }
   }
 
@@ -1487,7 +1487,7 @@ export default class GoTrueClient {
         await this._callRefreshToken(session.refresh_token)
       }
     } catch (e: any) {
-      console.error('Auto refresh tick failed with error. This is likely a transient error.', e)
+      console.error('[@supabase/gotrue-js] Auto refresh tick failed with error. This is likely a transient error.', e)
     }
   }
 
@@ -1515,7 +1515,7 @@ export default class GoTrueClient {
       // current visbility state
       await this._onVisibilityChanged(true) // initial call
     } catch (error) {
-      console.error('_handleVisibilityChange', error)
+      console.error('[@supabase/gotrue-js] _handleVisibilityChange', error)
     }
   }
 

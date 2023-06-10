@@ -275,7 +275,7 @@ function base64urlencode(str: string) {
 export async function generatePKCEChallenge(verifier: string) {
   if (typeof crypto === 'undefined') {
     console.warn(
-      'WebCrypto API is not supported. Code challenge method will default to use plain instead of sha256.'
+      '[@supabase/gotrue-js] WebCrypto API is not supported. Code challenge method will default to use plain instead of sha256.'
     )
     return verifier
   }
