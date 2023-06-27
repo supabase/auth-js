@@ -158,6 +158,12 @@ export default class GoTrueClient {
     this.instanceID = GoTrueClient.nextInstanceID
     GoTrueClient.nextInstanceID += 1
 
+    if (this.instanceID > 0 && isBrowser()) {
+      console.warn(
+        'Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.'
+      )
+    }
+
     const settings = { ...DEFAULT_OPTIONS, ...options }
     this.logDebugMessages = settings.debug
     this.inMemorySession = null
