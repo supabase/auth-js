@@ -1285,7 +1285,7 @@ export default class GoTrueClient {
       } else {
         // no need to persist currentSession again, as we just loaded it from
         // local storage; persisting it again may overwrite a value saved by
-        // another lient with access to the same local storage
+        // another client with access to the same local storage
         await this._notifyAllSubscribers('SIGNED_IN', currentSession)
       }
     } catch (err) {
