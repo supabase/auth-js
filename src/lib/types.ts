@@ -19,16 +19,17 @@ export type Provider =
   | 'twitch'
   | 'twitter'
   | 'workos'
+  | 'zoom'
 
 export type AuthChangeEventMFA = 'MFA_CHALLENGE_VERIFIED'
 
 export type AuthChangeEvent =
+  | 'INITIAL_SESSION'
   | 'PASSWORD_RECOVERY'
   | 'SIGNED_IN'
   | 'SIGNED_OUT'
   | 'TOKEN_REFRESHED'
   | 'USER_UPDATED'
-  | 'USER_DELETED'
   | AuthChangeEventMFA
 
 export type GoTrueClientOptions = {
@@ -48,6 +49,8 @@ export type GoTrueClientOptions = {
   storage?: SupportedStorage
   /* A custom fetch implementation. */
   fetch?: Fetch
+  /* If set to 'pkce' PKCE flow. Defaults to the 'implicit' flow otherwise */
+  flowType?: AuthFlowType
 }
 
 export type AuthResponse =
@@ -55,6 +58,37 @@ export type AuthResponse =
       data: {
         user: User | null
         session: Session | null
+      }
+      error: null
+    }
+  | {
+      data: {
+        user: null
+        session: null
+      }
+      error: AuthError
+    }
+
+/**
+ * AuthOtpResponse is returned when OTP is used.
+ *
+ * {@see AuthRsponse}
+ */
+export type AuthOtpResponse =
+  | {
+      data: { user: null; session: null; messageId?: string | null }
+      error: null
+    }
+  | {
+      data: { user: null; session: null; messageId?: string | null }
+      error: AuthError
+    }
+
+export type AuthTokenResponse =
+  | {
+      data: {
+        user: User
+        session: Session
       }
       error: null
     }
@@ -85,7 +119,13 @@ export type OAuthResponse =
 export type SSOResponse =
   | {
       data: {
-        /** URL to take the user to (in a browser) to complete SSO. */
+        /**
+         * URL to open in a browser which will complete the sign-in flow by
+         * taking the user to the identity provider's authentication flow.
+         *
+         * On browsers you can set the URL to `window.location.href` to take
+         * the user to the authentication flow.
+         */
         url: string
       }
       error: null
@@ -161,12 +201,12 @@ export interface AMREntry {
 export interface UserIdentity {
   id: string
   user_id: string
-  identity_data: {
+  identity_data?: {
     [key: string]: any
   }
   provider: string
-  created_at: string
-  last_sign_in_at: string
+  created_at?: string
+  last_sign_in_at?: string
   updated_at?: string
 }
 
@@ -215,6 +255,7 @@ export interface User {
   recovery_sent_at?: string
   email_change_sent_at?: string
   new_email?: string
+  new_phone?: string
   invited_at?: string
   action_link?: string
   email?: string
@@ -247,6 +288,13 @@ export interface UserAttributes {
   password?: string
 
   /**
+   * The nonce sent for reauthentication if the user's password is to be updated.
+   *
+   * Call reauthenticate() to obtain the nonce first.
+   */
+  nonce?: string
+
+  /**
    * A custom data object to store the user's metadata. This maps to the `auth.users.user_metadata` column.
    *
    * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
@@ -255,11 +303,10 @@ export interface UserAttributes {
   data?: object
 }
 
-export interface AdminUserAttributes extends UserAttributes {
+export interface AdminUserAttributes extends Omit<UserAttributes, 'data'> {
   /**
    * A custom data object to store the user's metadata. This maps to the `auth.users.user_metadata` column.
    *
-   * Only a service role can modify.
    *
    * The `user_metadata` should be a JSON object that includes user-specific info, such as their first and last name.
    *
@@ -356,8 +403,10 @@ export type SignUpWithPasswordCredentials =
          * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
          */
         data?: object
-        /** Verification token received when the user completes the captcha on the site. */
+        /** Verification token received when the user completes the captcha on the site. Requires a configured WhatsApp sender on Twilio */
         captchaToken?: string
+        /** Messaging channel to use (e.g. whatsapp or sms) */
+        channel?: 'sms' | 'whatsapp'
       }
     }
 export type SignInWithPasswordCredentials =
@@ -367,12 +416,6 @@ export type SignInWithPasswordCredentials =
       /** The user's password. */
       password: string
       options?: {
-        /**
-         * A custom data object to store the user's metadata. This maps to the `auth.users.user_metadata` column.
-         *
-         * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
-         */
-        data?: object
         /** Verification token received when the user completes the captcha on the site. */
         captchaToken?: string
       }
@@ -427,9 +470,12 @@ export type SignInWithPasswordlessCredentials =
         data?: object
         /** Verification token received when the user completes the captcha on the site. */
         captchaToken?: string
+        /** Messaging channel to use (e.g. whatsapp or sms) */
+        channel?: 'sms' | 'whatsapp'
       }
     }
 
+export type AuthFlowType = 'implicit' | 'pkce'
 export type SignInWithOAuthCredentials = {
   /** One of the providers supported by GoTrue. */
   provider: Provider
@@ -440,6 +486,23 @@ export type SignInWithOAuthCredentials = {
     scopes?: string
     /** An object of query params */
     queryParams?: { [key: string]: string }
+    /** If set to true does not immediately redirect the current browser context to visit the OAuth authorization page for the provider. */
+    skipBrowserRedirect?: boolean
+  }
+}
+
+export type SignInWithIdTokenCredentials = {
+  /**
+   * Only Apple and Google ID tokens are supported for use from within iOS or Android applications.
+   */
+  provider: 'google' | 'apple'
+  /** ID token issued by Apple or Google. */
+  token: string
+  /** If the ID token contains a `nonce`, then the hash of this value is compared to the value in the ID token. */
+  nonce?: string
+  options?: {
+    /** Verification token received when the user completes the captcha on the site. */
+    captchaToken?: string
   }
 }
 
@@ -479,25 +542,49 @@ export interface VerifyEmailOtpParams {
 }
 
 export type MobileOtpType = 'sms' | 'phone_change'
-export type EmailOtpType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change'
+export type EmailOtpType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change' | 'email'
 
-export type SignInWithSSO = {
-  options?: {
-    /** A URL to send the user to after they have signed-in. */
-    redirectTo?: string
-    /** Verification token received when the user completes the captcha on the site. */
-    captchaToken?: string
-  }
-} & (
+export type ResendParams =
+  | {
+      type: Extract<EmailOtpType, 'signup' | 'email_change'>
+      email: string
+      options?: {
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
+    }
+  | {
+      type: Extract<MobileOtpType, 'sms' | 'phone_change'>
+      phone: string
+      options?: {
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
+    }
+
+export type SignInWithSSO =
   | {
       /** UUID of the SSO provider to invoke single-sign on to. */
       providerId: string
+
+      options?: {
+        /** A URL to send the user to after they have signed-in. */
+        redirectTo?: string
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
     }
   | {
       /** Domain name of the organization for which to invoke single-sign on. */
       domain: string
+
+      options?: {
+        /** A URL to send the user to after they have signed-in. */
+        redirectTo?: string
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
     }
-)
 
 export type GenerateSignupLinkParams = {
   type: 'signup'
@@ -912,8 +999,8 @@ export type CallRefreshTokenResult =
 
 export type Pagination = {
   [key: string]: any
-  nextPage: number | null,
-  lastPage: number,
+  nextPage: number | null
+  lastPage: number
   total: number
 }
 

@@ -69,6 +69,12 @@ export class AuthSessionMissingError extends CustomAuthError {
   }
 }
 
+export class AuthInvalidTokenResponseError extends CustomAuthError {
+  constructor() {
+    super('Auth session or user missing', 'AuthInvalidTokenResponseError', 500)
+  }
+}
+
 export class AuthInvalidCredentialsError extends CustomAuthError {
   constructor(message: string) {
     super(message, 'AuthInvalidCredentialsError', 400)
@@ -92,8 +98,29 @@ export class AuthImplicitGrantRedirectError extends CustomAuthError {
   }
 }
 
+export class AuthPKCEGrantCodeExchangeError extends CustomAuthError {
+  details: { error: string; code: string } | null = null
+  constructor(message: string, details: { error: string; code: string } | null = null) {
+    super(message, 'AuthPKCEGrantCodeExchangeError', 500)
+    this.details = details
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      status: this.status,
+      details: this.details,
+    }
+  }
+}
+
 export class AuthRetryableFetchError extends CustomAuthError {
   constructor(message: string, status: number) {
     super(message, 'AuthRetryableFetchError', status)
   }
+}
+
+export function isAuthRetryableFetchError(error: unknown): error is AuthRetryableFetchError {
+  return isAuthError(error) && error.name === 'AuthRetryableFetchError'
 }
