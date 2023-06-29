@@ -1352,35 +1352,28 @@ export default class GoTrueClient {
       }
 
       const timeNow = Math.round(Date.now() / 1000)
-      const expiresWithMargin = (currentSession.expires_at ?? Infinity) < timeNow + EXPIRY_MARGIN
+      const expiresWithMargin = currentSession.expires_at! < timeNow + EXPIRY_MARGIN
 
       this._debug(
         debugName,
         `session has${expiresWithMargin ? '' : ' not'} expired with margin of ${EXPIRY_MARGIN}s`
       )
 
-      if (expiresWithMargin) {
-        if (this.autoRefreshToken && currentSession.refresh_token) {
-          const { error } = await this._callRefreshToken(currentSession.refresh_token)
+      if (this.autoRefreshToken && expiresWithMargin) {
+        const { error } = await this._callRefreshToken(currentSession.refresh_token)
 
-          if (error) {
-            console.error(error)
+        if (error) {
+          console.error(error)
 
-            if (!isAuthRetryableFetchError(error)) {
-              this._debug(
-                debugName,
-                'refresh failed with a non-retryable error, removing the session',
-                error
-              )
-              await this._removeSession()
-            }
+          if (!isAuthRetryableFetchError(error)) {
+            this._debug(
+              debugName,
+              'refresh failed with a non-retryable error, removing the session',
+              error
+            )
+            await this._removeSession()
           }
         }
-      } else {
-        // no need to persist currentSession again, as we just loaded it from
-        // local storage; persisting it again may overwrite a value saved by
-        // another client with access to the same local storage
-        await this._notifyAllSubscribers('SIGNED_IN', currentSession)
       }
     } catch (err) {
       this._debug(debugName, 'error', err)
