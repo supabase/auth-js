@@ -1422,7 +1422,7 @@ export default class GoTrueClient {
 
       return result
     } catch (error) {
-      this._debug(debugName, 'erorr', error)
+      this._debug(debugName, 'error', error)
 
       if (isAuthError(error)) {
         const result = { session: null, error }
