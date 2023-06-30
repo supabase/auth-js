@@ -551,6 +551,8 @@ export type ResendParams =
       type: Extract<EmailOtpType, 'signup' | 'email_change'>
       email: string
       options?: {
+        /** The redirect url embedded in the email link */
+        redirectTo?: string
         /** Verification token received when the user completes the captcha on the site. */
         captchaToken?: string
       }

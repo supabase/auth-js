@@ -729,6 +729,7 @@ export default class GoTrueClient {
         const { email, type, options } = credentials
         const { error } = await _request(this.fetch, 'POST', endpoint, {
           headers: this.headers,
+          redirectTo: options?.redirectTo,
           body: {
             email,
             type,
