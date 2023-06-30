@@ -721,12 +721,12 @@ export default class GoTrueClient {
   /**
    * Resends an existing signup confirmation email, email change email, SMS OTP or phone change OTP.
    */
-  async resend(credentials: ResendParams): Promise<AuthOtpResponse> {
+  async resend(params: ResendParams): Promise<AuthOtpResponse> {
     try {
       await this._removeSession()
       const endpoint = `${this.url}/resend`
-      if ('email' in credentials) {
-        const { email, type, options } = credentials
+      if ('email' in params) {
+        const { email, type, options } = params
         const { error } = await _request(this.fetch, 'POST', endpoint, {
           headers: this.headers,
           redirectTo: options?.redirectTo,
@@ -737,8 +737,8 @@ export default class GoTrueClient {
           },
         })
         return { data: { user: null, session: null }, error }
-      } else if ('phone' in credentials) {
-        const { phone, type, options } = credentials
+      } else if ('phone' in params) {
+        const { phone, type, options } = params
         const { data, error } = await _request(this.fetch, 'POST', endpoint, {
           headers: this.headers,
           body: {
