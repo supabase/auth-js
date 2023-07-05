@@ -1491,7 +1491,13 @@ export default class GoTrueClient {
       this.inMemorySession = session
     }
 
-    if (this.persistSession && session.expires_at) {
+    if (this.persistSession) {
+      if (!session.expires_at) {
+        throw new Error(
+          `GoTrueClient#_saveSession() requires a session with the expires_at field set`
+        )
+      }
+
       await this._persistSession(session)
     }
   }
@@ -1852,8 +1858,8 @@ export default class GoTrueClient {
       }
 
       await this._saveSession({
-        expires_at: Math.round(Date.now() / 1000) + data.expires_in,
         ...data,
+        expires_at: Math.round(Date.now() / 1000) + data.expires_in,
       })
       await this._notifyAllSubscribers('MFA_CHALLENGE_VERIFIED', data)
 
