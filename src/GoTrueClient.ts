@@ -77,11 +77,12 @@ import type {
   MFAChallengeAndVerifyParams,
   ResendParams,
   AuthFlowType,
+  LockFunc,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
 
-const DEFAULT_OPTIONS: Omit<Required<GoTrueClientOptions>, 'fetch' | 'storage'> = {
+const DEFAULT_OPTIONS: Omit<Required<GoTrueClientOptions>, 'fetch' | 'storage' | 'lock'> = {
   url: GOTRUE_URL,
   storageKey: STORAGE_KEY,
   autoRefreshToken: true,
@@ -98,6 +99,10 @@ const AUTO_REFRESH_TICK_DURATION = 30 * 1000
 /**
  * A token refresh will be attempted this many ticks before the current session expires. */
 const AUTO_REFRESH_TICK_THRESHOLD = 3
+
+async function lockNoOp<R>(name: string, acquireTimeout: number, fn: () => Promise<R>): Promise<R> {
+  return await fn()
+}
 
 export default class GoTrueClient {
   private static nextInstanceID = 0
@@ -146,6 +151,7 @@ export default class GoTrueClient {
     [key: string]: string
   }
   protected fetch: Fetch
+  protected lock: LockFunc
 
   /**
    * Used to broadcast state change events to other tabs listening.
@@ -174,6 +180,7 @@ export default class GoTrueClient {
     this.autoRefreshToken = settings.autoRefreshToken
     this.persistSession = settings.persistSession
     this.storage = settings.storage || localStorageAdapter
+    this.lock = settings.lock || lockNoOp
     this.admin = new GoTrueAdminApi({
       url: settings.url,
       headers: settings.headers,
@@ -775,6 +782,28 @@ export default class GoTrueClient {
     })
   }
 
+  private async _acquireLock<R>(
+    name: string,
+    acquireTimeout: number,
+    fn: () => Promise<R>
+  ): Promise<R> {
+    try {
+      this._debug('#_acquireLock', name, 'start')
+
+      return this.lock(`lock:${this.storageKey}:${name}`, acquireTimeout, async () => {
+        try {
+          this._debug('#_acquireLock', name, 'acquired')
+
+          return await fn()
+        } finally {
+          this._debug('#_acquireLock', name, 'released')
+        }
+      })
+    } finally {
+      this._debug('#_acquireLock', name, 'end')
+    }
+  }
+
   /**
    * Use instead of {@link #getSession} inside the library. It is
    * semantically usually what you want, as getting a session involves some
@@ -802,14 +831,27 @@ export default class GoTrueClient {
             }
             error: null
           }
-    ) => Promise<R>
+    ) => Promise<R>,
+    acquireTimeout: number = -1
   ): Promise<R> {
-    return await stackGuard('_useSession', async () => {
+    if (isInStackGuard('_useSession')) {
+      this._debug('#_useSession', 'recursive use detected')
+
+      // the lock should not be recursively held to avoid dead-locks
       // the use of __loadSession here is the only correct use of the function!
       const result = await this.__loadSession()
 
       return await fn(result)
-    })
+    } else {
+      return await this._acquireLock('_useSession', acquireTimeout, async () => {
+        return await stackGuard('_useSession', async () => {
+          // the use of __loadSession here is the only correct use of the function!
+          const result = await this.__loadSession()
+
+          return await fn(result)
+        })
+      })
+    }
   }
 
   /**
@@ -1720,9 +1762,16 @@ export default class GoTrueClient {
           if (expiresInTicks <= AUTO_REFRESH_TICK_THRESHOLD) {
             await this._callRefreshToken(session.refresh_token)
           }
-        })
+        }, 0 /* try-lock */)
       } catch (e: any) {
-        console.error('Auto refresh tick failed with error. This is likely a transient error.', e)
+        if (e.isAcquireTimeout) {
+          this._debug(
+            '#_autoRefreshTokenTick()',
+            'lock is already acquired, skipping for next tick'
+          )
+        } else {
+          console.error('Auto refresh tick failed with error. This is likely a transient error.', e)
+        }
       }
     } finally {
       this._debug('#_autoRefreshTokenTick()', 'end')

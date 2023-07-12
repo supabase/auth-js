@@ -33,6 +33,8 @@ export type AuthChangeEvent =
   | 'USER_UPDATED'
   | AuthChangeEventMFA
 
+export type LockFunc = <R>(name: string, acquireTimeout: number, fn: () => Promise<R>) => Promise<R>
+
 export type GoTrueClientOptions = {
   /* The URL of the GoTrue server. */
   url?: string
@@ -50,6 +52,19 @@ export type GoTrueClientOptions = {
   storage?: SupportedStorage
   /* A custom fetch implementation. */
   fetch?: Fetch
+  /**
+   * Provide your own global lock implementation instead of the default
+   * implementation. The function should acquire a lock for the duration of the
+   * `fn` async function, such that no other client instances will be able to
+   * hold it at the same time.
+   *
+   * @experimental
+   *
+   * @param name Name of the lock to be acquired.
+   * @param acquireTimeout If negative, no timeout should occur. If positive it should throw an Error with an `isAcquireTimeout` property set to true if the operation fails to be acquired after this much time (ms).
+   * @param fn The operation to execute when the lock is acquired.
+   */
+  lock?: LockFunc
   /* If set to 'pkce' PKCE flow. Defaults to the 'implicit' flow otherwise */
   flowType?: AuthFlowType
   /* If debug messages are emitted. Can be used to inspect the behavior of the library. */

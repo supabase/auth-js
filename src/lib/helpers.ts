@@ -290,7 +290,7 @@ const STACK_GUARD_SUFFIX = `__`
 // they all include the function name. So instead of trying to parse the entry,
 // we're only looking for the special string `__stack_guard__${guardName}__`.
 // Guard names can only be letters with dashes or underscores.
-// 
+//
 // Example Firefox stack trace:
 // ```
 // __stack_guard__EXAMPLE__@debugger eval code:1:55
@@ -391,5 +391,78 @@ STACK_GUARD_CHECK_FN = async () => {
 
       return result
     })
+  }
+}
+
+const LOCAL_CHANNELS: { [name: string]: Set<WrappedBroadcastChannel<any>> } = {}
+
+/**
+ * Wraps a `BroadcastChannel` for use in environments where it is not
+ * available, like Node.js.
+ */
+export class WrappedBroadcastChannel<D> {
+  private _bc: BroadcastChannel | null = null
+
+  private _onmessage: null | ((event: { data: D }) => any) = null
+
+  set onmessage(cb: null | ((event: { data: D }) => any)) {
+    this._onmessage = cb
+
+    if (this._bc) {
+      if (cb) {
+        this._bc.onmessage = (event) => {
+          cb(event)
+        }
+      } else {
+        this._bc.onmessage = null
+      }
+    }
+  }
+
+  get onmessage() {
+    return this._onmessage
+  }
+
+  constructor(readonly name: string) {
+    if (globalThis.BroadcastChannel) {
+      this._bc = new globalThis.BroadcastChannel(name)
+    } else {
+      if (!LOCAL_CHANNELS[name]) {
+        LOCAL_CHANNELS[name] = new Set()
+      }
+
+      LOCAL_CHANNELS[name].add(this)
+    }
+  }
+
+  postMessage(data: D) {
+    if (this._bc) {
+      this._bc.postMessage(data)
+      return
+    }
+
+    setTimeout(() => {
+      LOCAL_CHANNELS[this.name].forEach((ch) => {
+        if (ch === this) {
+          return
+        }
+
+        if (ch._onmessage) {
+          ch._onmessage({ data })
+        }
+      })
+    }, 0)
+  }
+
+  close() {
+    this.onmessage = null
+
+    if (this._bc) {
+      this._bc.close()
+    } else {
+      LOCAL_CHANNELS[this.name].delete(this)
+    }
+
+    this._bc = null
   }
 }
