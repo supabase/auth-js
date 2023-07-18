@@ -960,6 +960,7 @@ export default class GoTrueClient {
         if (!sessionData.session) {
           throw new AuthSessionMissingError()
         }
+        const session: Session = sessionData.session
         let codeChallenge: string | null = null
         let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce' && attributes.email != null) {
@@ -969,7 +970,6 @@ export default class GoTrueClient {
           codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
         }
 
-        const session: Session = sessionData.session
         const { data, error: userError } = await _request(this.fetch, 'PUT', `${this.url}/user`, {
           headers: this.headers,
           redirectTo: options?.emailRedirectTo,
