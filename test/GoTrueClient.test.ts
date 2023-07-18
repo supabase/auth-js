@@ -826,6 +826,22 @@ describe('The auth client can signin with third-party oAuth providers', () => {
     })
   })
 
+  describe('Sign Up Enabled', () => {
+    test('User tries to sign up with password larger than 72 chars', async () => {
+      const { email, password } = mockUserCredentials()
+      const longPassword = 'a'.repeat(73)
+  
+      const signUpPromise = signUpEnabledClient.signUp({
+        email,
+        password: longPassword,
+      })
+  
+      await expect(signUpPromise).rejects.toThrow(
+        'Passwords larger than 72 chars are not supported'
+      )
+    })
+  })
+
   describe('Sign Up Disabled', () => {
     test('User cannot sign up', async () => {
       const { email, password } = mockUserCredentials()

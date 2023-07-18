@@ -331,6 +331,11 @@ export default class GoTrueClient {
       let res: AuthResponse
       if ('email' in credentials) {
         const { email, password, options } = credentials
+        if (password.length > 72) {
+          throw new AuthInvalidCredentialsError(
+            'Passwords larger than 72 chars are not supported'
+          )
+        }
         let codeChallenge: string | null = null
         let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce') {
@@ -354,6 +359,11 @@ export default class GoTrueClient {
         })
       } else if ('phone' in credentials) {
         const { phone, password, options } = credentials
+        if (password.length > 72) {
+          throw new AuthInvalidCredentialsError(
+            'Passwords larger than 72 chars are not supported'
+          )
+        }
         res = await _request(this.fetch, 'POST', `${this.url}/signup`, {
           headers: this.headers,
           body: {
@@ -410,6 +420,11 @@ export default class GoTrueClient {
       let res: AuthResponse
       if ('email' in credentials) {
         const { email, password, options } = credentials
+        if (password.length > 72) {
+          throw new AuthInvalidCredentialsError(
+            'Passwords larger than 72 chars are not supported'
+          )
+        }
         res = await _request(this.fetch, 'POST', `${this.url}/token?grant_type=password`, {
           headers: this.headers,
           body: {
@@ -421,6 +436,11 @@ export default class GoTrueClient {
         })
       } else if ('phone' in credentials) {
         const { phone, password, options } = credentials
+        if (password.length > 72) {
+          throw new AuthInvalidCredentialsError(
+            'Passwords larger than 72 chars are not supported'
+          )
+        }
         res = await _request(this.fetch, 'POST', `${this.url}/token?grant_type=password`, {
           headers: this.headers,
           body: {
