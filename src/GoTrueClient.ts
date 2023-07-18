@@ -984,7 +984,7 @@ export default class GoTrueClient {
         if (userError) throw userError
         session.user = data.user as User
         await this._saveSession(session)
-        this._notifyAllSubscribers('USER_UPDATED', session)
+        await this._notifyAllSubscribers('USER_UPDATED', session)
         return { data: { user: session.user }, error: null }
       })
     } catch (error) {
