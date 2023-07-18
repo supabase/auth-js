@@ -957,6 +957,9 @@ export default class GoTrueClient {
         if (sessionError) {
           throw sessionError
         }
+        if (!sessionData.session) {
+          throw new AuthSessionMissingError()
+        }
         let codeChallenge: string | null = null
         let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce' && attributes.email != null) {
