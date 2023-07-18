@@ -11,6 +11,7 @@ export type Provider =
   | 'github'
   | 'gitlab'
   | 'google'
+  | 'kakao'
   | 'keycloak'
   | 'linkedin'
   | 'notion'
@@ -51,6 +52,8 @@ export type GoTrueClientOptions = {
   fetch?: Fetch
   /* If set to 'pkce' PKCE flow. Defaults to the 'implicit' flow otherwise */
   flowType?: AuthFlowType
+  /* If debug messages are emitted. Can be used to inspect the behavior of the library. */
+  debug?: boolean
 }
 
 export type AuthResponse =
@@ -58,6 +61,37 @@ export type AuthResponse =
       data: {
         user: User | null
         session: Session | null
+      }
+      error: null
+    }
+  | {
+      data: {
+        user: null
+        session: null
+      }
+      error: AuthError
+    }
+
+/**
+ * AuthOtpResponse is returned when OTP is used.
+ *
+ * {@see AuthRsponse}
+ */
+export type AuthOtpResponse =
+  | {
+      data: { user: null; session: null; messageId?: string | null }
+      error: null
+    }
+  | {
+      data: { user: null; session: null; messageId?: string | null }
+      error: AuthError
+    }
+
+export type AuthTokenResponse =
+  | {
+      data: {
+        user: User
+        session: Session
       }
       error: null
     }
@@ -461,13 +495,13 @@ export type SignInWithOAuthCredentials = {
 }
 
 export type SignInWithIdTokenCredentials = {
-  /**
-   * Only Apple and Google ID tokens are supported for use from within iOS or Android applications.
-   */
-  provider: 'google' | 'apple'
-  /** ID token issued by Apple or Google. */
+  /** Provider name or OIDC `iss` value identifying which provider should be used to verify the provided token. Supported names: `google`, `apple`, `azure`, `facebook`, `keycloak` (deprecated). */
+  provider: 'google' | 'apple' | 'azure' | 'facebook' | string
+  /** OIDC ID token issued by the specified provider. The `iss` claim in the ID token must match the supplied provider. Some ID tokens contain an `at_hash` which require that you provide an `access_token` value to be accepted properly. If the token contains a `nonce` claim you must supply the nonce used to obtain the ID token. */
   token: string
-  /** If the ID token contains a `nonce`, then the hash of this value is compared to the value in the ID token. */
+  /** If the ID token contains an `at_hash` claim, then the hash of this value is compared to the value in the ID token. */
+  access_token?: string
+  /** If the ID token contains a `nonce` claim, then the hash of this value is compared to the value in the ID token. */
   nonce?: string
   options?: {
     /** Verification token received when the user completes the captcha on the site. */
@@ -518,6 +552,8 @@ export type ResendParams =
       type: Extract<EmailOtpType, 'signup' | 'email_change'>
       email: string
       options?: {
+        /** A URL to send the user to after they have signed-in. */
+        emailRedirectTo?: string
         /** Verification token received when the user completes the captcha on the site. */
         captchaToken?: string
       }
@@ -978,4 +1014,18 @@ export type PageParams = {
   page?: number
   /** Number of items returned per page */
   perPage?: number
+}
+
+export type SignOut = {
+  /**
+   * Determines which sessions should be
+   * logged out. Global means all
+   * sessions by this account. Local
+   * means only this session. Others
+   * means all other sessions except the
+   * current one. When using others,
+   * there is no sign-out event fired on
+   * the current session!
+   */
+  scope?: 'global' | 'local' | 'others'
 }
