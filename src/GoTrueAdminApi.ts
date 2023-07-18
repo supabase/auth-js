@@ -119,9 +119,6 @@ export default class GoTrueAdminApi {
     try {
       const { options, ...rest } = params
       const body: any = { ...rest, ...options }
-      if (options?.password && options.password.length > 72) {
-        throw new Error('Passwords larger than 72 chars are not supported')
-      }
       if ('newEmail' in rest) {
         // replace newEmail with new_email in request body
         body.new_email = rest?.newEmail
@@ -247,6 +244,9 @@ export default class GoTrueAdminApi {
    */
   async updateUserById(uid: string, attributes: AdminUserAttributes): Promise<UserResponse> {
     try {
+      if (attributes.password && attributes.password.length > 72) {
+        throw new Error('Passwords larger than 72 chars are not supported')
+      }
       return await _request(this.fetch, 'PUT', `${this.url}/admin/users/${uid}`, {
         body: attributes,
         headers: this.headers,
