@@ -231,7 +231,7 @@ export interface UserIdentity {
   identity_data?: {
     [key: string]: any
   }
-  provider: string
+  provider: Provider
   created_at?: string
   last_sign_in_at?: string
   updated_at?: string
@@ -265,7 +265,7 @@ export interface Factor {
 }
 
 export interface UserAppMetadata {
-  provider?: string
+  provider?: Provider
   [key: string]: any
 }
 
