@@ -232,6 +232,20 @@ export default class GoTrueClient {
     this.initialize()
   }
 
+  /**
+   * Use this to dynamically set or change the lock function of the client. This API will break and may not exist in future versions. Use at your own risk.
+   * @experimental
+   */
+  setLock(lock: LockFn | null) {
+    if (lock) {
+      this.lock = lock
+    } else {
+      this.lock = lockNoOp
+    }
+
+    this._debug('#setLock', 'changed lock function', this.lock)
+  }
+
   private _debug(...args: any[]): GoTrueClient {
     if (this.logDebugMessages) {
       console.log(
