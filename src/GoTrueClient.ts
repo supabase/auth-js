@@ -106,7 +106,11 @@ async function lockNoOp<R>(name: string, acquireTimeout: number, fn: () => Promi
   return await fn()
 }
 
-export default class GoTrueClient {
+function synchronized(target: any, propertyKey: string, propertyDescriptor: PropertyDescriptor) {
+  target[propertyKey].isSynchronized = true
+}
+
+class GoTrueClientInternal {
   private static nextInstanceID = 0
 
   private instanceID: number
@@ -140,13 +144,6 @@ export default class GoTrueClient {
   protected autoRefreshTicker: ReturnType<typeof setInterval> | null = null
   protected visibilityChangedCallback: (() => Promise<any>) | null = null
   protected refreshingDeferred: Deferred<CallRefreshTokenResult> | null = null
-  /**
-   * Keeps track of the async client initialization.
-   * When null or not yet resolved the auth state is `unknown`
-   * Once resolved the the auth state is known and it's save to call any further client methods.
-   * Keep extra care to never reject or throw uncaught errors
-   */
-  protected initializePromise: Promise<InitializeResult> | null = null
   protected detectSessionInUrl = true
   protected url: string
   protected headers: {
@@ -229,10 +226,11 @@ export default class GoTrueClient {
       })
     }
 
-    this.initialize()
+    // further initialization requires obtaining the lock, so it's actually
+    // going to be called from the proxy object
   }
 
-  private _debug(...args: any[]): GoTrueClient {
+  private _debug(...args: any[]) {
     if (this.logDebugMessages) {
       console.log(
         `GoTrueClient@${this.instanceID} (${version}) ${new Date().toISOString()}`,
@@ -249,10 +247,6 @@ export default class GoTrueClient {
    * manually when checking for an error from an auth redirect (oauth, magiclink, password recovery, etc).
    */
   initialize(): Promise<InitializeResult> {
-    if (this.initializePromise) {
-      return this.initializePromise
-    }
-
     return this._initialize()
   }
 
@@ -263,71 +257,59 @@ export default class GoTrueClient {
    *    the whole lifetime of the client
    */
   private async _initialize(): Promise<InitializeResult> {
-    if (this.initializePromise) {
-      throw new Error('Double call of #_initialize()')
-    }
+    try {
+      const isPKCEFlow = isBrowser() ? await this._isPKCEFlow() : false
+      this._debug('#_initialize()', 'begin', 'is PKCE flow', isPKCEFlow)
 
-    this.initializePromise = this._acquireLock(
-      -1,
-      async () =>
-        await stackGuard('_initialize', async () => {
-          try {
-            const isPKCEFlow = isBrowser() ? await this._isPKCEFlow() : false
-            this._debug('#_initialize()', 'begin', 'is PKCE flow', isPKCEFlow)
+      if (isPKCEFlow || (this.detectSessionInUrl && this._isImplicitGrantFlow())) {
+        const { data, error } = await this._getSessionFromURL(isPKCEFlow)
+        if (error) {
+          this._debug('#_initialize()', 'error detecting session from URL', error)
 
-            if (isPKCEFlow || (this.detectSessionInUrl && this._isImplicitGrantFlow())) {
-              const { data, error } = await this._getSessionFromURL(isPKCEFlow)
-              if (error) {
-                this._debug('#_initialize()', 'error detecting session from URL', error)
+          // failed login attempt via url,
+          // remove old session as in verifyOtp, signUp and signInWith*
+          await this._removeSession()
 
-                // failed login attempt via url,
-                // remove old session as in verifyOtp, signUp and signInWith*
-                await this._removeSession()
+          return { error }
+        }
 
-                return { error }
-              }
+        const { session, redirectType } = data
 
-              const { session, redirectType } = data
+        this._debug(
+          '#_initialize()',
+          'detected session in URL',
+          session,
+          'redirect type',
+          redirectType
+        )
 
-              this._debug(
-                '#_initialize()',
-                'detected session in URL',
-                session,
-                'redirect type',
-                redirectType
-              )
+        await this._saveSession(session)
 
-              await this._saveSession(session)
-
-              setTimeout(async () => {
-                if (redirectType === 'recovery') {
-                  await this._notifyAllSubscribers('PASSWORD_RECOVERY', session)
-                } else {
-                  await this._notifyAllSubscribers('SIGNED_IN', session)
-                }
-              }, 0)
-
-              return { error: null }
-            }
-            // no login attempt via callback url try to recover session from storage
-            await this._recoverAndRefresh()
-            return { error: null }
-          } catch (error) {
-            if (isAuthError(error)) {
-              return { error }
-            }
-
-            return {
-              error: new AuthUnknownError('Unexpected error during initialization', error),
-            }
-          } finally {
-            await this._handleVisibilityChange()
-            this._debug('#_initialize()', 'end')
+        setTimeout(async () => {
+          if (redirectType === 'recovery') {
+            await this._notifyAllSubscribers('PASSWORD_RECOVERY', session)
+          } else {
+            await this._notifyAllSubscribers('SIGNED_IN', session)
           }
-        })
-    )
+        }, 0)
 
-    return await this.initializePromise
+        return { error: null }
+      }
+      // no login attempt via callback url try to recover session from storage
+      await this._recoverAndRefresh()
+      return { error: null }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { error }
+      }
+
+      return {
+        error: new AuthUnknownError('Unexpected error during initialization', error),
+      }
+    } finally {
+      await this._handleVisibilityChange()
+      this._debug('#_initialize()', 'end')
+    }
   }
 
   /**
@@ -798,6 +780,7 @@ export default class GoTrueClient {
    * Returns the session, refreshing it if necessary.
    * The session returned can be null if the session is not detected which can happen in the event a user is not signed-in or has logged out.
    */
+  @synchronized
   async getSession() {
     return this._useSession(async (result) => {
       return result
@@ -807,31 +790,15 @@ export default class GoTrueClient {
   /**
    * Acquires a global lock based on the storage key.
    */
-  private async _acquireLock<R>(acquireTimeout: number, fn: () => Promise<R>): Promise<R> {
+  async _acquireLock<R>(acquireTimeout: number, fn: () => Promise<R>): Promise<R> {
     this._debug('#_acquireLock', 'begin', acquireTimeout)
 
     try {
-      if (!(await stackGuardsSupported())) {
-        this._debug(
-          '#_acquireLock',
-          'Stack guards not supported, so exclusive locking is not performed as it can lead to deadlocks if the lock is attempted to be recursively acquired (as the recursion cannot be detected).'
-        )
-
-        return await fn()
-      }
-
-      if (isInStackGuard('_acquireLock')) {
-        this._debug('#_acquireLock', 'recursive call')
-        return await fn()
-      }
-
       return await this.lock(`lock:${this.storageKey}`, acquireTimeout, async () => {
         this._debug('#_acquireLock', 'lock acquired for storage key', this.storageKey)
 
         try {
-          return await stackGuard('_acquireLock', async () => {
-            return await fn()
-          })
+          return await fn()
         } finally {
           this._debug('#_acquireLock', 'lock released for storage key', this.storageKey)
         }
@@ -873,23 +840,10 @@ export default class GoTrueClient {
     this._debug('#_useSession', 'begin')
 
     try {
-      if (isInStackGuard('_useSession')) {
-        this._debug('#_useSession', 'recursive call')
+      // the use of __loadSession here is the only correct use of the function!
+      const result = await this.__loadSession()
 
-        // the use of __loadSession here is the only correct use of the function!
-        const result = await this.__loadSession()
-
-        return await fn(result)
-      }
-
-      return await this._acquireLock(-1, async () => {
-        return await stackGuard('_useSession', async () => {
-          // the use of __loadSession here is the only correct use of the function!
-          const result = await this.__loadSession()
-
-          return await fn(result)
-        })
-      })
+      return await fn(result)
     } finally {
       this._debug('#_useSession', 'end')
     }
@@ -921,18 +875,6 @@ export default class GoTrueClient {
       }
   > {
     this._debug('#__loadSession()', 'begin')
-
-    if (this.logDebugMessages && !isInStackGuard('_useSession') && (await stackGuardsSupported())) {
-      throw new Error('Please use #_useSession()')
-    }
-
-    if (isInStackGuard('_initialize')) {
-      this._debug('#__loadSession', '#_initialize recursion detected', new Error().stack)
-    }
-
-    // always wait for #_initialize() to finish before loading anything from
-    // storage
-    await this.initializePromise
 
     try {
       let currentSession: Session | null = null
@@ -989,6 +931,7 @@ export default class GoTrueClient {
    * Gets the current user details if there is an existing session.
    * @param jwt Takes in an optional access token jwt. If no jwt is provided, getUser() will attempt to get the jwt from the current session.
    */
+  @synchronized
   async getUser(jwt?: string): Promise<UserResponse> {
     try {
       if (jwt) {
@@ -1729,7 +1672,6 @@ export default class GoTrueClient {
     // #_initialize can be allowed to complete without recursively waiting on
     // itself
     setTimeout(async () => {
-      await this.initializePromise
       await this._autoRefreshTokenTick()
     }, 0)
   }
@@ -1873,7 +1815,6 @@ export default class GoTrueClient {
       setTimeout(async () => {
         if (!isInitial) {
           // initial visibility change setup is handled in another flow under #initialize()
-          await this.initializePromise
           await this._recoverAndRefresh()
 
           this._debug(
@@ -2163,3 +2104,41 @@ export default class GoTrueClient {
     })
   }
 }
+
+const GoTrueClient = new Proxy(GoTrueClientInternal, {
+  construct(target, args) {
+    const internal = new target(args[0])
+
+    const initialized = (async () => {
+      // acquire the lock here, then
+      await internal._acquireLock(-1, async () => {
+        await internal.initialize()
+      })
+    })()
+
+    return new Proxy<GoTrueClientInternal>(internal, {
+      get(target: any, prop) {
+        if (typeof prop !== 'string') {
+          return target[prop]
+        }
+
+        const result: any = target[prop]
+
+        if (typeof result === 'function' && result.isSynchronized === true) {
+          return async (...args: any[]) => {
+            await initialized
+
+            // acquire lock
+            return await target._acquireLock(-1, async () => {
+              return await result.call(target, ...args)
+            })
+          }
+        }
+
+        return result
+      },
+    })
+  },
+})
+
+export default GoTrueClient

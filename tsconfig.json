@@ -10,6 +10,7 @@
     "target": "ES2017",
 
     "strict": true,
+    "experimentalDecorators": true,
 
     "esModuleInterop": true,
     "moduleResolution": "Node",
