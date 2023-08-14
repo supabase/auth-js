@@ -519,8 +519,7 @@ export default class GoTrueClient {
   }
 
   /**
-   * Allows signing in with an OIDC ID token. The authentication provider used
-   * should be enabled and configured.
+   * Allows signing in with an OIDC ID token. The authentication provider used should be enabled and configured.
    */
   async signInWithIdToken(credentials: SignInWithIdTokenCredentials): Promise<AuthTokenResponse> {
     await this._removeSession()
