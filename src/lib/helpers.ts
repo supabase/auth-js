@@ -240,8 +240,17 @@ export function retryable<T>(
             return
           }
         } catch (e: any) {
-          if (!isRetryable(attempt, e)) {
-            reject(e)
+          let shouldRetry = false
+
+          try {
+            shouldRetry = isRetryable(attempt, e)
+          } catch (innerError: any) {
+            reject(innerError)
+            return
+          }
+
+          if (!shouldRetry) {
+            reject(error)
             return
           }
         }

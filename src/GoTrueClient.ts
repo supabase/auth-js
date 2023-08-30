@@ -1530,12 +1530,20 @@ export default class GoTrueClient {
             xform: _sessionResponse,
           })
         },
-        (attempt, _, result) =>
-          result &&
-          result.error &&
-          isAuthRetryableFetchError(result.error) &&
-          // retryable only if the request can be sent before the backoff overflows the tick duration
-          Date.now() + (attempt + 1) * 200 - startedAt < AUTO_REFRESH_TICK_DURATION
+        (attempt, error, result) => {
+          if (error && !isAuthRetryableFetchError(error)) {
+            // not retryable
+            return false
+          }
+
+          return (
+            result &&
+            result.error &&
+            isAuthRetryableFetchError(result.error) &&
+            // retryable only if the request can be sent before the backoff overflows the tick duration
+            Date.now() + (attempt + 1) * 200 - startedAt < AUTO_REFRESH_TICK_DURATION
+          )
+        }
       )
     } catch (error) {
       this._debug(debugName, 'error', error)
