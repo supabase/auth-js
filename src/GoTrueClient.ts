@@ -18,7 +18,6 @@ import {
   decodeJWTPayload,
   Deferred,
   getItemAsync,
-  getParameterByName,
   isBrowser,
   removeItemAsync,
   resolveFetch,
@@ -29,11 +28,11 @@ import {
   generatePKCEVerifier,
   generatePKCEChallenge,
   supportsLocalStorage,
-  stackGuard,
-  isInStackGuard,
+  parseParametersFromURL,
 } from './lib/helpers'
 import localStorageAdapter from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
+import { version } from './lib/version'
 
 import type {
   AuthChangeEvent,
@@ -77,11 +76,12 @@ import type {
   MFAChallengeAndVerifyParams,
   ResendParams,
   AuthFlowType,
+  LockFunc,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
 
-const DEFAULT_OPTIONS: Omit<Required<GoTrueClientOptions>, 'fetch' | 'storage'> = {
+const DEFAULT_OPTIONS: Omit<Required<GoTrueClientOptions>, 'fetch' | 'storage' | 'lock'> = {
   url: GOTRUE_URL,
   storageKey: STORAGE_KEY,
   autoRefreshToken: true,
@@ -98,6 +98,10 @@ const AUTO_REFRESH_TICK_DURATION = 30 * 1000
 /**
  * A token refresh will be attempted this many ticks before the current session expires. */
 const AUTO_REFRESH_TICK_THRESHOLD = 3
+
+async function lockNoOp<R>(name: string, acquireTimeout: number, fn: () => Promise<R>): Promise<R> {
+  return await fn()
+}
 
 export default class GoTrueClient {
   private static nextInstanceID = 0
@@ -146,6 +150,9 @@ export default class GoTrueClient {
     [key: string]: string
   }
   protected fetch: Fetch
+  protected lock: LockFunc
+  protected lockAcquired = false
+  protected pendingInLock: Promise<any>[] = []
 
   /**
    * Used to broadcast state change events to other tabs listening.
@@ -183,6 +190,7 @@ export default class GoTrueClient {
     this.url = settings.url
     this.headers = settings.headers
     this.fetch = resolveFetch(settings.fetch)
+    this.lock = settings.lock || lockNoOp
     this.detectSessionInUrl = settings.detectSessionInUrl
     this.flowType = settings.flowType
 
@@ -225,7 +233,10 @@ export default class GoTrueClient {
 
   private _debug(...args: any[]): GoTrueClient {
     if (this.logDebugMessages) {
-      console.log(`GoTrueClient@${this.instanceID} ${new Date().toISOString()}`, ...args)
+      console.log(
+        `GoTrueClient@${this.instanceID} (${version}) ${new Date().toISOString()}`,
+        ...args
+      )
     }
 
     return this
@@ -236,12 +247,18 @@ export default class GoTrueClient {
    * This method is automatically called when instantiating the client, but should also be called
    * manually when checking for an error from an auth redirect (oauth, magiclink, password recovery, etc).
    */
-  initialize(): Promise<InitializeResult> {
+  async initialize(): Promise<InitializeResult> {
     if (this.initializePromise) {
-      return this.initializePromise
+      return await this.initializePromise
     }
 
-    return this._initialize()
+    this.initializePromise = (async () => {
+      return await this._acquireLock(-1, async () => {
+        return await this._initialize()
+      })
+    })()
+
+    return await this.initializePromise
   }
 
   /**
@@ -251,67 +268,59 @@ export default class GoTrueClient {
    *    the whole lifetime of the client
    */
   private async _initialize(): Promise<InitializeResult> {
-    if (this.initializePromise) {
-      throw new Error('Double call of #_initialize()')
-    }
+    try {
+      const isPKCEFlow = isBrowser() ? await this._isPKCEFlow() : false
+      this._debug('#_initialize()', 'begin', 'is PKCE flow', isPKCEFlow)
 
-    this.initializePromise = stackGuard('_initialize', async () => {
-      try {
-        const isPKCEFlow = isBrowser() ? await this._isPKCEFlow() : false
-        this._debug('#_initialize()', 'begin', 'is PKCE flow', isPKCEFlow)
+      if (isPKCEFlow || (this.detectSessionInUrl && this._isImplicitGrantFlow())) {
+        const { data, error } = await this._getSessionFromURL(isPKCEFlow)
+        if (error) {
+          this._debug('#_initialize()', 'error detecting session from URL', error)
 
-        if (isPKCEFlow || (this.detectSessionInUrl && this._isImplicitGrantFlow())) {
-          const { data, error } = await this._getSessionFromUrl(isPKCEFlow)
-          if (error) {
-            this._debug('#_initialize()', 'error detecting session from URL', error)
+          // failed login attempt via url,
+          // remove old session as in verifyOtp, signUp and signInWith*
+          await this._removeSession()
 
-            // failed login attempt via url,
-            // remove old session as in verifyOtp, signUp and signInWith*
-            await this._removeSession()
-
-            return { error }
-          }
-
-          const { session, redirectType } = data
-
-          this._debug(
-            '#_initialize()',
-            'detected session in URL',
-            session,
-            'redirect type',
-            redirectType
-          )
-
-          await this._saveSession(session)
-
-          setTimeout(async () => {
-            if (redirectType === 'recovery') {
-              await this._notifyAllSubscribers('PASSWORD_RECOVERY', session)
-            } else {
-              await this._notifyAllSubscribers('SIGNED_IN', session)
-            }
-          }, 0)
-
-          return { error: null }
-        }
-        // no login attempt via callback url try to recover session from storage
-        await this._recoverAndRefresh()
-        return { error: null }
-      } catch (error) {
-        if (isAuthError(error)) {
           return { error }
         }
 
-        return {
-          error: new AuthUnknownError('Unexpected error during initialization', error),
-        }
-      } finally {
-        await this._handleVisibilityChange()
-        this._debug('#_initialize()', 'end')
-      }
-    })
+        const { session, redirectType } = data
 
-    return await this.initializePromise
+        this._debug(
+          '#_initialize()',
+          'detected session in URL',
+          session,
+          'redirect type',
+          redirectType
+        )
+
+        await this._saveSession(session)
+
+        setTimeout(async () => {
+          if (redirectType === 'recovery') {
+            await this._notifyAllSubscribers('PASSWORD_RECOVERY', session)
+          } else {
+            await this._notifyAllSubscribers('SIGNED_IN', session)
+          }
+        }, 0)
+
+        return { error: null }
+      }
+      // no login attempt via callback url try to recover session from storage
+      await this._recoverAndRefresh()
+      return { error: null }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { error }
+      }
+
+      return {
+        error: new AuthUnknownError('Unexpected error during initialization', error),
+      }
+    } finally {
+      await this._handleVisibilityChange()
+      this._debug('#_initialize()', 'end')
+    }
   }
 
   /**
@@ -474,6 +483,14 @@ export default class GoTrueClient {
    * Log in an existing user by exchanging an Auth Code issued during the PKCE flow.
    */
   async exchangeCodeForSession(authCode: string): Promise<AuthTokenResponse> {
+    await this.initializePromise
+
+    return this._acquireLock(-1, async () => {
+      return this._exchangeCodeForSession(authCode)
+    })
+  }
+
+  private async _exchangeCodeForSession(authCode: string): Promise<AuthTokenResponse> {
     const codeVerifier = await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)
     const { data, error } = await _request(
       this.fetch,
@@ -623,13 +640,20 @@ export default class GoTrueClient {
         // we don't want to remove the authenticated session if the user is performing an email_change or phone_change verification
         await this._removeSession()
       }
+
+      let redirectTo = undefined
+      let captchaToken = undefined
+      if ('options' in params) {
+        redirectTo = params.options?.redirectTo
+        captchaToken = params.options?.captchaToken
+      }
       const { data, error } = await _request(this.fetch, 'POST', `${this.url}/verify`, {
         headers: this.headers,
         body: {
           ...params,
-          gotrue_meta_security: { captcha_token: params.options?.captchaToken },
+          gotrue_meta_security: { captcha_token: captchaToken },
         },
-        redirectTo: params.options?.redirectTo,
+        redirectTo,
         xform: _sessionResponse,
       })
 
@@ -703,6 +727,14 @@ export default class GoTrueClient {
    * Requires the user to be signed-in.
    */
   async reauthenticate(): Promise<AuthResponse> {
+    await this.initializePromise
+
+    return await this._acquireLock(-1, async () => {
+      return await this._reauthenticate()
+    })
+  }
+
+  private async _reauthenticate(): Promise<AuthResponse> {
     try {
       return await this._useSession(async (result) => {
         const {
@@ -776,9 +808,84 @@ export default class GoTrueClient {
    * The session returned can be null if the session is not detected which can happen in the event a user is not signed-in or has logged out.
    */
   async getSession() {
-    return this._useSession(async (result) => {
-      return result
+    await this.initializePromise
+
+    return this._acquireLock(-1, async () => {
+      return this._useSession(async (result) => {
+        return result
+      })
     })
+  }
+
+  /**
+   * Acquires a global lock based on the storage key.
+   */
+  private async _acquireLock<R>(acquireTimeout: number, fn: () => Promise<R>): Promise<R> {
+    this._debug('#_acquireLock', 'begin', acquireTimeout)
+
+    try {
+      if (this.lockAcquired) {
+        const last = this.pendingInLock.length
+          ? this.pendingInLock[this.pendingInLock.length - 1]
+          : Promise.resolve()
+
+        const result = (async () => {
+          await last
+          return await fn()
+        })()
+
+        this.pendingInLock.push(
+          (async () => {
+            try {
+              await result
+            } catch (e: any) {
+              // we jsut care if it finished
+            }
+          })()
+        )
+
+        return result
+      }
+
+      return await this.lock(`lock:${this.storageKey}`, acquireTimeout, async () => {
+        this._debug('#_acquireLock', 'lock acquired for storage key', this.storageKey)
+
+        try {
+          this.lockAcquired = true
+
+          const result = fn()
+
+          this.pendingInLock.push(
+            (async () => {
+              try {
+                await result
+              } catch (e: any) {
+                // we just care if it finished
+              }
+            })()
+          )
+
+          await result
+
+          // keep draining the queue until there's nothing to wait on
+          while (this.pendingInLock.length) {
+            const waitOn = [...this.pendingInLock]
+
+            await Promise.all(waitOn)
+
+            this.pendingInLock.splice(0, waitOn.length)
+          }
+
+          return await result
+        } finally {
+          this._debug('#_acquireLock', 'lock released for storage key', this.storageKey)
+
+          this.lockAcquired = false
+        }
+      })
+    } finally {
+      this._debug('#_acquireLock', 'end')
+    }
   }
 
   /**
@@ -810,12 +917,16 @@ export default class GoTrueClient {
           }
     ) => Promise<R>
   ): Promise<R> {
-    return await stackGuard('_useSession', async () => {
+    this._debug('#_useSession', 'begin')
+
+    try {
       // the use of __loadSession here is the only correct use of the function!
       const result = await this.__loadSession()
 
       return await fn(result)
-    })
+    } finally {
+      this._debug('#_useSession', 'end')
+    }
   }
 
   /**
@@ -845,18 +956,8 @@ export default class GoTrueClient {
   > {
     this._debug('#__loadSession()', 'begin')
 
-    if (this.logDebugMessages && !isInStackGuard('_useSession')) {
-      throw new Error('Please use #_useSession()')
-    }
-
-    // make sure we've read the session from the url if there is one
-    // save to just await, as long we make sure _initialize() never throws
-    if (!isInStackGuard('_initialize')) {
-      // only wait when not called from within #_initialize() since it's
-      // waiting for itself. one such pathway is #_initialize() ->
-      // #_handleVisibilityChange() -> #_onVisbilityChanged() ->
-      // #_loadSession().
-      await this.initializePromise
+    if (!this.lockAcquired) {
+      this._debug('#__loadSession()', 'used outside of an acquired lock!', new Error().stack)
     }
 
     try {
@@ -915,21 +1016,36 @@ export default class GoTrueClient {
    * @param jwt Takes in an optional access token jwt. If no jwt is provided, getUser() will attempt to get the jwt from the current session.
    */
   async getUser(jwt?: string): Promise<UserResponse> {
-    try {
-      return await this._useSession(async (result) => {
-        if (!jwt) {
-          const { data, error } = result
-          if (error) {
-            throw error
-          }
+    if (jwt) {
+      return await this._getUser(jwt)
+    }
 
-          // Default to Authorization header if there is no existing session
-          jwt = data.session?.access_token ?? undefined
+    await this.initializePromise
+
+    return this._acquireLock(-1, async () => {
+      return await this._getUser()
+    })
+  }
+
+  private async _getUser(jwt?: string): Promise<UserResponse> {
+    try {
+      if (jwt) {
+        return await _request(this.fetch, 'GET', `${this.url}/user`, {
+          headers: this.headers,
+          jwt: jwt,
+          xform: _userResponse,
+        })
+      }
+
+      return await this._useSession(async (result) => {
+        const { data, error } = result
+        if (error) {
+          throw error
         }
 
         return await _request(this.fetch, 'GET', `${this.url}/user`, {
           headers: this.headers,
-          jwt: jwt,
+          jwt: data.session?.access_token ?? undefined,
           xform: _userResponse,
         })
       })
@@ -946,6 +1062,19 @@ export default class GoTrueClient {
    * Updates user data for a logged in user.
    */
   async updateUser(
+    attributes: UserAttributes,
+    options: {
+      emailRedirectTo?: string | undefined
+    } = {}
+  ): Promise<UserResponse> {
+    await this.initializePromise
+
+    return await this._acquireLock(-1, async () => {
+      return await this._updateUser(attributes, options)
+    })
+  }
+
+  protected async _updateUser(
     attributes: UserAttributes,
     options: {
       emailRedirectTo?: string | undefined
@@ -1016,6 +1145,17 @@ export default class GoTrueClient {
     access_token: string
     refresh_token: string
   }): Promise<AuthResponse> {
+    await this.initializePromise
+
+    return await this._acquireLock(-1, async () => {
+      return await this._setSession(currentSession)
+    })
+  }
+
+  protected async _setSession(currentSession: {
+    access_token: string
+    refresh_token: string
+  }): Promise<AuthResponse> {
     try {
       if (!currentSession.access_token || !currentSession.refresh_token) {
         throw new AuthSessionMissingError()
@@ -1044,7 +1184,7 @@ export default class GoTrueClient {
         }
         session = refreshedSession
       } else {
-        const { data, error } = await this.getUser(currentSession.access_token)
+        const { data, error } = await this._getUser(currentSession.access_token)
         if (error) {
           throw error
         }
@@ -1077,6 +1217,16 @@ export default class GoTrueClient {
    * @param currentSession The current session. If passed in, it must contain a refresh token.
    */
   async refreshSession(currentSession?: { refresh_token: string }): Promise<AuthResponse> {
+    await this.initializePromise
+
+    return await this._acquireLock(-1, async () => {
+      return await this._refreshSession(currentSession)
+    })
+  }
+
+  protected async _refreshSession(currentSession?: {
+    refresh_token: string
+  }): Promise<AuthResponse> {
     try {
       return await this._useSession(async (result) => {
         if (!currentSession) {
@@ -1115,7 +1265,7 @@ export default class GoTrueClient {
   /**
    * Gets the session data from a URL string
    */
-  private async _getSessionFromUrl(isPKCEFlow: boolean): Promise<
+  private async _getSessionFromURL(isPKCEFlow: boolean): Promise<
     | {
         data: { session: Session; redirectType: string | null }
         error: null
@@ -1129,62 +1279,68 @@ export default class GoTrueClient {
       } else if (this.flowType == 'pkce' && !isPKCEFlow) {
         throw new AuthPKCEGrantCodeExchangeError('Not a valid PKCE flow url.')
       }
+
+      const params = parseParametersFromURL(window.location.href)
+
       if (isPKCEFlow) {
-        const authCode = getParameterByName('code')
-        if (!authCode) throw new AuthPKCEGrantCodeExchangeError('No code detected.')
-        const { data, error } = await this.exchangeCodeForSession(authCode)
+        if (!params.code) throw new AuthPKCEGrantCodeExchangeError('No code detected.')
+        const { data, error } = await this._exchangeCodeForSession(params.code)
         if (error) throw error
-        if (!data.session) throw new AuthPKCEGrantCodeExchangeError('No session detected.')
-        let url = new URL(window.location.href)
+
+        const url = new URL(window.location.href)
         url.searchParams.delete('code')
+
         window.history.replaceState(window.history.state, '', url.toString())
+
         return { data: { session: data.session, redirectType: null }, error: null }
       }
 
-      const error_description = getParameterByName('error_description')
-      if (error_description) {
-        const error_code = getParameterByName('error_code')
-        if (!error_code) throw new AuthImplicitGrantRedirectError('No error_code detected.')
-        const error = getParameterByName('error')
-        if (!error) throw new AuthImplicitGrantRedirectError('No error detected.')
-
-        throw new AuthImplicitGrantRedirectError(error_description, { error, code: error_code })
+      if (params.error || params.error_description || params.error_code) {
+        throw new AuthImplicitGrantRedirectError(
+          params.error_description || 'Error in URL with unspecified error_description',
+          {
+            error: params.error || 'unspecified_error',
+            code: params.error_code || 'unspecified_code',
+          }
+        )
       }
 
-      const provider_token = getParameterByName('provider_token')
-      const provider_refresh_token = getParameterByName('provider_refresh_token')
-      const access_token = getParameterByName('access_token')
-      if (!access_token) throw new AuthImplicitGrantRedirectError('No access_token detected.')
-      const expires_in = getParameterByName('expires_in')
-      if (!expires_in) throw new AuthImplicitGrantRedirectError('No expires_in detected.')
-      const refresh_token = getParameterByName('refresh_token')
-      if (!refresh_token) throw new AuthImplicitGrantRedirectError('No refresh_token detected.')
-      const token_type = getParameterByName('token_type')
-      if (!token_type) throw new AuthImplicitGrantRedirectError('No token_type detected.')
+      const {
+        provider_token,
+        provider_refresh_token,
+        access_token,
+        refresh_token,
+        expires_in,
+        token_type,
+      } = params
+
+      if (!access_token || !expires_in || !refresh_token || !token_type) {
+        throw new AuthImplicitGrantRedirectError('No session defined in URL')
+      }
 
       const timeNow = Math.round(Date.now() / 1000)
-      const expires_at = timeNow + parseInt(expires_in)
+      const expiresIn = parseInt(expires_in)
+      const expires_at = timeNow + expiresIn
 
-      const { data, error } = await this.getUser(access_token)
+      const { data, error } = await this._getUser(access_token)
       if (error) throw error
-      const user: User = data.user
+
       const session: Session = {
         provider_token,
         provider_refresh_token,
         access_token,
-        expires_in: parseInt(expires_in),
+        expires_in: expiresIn,
         expires_at,
         refresh_token,
         token_type,
-        user,
+        user: data.user!!,
       }
-      const redirectType = getParameterByName('type')
 
       // Remove tokens from URL
       window.location.hash = ''
-      this._debug('#_getSessionFromUrl()', 'clearing window.location.hash')
+      this._debug('#_getSessionFromURL()', 'clearing window.location.hash')
 
-      return { data: { session, redirectType }, error: null }
+      return { data: { session, redirectType: params.type }, error: null }
     } catch (error) {
       if (isAuthError(error)) {
         return { data: { session: null, redirectType: null }, error }
@@ -1198,21 +1354,22 @@ export default class GoTrueClient {
    * Checks if the current URL contains parameters given by an implicit oauth grant flow (https://www.rfc-editor.org/rfc/rfc6749.html#section-4.2)
    */
   private _isImplicitGrantFlow(): boolean {
-    return (
-      isBrowser() &&
-      (Boolean(getParameterByName('access_token')) ||
-        Boolean(getParameterByName('error_description')))
-    )
+    const params = parseParametersFromURL(window.location.href)
+
+    return !!(isBrowser() && (params.access_token || params.error_description))
   }
   /**
    * Checks if the current URL and backing storage contain parameters given by a PKCE flow
    */
   private async _isPKCEFlow(): Promise<boolean> {
+    const params = parseParametersFromURL(window.location.href)
+
     const currentStorageContent = await getItemAsync(
       this.storage,
       `${this.storageKey}-code-verifier`
     )
-    return Boolean(getParameterByName('code')) && Boolean(currentStorageContent)
+
+    return !!(params.code && currentStorageContent)
   }
 
   /**
@@ -1224,7 +1381,17 @@ export default class GoTrueClient {
    *
    * If using others scope, no `SIGNED_OUT` event is fired!
    */
-  async signOut({ scope }: SignOut = { scope: 'global' }): Promise<{ error: AuthError | null }> {
+  async signOut(options: SignOut = { scope: 'global' }): Promise<{ error: AuthError | null }> {
+    await this.initializePromise
+
+    return await this._acquireLock(-1, async () => {
+      return await this._signOut(options)
+    })
+  }
+
+  protected async _signOut(
+    { scope }: SignOut = { scope: 'global' }
+  ): Promise<{ error: AuthError | null }> {
     return await this._useSession(async (result) => {
       const { data, error: sessionError } = result
       if (sessionError) {
@@ -1273,8 +1440,13 @@ export default class GoTrueClient {
     this._debug('#onAuthStateChange()', 'registered callback with id', id)
 
     this.stateChangeEmitters.set(id, subscription)
+    ;(async () => {
+      await this.initializePromise
 
-    this._emitInitialSession(id)
+      await this._acquireLock(-1, async () => {
+        this._emitInitialSession(id)
+      })
+    })()
 
     return { data: { subscription } }
   }
@@ -1652,8 +1824,13 @@ export default class GoTrueClient {
       Deno.unrefTimer(ticker)
     }
 
-    // run the tick immediately
-    await this._autoRefreshTokenTick()
+    // run the tick immediately, but in the next pass of the event loop so that
+    // #_initialize can be allowed to complete without recursively waiting on
+    // itself
+    setTimeout(async () => {
+      await this.initializePromise
+      await this._autoRefreshTokenTick()
+    }, 0)
   }
 
   /**
@@ -1718,38 +1895,51 @@ export default class GoTrueClient {
     this._debug('#_autoRefreshTokenTick()', 'begin')
 
     try {
-      const now = Date.now()
+      await this._acquireLock(0, async () => {
+        try {
+          const now = Date.now()
 
-      try {
-        return await this._useSession(async (result) => {
-          const {
-            data: { session },
-          } = result
+          try {
+            return await this._useSession(async (result) => {
+              const {
+                data: { session },
+              } = result
 
-          if (!session || !session.refresh_token || !session.expires_at) {
-            this._debug('#_autoRefreshTokenTick()', 'no session')
-            return
+              if (!session || !session.refresh_token || !session.expires_at) {
+                this._debug('#_autoRefreshTokenTick()', 'no session')
+                return
+              }
+
+              // session will expire in this many ticks (or has already expired if <= 0)
+              const expiresInTicks = Math.floor(
+                (session.expires_at * 1000 - now) / AUTO_REFRESH_TICK_DURATION
+              )
+
+              this._debug(
+                '#_autoRefreshTokenTick()',
+                `access token expires in ${expiresInTicks} ticks, a tick lasts ${AUTO_REFRESH_TICK_DURATION}ms, refresh threshold is ${AUTO_REFRESH_TICK_THRESHOLD} ticks`
+              )
+
+              if (expiresInTicks <= AUTO_REFRESH_TICK_THRESHOLD) {
+                await this._callRefreshToken(session.refresh_token)
+              }
+            })
+          } catch (e: any) {
+            console.error(
+              'Auto refresh tick failed with error. This is likely a transient error.',
+              e
+            )
           }
-
-          // session will expire in this many ticks (or has already expired if <= 0)
-          const expiresInTicks = Math.floor(
-            (session.expires_at * 1000 - now) / AUTO_REFRESH_TICK_DURATION
-          )
-
-          this._debug(
-            '#_autoRefreshTokenTick()',
-            `access token expires in ${expiresInTicks} ticks, a tick lasts ${AUTO_REFRESH_TICK_DURATION}ms, refresh threshold is ${AUTO_REFRESH_TICK_THRESHOLD} ticks`
-          )
-
-          if (expiresInTicks <= AUTO_REFRESH_TICK_THRESHOLD) {
-            await this._callRefreshToken(session.refresh_token)
-          }
-        })
-      } catch (e: any) {
-        console.error('Auto refresh tick failed with error. This is likely a transient error.', e)
+        } finally {
+          this._debug('#_autoRefreshTokenTick()', 'end')
+        }
+      })
+    } catch (e: any) {
+      if (e.isAcquireTimeout) {
+        this._debug('auto refresh token tick lock not available')
+      } else {
+        throw e
       }
-    } finally {
-      this._debug('#_autoRefreshTokenTick()', 'end')
     }
   }
 
@@ -1786,25 +1976,38 @@ export default class GoTrueClient {
   /**
    * Callback registered with `window.addEventListener('visibilitychange')`.
    */
-  private async _onVisibilityChanged(isInitial: boolean) {
-    this._debug(`#_onVisibilityChanged(${isInitial})`, 'visibilityState', document.visibilityState)
+  private async _onVisibilityChanged(calledFromInitialize: boolean) {
+    const methodName = `#_onVisibilityChanged(${calledFromInitialize})`
+    this._debug(methodName, 'visibilityState', document.visibilityState)
 
     if (document.visibilityState === 'visible') {
-      if (!isInitial) {
-        // initial visibility change setup is handled in another flow under #initialize()
-        await this.initializePromise
-        await this._recoverAndRefresh()
-
-        this._debug(
-          '#_onVisibilityChanged()',
-          'finished waiting for initialize, _recoverAndRefresh'
-        )
-      }
-
       if (this.autoRefreshToken) {
         // in browser environments the refresh token ticker runs only on focused tabs
         // which prevents race conditions
         this._startAutoRefresh()
+      }
+
+      if (!calledFromInitialize) {
+        // called when the visibility has changed, i.e. the browser
+        // transitioned from hidden -> visible so we need to see if the session
+        // should be recovered immediately... but to do that we need to acquire
+        // the lock first asynchronously
+        await this.initializePromise
+
+        await this._acquireLock(-1, async () => {
+          if (document.visibilityState !== 'visible') {
+            this._debug(
+              methodName,
+              'acquired the lock to recover the session, but the browser visibilityState is no longer visible, aborting'
+            )
+
+            // visibility has changed while waiting for the lock, abort
+            return
+          }
+
+          // recover the session
+          await this._recoverAndRefresh()
+        })
       }
     } else if (document.visibilityState === 'hidden') {
       if (this.autoRefreshToken) {
@@ -2020,7 +2223,7 @@ export default class GoTrueClient {
     const {
       data: { user },
       error: userError,
-    } = await this.getUser()
+    } = await this._getUser()
     if (userError) {
       return { data: null, error: userError }
     }
