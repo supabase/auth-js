@@ -95,6 +95,10 @@ export type AuthResponse =
       }
       error: AuthError
     }
+  | {
+      code: string
+      message: string
+    }
 
 /**
  * AuthOtpResponse is returned when OTP is used.
