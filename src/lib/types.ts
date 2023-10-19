@@ -34,6 +34,7 @@ export type AuthChangeEvent =
   | 'SIGNED_OUT'
   | 'TOKEN_REFRESHED'
   | 'USER_UPDATED'
+  | 'REFRESH_TOKEN_FAILED'
   | AuthChangeEventMFA
 
 /**

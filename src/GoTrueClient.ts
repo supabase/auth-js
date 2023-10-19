@@ -1729,6 +1729,7 @@ export default class GoTrueClient {
         const result = { session: null, error }
 
         this.refreshingDeferred?.resolve(result)
+        await this._notifyAllSubscribers('REFRESH_TOKEN_FAILED', null)
 
         return result
       }
