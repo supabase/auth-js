@@ -592,6 +592,12 @@ export interface VerifyTokenHashParams {
 }
 
 export type MobileOtpType = 'sms' | 'phone_change'
+
+/**
+ * Represents the type of email OTP.
+ * @deprecated 'signup' and 'magiclink' are deprecated, use 'email' instead.
+ * @seee https://supabase.com/docs/reference/javascript/auth-verifyotp#auth-verifyotp
+ */
 export type EmailOtpType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change' | 'email'
 
 export type ResendParams =
