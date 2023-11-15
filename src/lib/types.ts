@@ -820,7 +820,7 @@ export type AuthMFAEnrollResponse =
            * to use it. Avoid loggin this value to the console. */
           uri: string
         }
-        /** Friendly Name of the Factor **/
+        /** Friendly name of the factor, useful for distinguishing between factors **/
         friendly_name: string
       }
       error: null
