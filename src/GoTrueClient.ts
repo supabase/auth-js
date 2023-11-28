@@ -5,7 +5,6 @@ import {
   AuthImplicitGrantRedirectError,
   AuthPKCEGrantCodeExchangeError,
   AuthInvalidCredentialsError,
-  AuthRetryableFetchError,
   AuthSessionMissingError,
   AuthInvalidTokenResponseError,
   AuthUnknownError,
@@ -1794,13 +1793,7 @@ export default class GoTrueClient {
   private async _saveSession(session: Session) {
     this._debug('#_saveSession()', session)
 
-    await this._persistSession(session)
-  }
-
-  private _persistSession(currentSession: Session) {
-    this._debug('#_persistSession()', currentSession)
-
-    return setItemAsync(this.storage, this.storageKey, currentSession)
+    await setItemAsync(this.storage, this.storageKey, session)
   }
 
   private async _removeSession() {
