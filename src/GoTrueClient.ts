@@ -499,11 +499,16 @@ export default class GoTrueClient {
     })
   }
 
-  private async _exchangeCodeForSession(authCode: string): Promise<AuthTokenResponse> {
-    const [codeVerifier, type] = (
+  private async _exchangeCodeForSession(authCode: string): Promise<
+    | {
+        data: { session: Session; user: User; redirectType: string | null }
+        error: null
+      }
+    | { data: { session: null; user: null; redirectType: null }; error: AuthError }
+  > {
+    const [codeVerifier, redirectType] = (
       (await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)) as string
     ).split('/')
-    const isPasswordRecoveryFlow = type === 'PASSWORD_RECOVERY'
     const { data, error } = await _request(
       this.fetch,
       'POST',
@@ -519,19 +524,18 @@ export default class GoTrueClient {
     )
     await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
     if (error) {
-      return { data: { user: null, session: null }, error }
+      return { data: { user: null, session: null, redirectType: null }, error }
     } else if (!data || !data.session || !data.user) {
-      return { data: { user: null, session: null }, error: new AuthInvalidTokenResponseError() }
+      return {
+        data: { user: null, session: null, redirectType: null },
+        error: new AuthInvalidTokenResponseError(),
+      }
     }
     if (data.session) {
       await this._saveSession(data.session)
-      if (isPasswordRecoveryFlow) {
-        await this._notifyAllSubscribers('PASSWORD_RECOVERY', data.session)
-      } else {
-        await this._notifyAllSubscribers('SIGNED_IN', data.session)
-      }
+      await this._notifyAllSubscribers('SIGNED_IN', data.session)
     }
-    return { data, error }
+    return { data: { ...data, redirectType: redirectType ?? null }, error }
   }
 
   /**
