@@ -500,10 +500,10 @@ export default class GoTrueClient {
   }
 
   private async _exchangeCodeForSession(authCode: string): Promise<AuthTokenResponse> {
-    const [codeVerifier, flow] = (
+    const [codeVerifier, type] = (
       (await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)) as string
     ).split('/')
-    const isPasswordRecoveryFlow = flow === 'PASSWORD_RECOVERY'
+    const isPasswordRecoveryFlow = type === 'PASSWORD_RECOVERY'
     const { data, error } = await _request(
       this.fetch,
       'POST',
