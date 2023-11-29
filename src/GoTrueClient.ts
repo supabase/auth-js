@@ -500,7 +500,10 @@ export default class GoTrueClient {
   }
 
   private async _exchangeCodeForSession(authCode: string): Promise<AuthTokenResponse> {
-    const codeVerifier = await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)
+    const [codeVerifier, flow] = (
+      (await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)) as string
+    ).split('/')
+    const isPasswordRecoveryFlow = flow === 'PASSWORD_RECOVERY'
     const { data, error } = await _request(
       this.fetch,
       'POST',
@@ -522,7 +525,11 @@ export default class GoTrueClient {
     }
     if (data.session) {
       await this._saveSession(data.session)
-      await this._notifyAllSubscribers('SIGNED_IN', data.session)
+      if (isPasswordRecoveryFlow) {
+        await this._notifyAllSubscribers('PASSWORD_RECOVERY', data.session)
+      } else {
+        await this._notifyAllSubscribers('SIGNED_IN', data.session)
+      }
     }
     return { data, error }
   }
@@ -1538,7 +1545,11 @@ export default class GoTrueClient {
     let codeChallengeMethod: string | null = null
     if (this.flowType === 'pkce') {
       const codeVerifier = generatePKCEVerifier()
-      await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
+      await setItemAsync(
+        this.storage,
+        `${this.storageKey}-code-verifier`,
+        `${codeVerifier}/PASSWORD_RECOVERY`
+      )
       codeChallenge = await generatePKCEChallenge(codeVerifier)
       codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
     }
