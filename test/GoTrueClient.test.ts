@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { AuthError } from '../src/lib/errors'
 import {
   authClient as auth,
@@ -183,12 +184,15 @@ describe('GoTrueClient', () => {
       // @ts-expect-error 'Allow access to protected storageKey'
       const storageKey = authWithSession.storageKey
 
+      const value = Buffer.from(
+        (await storage.getItem(storageKey)) || Buffer.from('null').toString('base64url'),
+        'base64url'
+      ).toString('utf8')
       await storage.setItem(
         storageKey,
-        JSON.stringify({
-          ...JSON.parse((await storage.getItem(storageKey)) || 'null'),
-          expires_at: expiredSeconds,
-        })
+        Buffer.from(JSON.stringify({ ...JSON.parse(value), expires_at: expiredSeconds })).toString(
+          'base64url'
+        )
       )
 
       // wait 1 seconds before calling getSession()

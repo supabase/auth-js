@@ -116,12 +116,18 @@ export const looksLikeFetchResponse = (maybeResponse: unknown): maybeResponse is
 export const setItemAsync = async (
   storage: SupportedStorage,
   key: string,
-  data: any
+  data: any,
+  base64 = false
 ): Promise<void> => {
-  await storage.setItem(key, JSON.stringify(data))
+  const value = JSON.stringify(data)
+  await storage.setItem(key, base64 ? encodeBase64URL(value) : value)
 }
 
-export const getItemAsync = async (storage: SupportedStorage, key: string): Promise<unknown> => {
+export const getItemAsync = async (
+  storage: SupportedStorage,
+  key: string,
+  base64 = false
+): Promise<unknown> => {
   const value = await storage.getItem(key)
 
   if (!value) {
@@ -129,7 +135,7 @@ export const getItemAsync = async (storage: SupportedStorage, key: string): Prom
   }
 
   try {
-    return JSON.parse(value)
+    return JSON.parse(base64 ? decodeBase64URL(value) : value)
   } catch {
     return value
   }
@@ -137,6 +143,12 @@ export const getItemAsync = async (storage: SupportedStorage, key: string): Prom
 
 export const removeItemAsync = async (storage: SupportedStorage, key: string): Promise<void> => {
   await storage.removeItem(key)
+}
+
+const encoder = new TextEncoder()
+
+export function encodeBase64URL(value: string): string {
+  return base64urlencode(Array.from(encoder.encode(value), (c) => String.fromCharCode(c)).join(''))
 }
 
 export function decodeBase64URL(value: string): string {

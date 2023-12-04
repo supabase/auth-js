@@ -993,7 +993,7 @@ export default class GoTrueClient {
     try {
       let currentSession: Session | null = null
 
-      const maybeSession = await getItemAsync(this.storage, this.storageKey)
+      const maybeSession = await getItemAsync(this.storage, this.storageKey, true)
 
       this._debug('#getSession()', 'session from storage', maybeSession)
 
@@ -1665,7 +1665,7 @@ export default class GoTrueClient {
     this._debug(debugName, 'begin')
 
     try {
-      const currentSession = await getItemAsync(this.storage, this.storageKey)
+      const currentSession = await getItemAsync(this.storage, this.storageKey, true)
       this._debug(debugName, 'session from storage', currentSession)
 
       if (!this._isValidSession(currentSession)) {
@@ -1820,7 +1820,8 @@ export default class GoTrueClient {
   private _persistSession(currentSession: Session) {
     this._debug('#_persistSession()', currentSession)
 
-    return setItemAsync(this.storage, this.storageKey, currentSession)
+    // encode the session in base64 for storages such as cookie
+    return setItemAsync(this.storage, this.storageKey, currentSession, true)
   }
 
   private async _removeSession() {
