@@ -286,6 +286,15 @@ export default class GoTrueClient {
         if (error) {
           this._debug('#_initialize()', 'error detecting session from URL', error)
 
+          // hacky workaround to keep the existing session if there's an error returned from identity linking
+          // TODO: once error codes are ready, we should match against it instead of the message
+          if (
+            error?.message === 'Identity is already linked' ||
+            error?.message === 'Identity is already linked to another user'
+          ) {
+            return { error }
+          }
+
           // failed login attempt via url,
           // remove old session as in verifyOtp, signUp and signInWith*
           await this._removeSession()
