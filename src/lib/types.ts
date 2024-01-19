@@ -821,7 +821,7 @@ export type AuthMFAEnrollResponse =
           uri: string
         }
         /** Friendly name of the factor, useful for distinguishing between factors **/
-        friendly_name: string
+        friendly_name?: string
       }
       error: null
     }
