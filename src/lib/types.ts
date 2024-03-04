@@ -452,6 +452,13 @@ export interface UpdatableFactorAttributes {
   friendlyName: string
 }
 
+export type SignInAnonymouslyCredentials = {
+  options?: {
+    data?: object
+    captchaToken?: string
+  }
+}
+
 export type SignUpWithPasswordCredentials =
   | {
       /** The user's email address. */
