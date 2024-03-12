@@ -571,28 +571,32 @@ export default class GoTrueClient {
     await this.initializePromise
 
     return this._acquireLock(-1, async () => {
-      return this._exchangeCodeForSession(authCode)
+      return this._exchangeCodeForSession(authCode, this.flowType)
     })
   }
 
-  private async _exchangeCodeForSession(authCode: string): Promise<
+  private async _exchangeCodeForSession(
+    authCode: string,
+    flowType: AuthFlowType
+  ): Promise<
     | {
         data: { session: Session; user: User; redirectType: string | null }
         error: null
       }
     | { data: { session: null; user: null; redirectType: null }; error: AuthError }
   > {
+    // TODO: wrap to only call when using PKCE flow
     const storageItem = await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)
     const [codeVerifier, redirectType] = ((storageItem ?? '') as string).split('/')
     const { data, error } = await _request(
       this.fetch,
       'POST',
-      `${this.url}/token?grant_type=pkce`,
+      `${this.url}/token?grant_type={flowType}`,
       {
         headers: this.headers,
         body: {
           auth_code: authCode,
-          code_verifier: codeVerifier,
+          code_verifier: this.flowType === 'pkce' ? codeVerifier : null,
         },
         xform: _sessionResponse,
       }
@@ -1429,7 +1433,7 @@ export default class GoTrueClient {
   /**
    * Gets the session data from a URL string
    */
-  private async _getSessionFromURL(isPKCEFlow: boolean): Promise<
+  private async _getSessionFromURL(isCodeFlow: boolean): Promise<
     | {
         data: { session: Session; redirectType: string | null }
         error: null
@@ -1440,15 +1444,16 @@ export default class GoTrueClient {
       if (!isBrowser()) throw new AuthImplicitGrantRedirectError('No browser detected.')
       if (this.flowType === 'implicit' && !this._isImplicitGrantFlow()) {
         throw new AuthImplicitGrantRedirectError('Not a valid implicit grant flow url.')
-      } else if (this.flowType == 'pkce' && !isPKCEFlow) {
-        throw new AuthPKCEGrantCodeExchangeError('Not a valid PKCE flow url.')
+      } else if (isCodeFlowType(this.flowType) && !isCodeFlow) {
+        throw new AuthPKCEGrantCodeExchangeError('Not a valid PKCE or code flow url.')
       }
 
       const params = parseParametersFromURL(window.location.href)
 
-      if (isPKCEFlow) {
+      if (isCodeFlow) {
+        // TODO: Adjust this error to be generic
         if (!params.code) throw new AuthPKCEGrantCodeExchangeError('No code detected.')
-        const { data, error } = await this._exchangeCodeForSession(params.code)
+        const { data, error } = await this._exchangeCodeForSession(params.code, this.flowType)
         if (error) throw error
 
         const url = new URL(window.location.href)
