@@ -591,7 +591,7 @@ export default class GoTrueClient {
     const { data, error } = await _request(
       this.fetch,
       'POST',
-      `${this.url}/token?grant_type={flowType}`,
+      `${this.url}/token?grant_type=${flowType}`,
       {
         headers: this.headers,
         body: {
@@ -2353,7 +2353,7 @@ export default class GoTrueClient {
       if (this.flowType === 'pkce' && codeChallenge && codeChallengeMethod) {
         flowParams.append('code_challenge', encodeURIComponent(codeChallenge))
         flowParams.append('code_challenge_method', encodeURIComponent(codeChallengeMethod))
-      } else if (this.flowType) {
+      } else if (this.flowType == 'pkce') {
         // TODO: come back and handle this - this shouldn't happen
         throw 'unexpected error, code challenge method and code challenge should not be null'
       }
