@@ -1,4 +1,4 @@
-import { SupportedStorage } from './types'
+import { SupportedStorage, AuthFlowType } from './types'
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
   return timeNow + expiresIn
@@ -305,11 +305,16 @@ export async function generatePKCEChallenge(verifier: string) {
   return base64urlencode(hashed)
 }
 
-export async function getCodeChallengeAndMethod(
+export async function getCodeFlowParams(
   storage: SupportedStorage,
   storageKey: string,
+  flowType: AuthFlowType,
   isPasswordRecovery = false
 ) {
+  const responseType = 'code'
+  if (isAuthCodeFlowType(flowType)) {
+    return [null, null, responseType]
+  }
   const codeVerifier = generatePKCEVerifier()
   let storedCodeVerifier = codeVerifier
   if (isPasswordRecovery) {
@@ -318,5 +323,18 @@ export async function getCodeChallengeAndMethod(
   await setItemAsync(storage, `${storageKey}-code-verifier`, storedCodeVerifier)
   const codeChallenge = await generatePKCEChallenge(codeVerifier)
   const codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
-  return [codeChallenge, codeChallengeMethod]
+
+  return [codeChallenge, codeChallengeMethod, responseType]
+}
+
+function isPKCEFlowType(flowType: AuthFlowType) {
+  return flowType === 'pkce'
+}
+
+function isAuthCodeFlowType(flowType: AuthFlowType) {
+  return flowType === 'code'
+}
+
+export function isCodeFlowType(flowType: AuthFlowType) {
+  return isAuthCodeFlowType(flowType) || isPKCEFlowType(flowType)
 }

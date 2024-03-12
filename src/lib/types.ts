@@ -562,7 +562,7 @@ export type SignInWithPasswordlessCredentials =
       }
     }
 
-export type AuthFlowType = 'implicit' | 'pkce'
+export type AuthFlowType = 'implicit' | 'pkce' | 'code'
 export type SignInWithOAuthCredentials = {
   /** One of the providers supported by GoTrue. */
   provider: Provider
