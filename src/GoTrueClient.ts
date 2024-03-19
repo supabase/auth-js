@@ -118,8 +118,6 @@ export default class GoTrueClient {
 
   private instanceID: number
 
-  private static memoryLeakWarningIssued: boolean = false;
-
   /**
    * Namespace for the GoTrue admin methods.
    * These methods should only be used in a trusted server-side environment.
@@ -170,6 +168,7 @@ export default class GoTrueClient {
   protected logger: (message: string, ...args: any[]) => void = console.log
 
   protected insecureGetSessionWarningShown = false
+  private static memoryLeakWarningIssued = false
 
   /**
    * Create a new client for use in the browser.
