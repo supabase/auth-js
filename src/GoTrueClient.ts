@@ -118,6 +118,8 @@ export default class GoTrueClient {
 
   private instanceID: number
 
+  private static memoryLeakWarningIssued: boolean = false;
+
   /**
    * Namespace for the GoTrue admin methods.
    * These methods should only be used in a trusted server-side environment.
@@ -2096,8 +2098,9 @@ export default class GoTrueClient {
       willUnref = true
     }
 
-    if(!willUnref) {
+    if(!willUnref && !GoTrueClient.memoryLeakWarningIssued) { // prevents the warning from being spammed / shown multiple times
       console.warn("[GoTrueClient] dereferencing setInterval is not supported in your JavaScript Runtime. This will cause memory leaks unless you call the `stopAutoRefresh` method before losing the last reference to a `GoTrueClient` instance. If you are using `supabase-js`, this can be accomplished by calling `supabase.auth.stopAutoRefresh()`. For more information, see https://github.com/supabase/gotrue-js/issues/856");
+      GoTrueClient.memoryLeakWarningIssued = true;
     }
 
     // run the tick immediately, but in the next pass of the event loop so that
