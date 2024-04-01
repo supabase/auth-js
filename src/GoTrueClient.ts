@@ -1174,7 +1174,7 @@ export default class GoTrueClient {
       return await this._getUser()
     })
 
-    if (result.data && this.storage.isServer) {
+    if (!result.error && this.storage.isServer) {
       // no longer emit the insecure warning for getSession() as the access_token is now authenticated
       this.insecureGetSessionWarningShown = true
     }
