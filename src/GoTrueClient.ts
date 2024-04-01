@@ -1812,7 +1812,7 @@ export default class GoTrueClient {
       // will attempt to refresh the token with exponential backoff
       return await retryable(
         async (attempt) => {
-          await sleep(Math.pow(200, attempt)) // 0, 200, 400, 800, ...
+          await sleep(100 * Math.pow(2, attempt)) // 0, 200, 400, 800, ...
 
           this._debug(debugName, 'refreshing attempt', attempt)
 
@@ -1827,7 +1827,7 @@ export default class GoTrueClient {
           result.error &&
           isAuthRetryableFetchError(result.error) &&
           // retryable only if the request can be sent before the backoff overflows the tick duration
-          Date.now() + Math.pow(200, attempt + 1) - startedAt < AUTO_REFRESH_TICK_DURATION
+          Date.now() + 200 * Math.pow(2, attempt + 1) - startedAt < AUTO_REFRESH_TICK_DURATION
       )
     } catch (error) {
       this._debug(debugName, 'error', error)
