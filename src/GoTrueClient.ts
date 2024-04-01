@@ -1812,7 +1812,7 @@ export default class GoTrueClient {
       // will attempt to refresh the token with exponential backoff
       return await retryable(
         async (attempt) => {
-          await sleep(100 * Math.pow(2, attempt)) // 0, 200, 400, 800, ...
+          await sleep(200 * Math.pow(2, attempt)) // 0, 200, 400, 800, ...
 
           this._debug(debugName, 'refreshing attempt', attempt)
 
