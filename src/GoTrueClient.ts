@@ -31,10 +31,9 @@ import {
   uuid,
   retryable,
   sleep,
-  generatePKCEVerifier,
-  generatePKCEChallenge,
   supportsLocalStorage,
   parseParametersFromURL,
+  getCodeChallengeAndMethod,
 } from './lib/helpers'
 import { localStorageAdapter, memoryLocalStorageAdapter } from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
@@ -87,7 +86,7 @@ import type {
   AuthFlowType,
   LockFunc,
   UserIdentity,
-  WeakPassword,
+  SignInAnonymouslyCredentials,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -362,6 +361,46 @@ export default class GoTrueClient {
   }
 
   /**
+   * Creates a new anonymous user.
+   *
+   * @returns A session where the is_anonymous claim in the access token JWT set to true
+   */
+  async signInAnonymously(credentials?: SignInAnonymouslyCredentials): Promise<AuthResponse> {
+    try {
+      await this._removeSession()
+
+      const res = await _request(this.fetch, 'POST', `${this.url}/signup`, {
+        headers: this.headers,
+        body: {
+          data: credentials?.options?.data ?? {},
+          gotrue_meta_security: { captcha_token: credentials?.options?.captchaToken },
+        },
+        xform: _sessionResponse,
+      })
+      const { data, error } = res
+
+      if (error || !data) {
+        return { data: { user: null, session: null }, error: error }
+      }
+      const session: Session | null = data.session
+      const user: User | null = data.user
+
+      if (data.session) {
+        await this._saveSession(data.session)
+        await this._notifyAllSubscribers('SIGNED_IN', session)
+      }
+
+      return { data: { user, session }, error: null }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error }
+      }
+
+      throw error
+    }
+  }
+
+  /**
    * Creates a new user.
    *
    * Be aware that if a user account exists in the system you may get back an
@@ -384,10 +423,10 @@ export default class GoTrueClient {
         let codeChallenge: string | null = null
         let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce') {
-          const codeVerifier = generatePKCEVerifier()
-          await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
-          codeChallenge = await generatePKCEChallenge(codeVerifier)
-          codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
+          ;[codeChallenge, codeChallengeMethod] = await getCodeChallengeAndMethod(
+            this.storage,
+            this.storageKey
+          )
         }
         res = await _request(this.fetch, 'POST', `${this.url}/signup`, {
           headers: this.headers,
@@ -682,10 +721,10 @@ export default class GoTrueClient {
         let codeChallenge: string | null = null
         let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce') {
-          const codeVerifier = generatePKCEVerifier()
-          await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
-          codeChallenge = await generatePKCEChallenge(codeVerifier)
-          codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
+          ;[codeChallenge, codeChallengeMethod] = await getCodeChallengeAndMethod(
+            this.storage,
+            this.storageKey
+          )
         }
         const { error } = await _request(this.fetch, 'POST', `${this.url}/otp`, {
           headers: this.headers,
@@ -814,10 +853,10 @@ export default class GoTrueClient {
       let codeChallenge: string | null = null
       let codeChallengeMethod: string | null = null
       if (this.flowType === 'pkce') {
-        const codeVerifier = generatePKCEVerifier()
-        await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
-        codeChallenge = await generatePKCEChallenge(codeVerifier)
-        codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
+        ;[codeChallenge, codeChallengeMethod] = await getCodeChallengeAndMethod(
+          this.storage,
+          this.storageKey
+        )
       }
 
       return await _request(this.fetch, 'POST', `${this.url}/sso`, {
@@ -1275,10 +1314,10 @@ export default class GoTrueClient {
         let codeChallenge: string | null = null
         let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce' && attributes.email != null) {
-          const codeVerifier = generatePKCEVerifier()
-          await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
-          codeChallenge = await generatePKCEChallenge(codeVerifier)
-          codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
+          ;[codeChallenge, codeChallengeMethod] = await getCodeChallengeAndMethod(
+            this.storage,
+            this.storageKey
+          )
         }
 
         const { data, error: userError } = await _request(this.fetch, 'PUT', `${this.url}/user`, {
@@ -1703,15 +1742,13 @@ export default class GoTrueClient {
   > {
     let codeChallenge: string | null = null
     let codeChallengeMethod: string | null = null
+
     if (this.flowType === 'pkce') {
-      const codeVerifier = generatePKCEVerifier()
-      await setItemAsync(
+      ;[codeChallenge, codeChallengeMethod] = await getCodeChallengeAndMethod(
         this.storage,
-        `${this.storageKey}-code-verifier`,
-        `${codeVerifier}/PASSWORD_RECOVERY`
+        this.storageKey,
+        true // isPasswordRecovery
       )
-      codeChallenge = await generatePKCEChallenge(codeVerifier)
-      codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
     }
     try {
       return await _request(this.fetch, 'POST', `${this.url}/recover`, {
@@ -2342,19 +2379,9 @@ export default class GoTrueClient {
       urlParams.push(`scopes=${encodeURIComponent(options.scopes)}`)
     }
     if (this.flowType === 'pkce') {
-      const codeVerifier = generatePKCEVerifier()
-      await setItemAsync(this.storage, `${this.storageKey}-code-verifier`, codeVerifier)
-      const codeChallenge = await generatePKCEChallenge(codeVerifier)
-      const codeChallengeMethod = codeVerifier === codeChallenge ? 'plain' : 's256'
-
-      this._debug(
-        'PKCE',
-        'code verifier',
-        `${codeVerifier.substring(0, 5)}...`,
-        'code challenge',
-        codeChallenge,
-        'method',
-        codeChallengeMethod
+      const [codeChallenge, codeChallengeMethod] = await getCodeChallengeAndMethod(
+        this.storage,
+        this.storageKey
       )
 
       const flowParams = new URLSearchParams({

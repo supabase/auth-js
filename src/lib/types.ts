@@ -339,6 +339,7 @@ export interface User {
   role?: string
   updated_at?: string
   identities?: UserIdentity[]
+  is_anonymous?: boolean
   factors?: Factor[]
 }
 
@@ -366,7 +367,7 @@ export interface UserAttributes {
   nonce?: string
 
   /**
-   * A custom data object to store the user's metadata. This maps to the `auth.users.user_metadata` column.
+   * A custom data object to store the user's metadata. This maps to the `auth.users.raw_user_meta_data` column.
    *
    * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
    *
@@ -376,7 +377,7 @@ export interface UserAttributes {
 
 export interface AdminUserAttributes extends Omit<UserAttributes, 'data'> {
   /**
-   * A custom data object to store the user's metadata. This maps to the `auth.users.user_metadata` column.
+   * A custom data object to store the user's metadata. This maps to the `auth.users.raw_user_meta_data` column.
    *
    *
    * The `user_metadata` should be a JSON object that includes user-specific info, such as their first and last name.
@@ -452,6 +453,19 @@ export interface UpdatableFactorAttributes {
   friendlyName: string
 }
 
+export type SignInAnonymouslyCredentials = {
+  options?: {
+    /**
+     * A custom data object to store the user's metadata. This maps to the `auth.users.raw_user_meta_data` column.
+     *
+     * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
+     */
+    data?: object
+    /** Verification token received when the user completes the captcha on the site. */
+    captchaToken?: string
+  }
+}
+
 export type SignUpWithPasswordCredentials =
   | {
       /** The user's email address. */
@@ -462,7 +476,7 @@ export type SignUpWithPasswordCredentials =
         /** The redirect url embedded in the email link */
         emailRedirectTo?: string
         /**
-         * A custom data object to store the user's metadata. This maps to the `auth.users.user_metadata` column.
+         * A custom data object to store the user's metadata. This maps to the `auth.users.raw_user_meta_data` column.
          *
          * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
          */
@@ -478,7 +492,7 @@ export type SignUpWithPasswordCredentials =
       password: string
       options?: {
         /**
-         * A custom data object to store the user's metadata. This maps to the `auth.users.user_metadata` column.
+         * A custom data object to store the user's metadata. This maps to the `auth.users.raw_user_meta_data` column.
          *
          * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
          */
@@ -521,7 +535,7 @@ export type SignInWithPasswordlessCredentials =
         /** If set to false, this method will not create a new user. Defaults to true. */
         shouldCreateUser?: boolean
         /**
-         * A custom data object to store the user's metadata. This maps to the `auth.users.user_metadata` column.
+         * A custom data object to store the user's metadata. This maps to the `auth.users.raw_user_meta_data` column.
          *
          * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
          */
@@ -537,7 +551,7 @@ export type SignInWithPasswordlessCredentials =
         /** If set to false, this method will not create a new user. Defaults to true. */
         shouldCreateUser?: boolean
         /**
-         * A custom data object to store the user's metadata. This maps to the `auth.users.user_metadata` column.
+         * A custom data object to store the user's metadata. This maps to the `auth.users.raw_user_meta_data` column.
          *
          * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
          */
@@ -708,7 +722,7 @@ export type GenerateEmailChangeLinkParams = {
 
 export interface GenerateLinkOptions {
   /**
-   * A custom data object to store the user's metadata. This maps to the `auth.users.user_metadata` column.
+   * A custom data object to store the user's metadata. This maps to the `auth.users.raw_user_meta_data` column.
    *
    * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
    */
