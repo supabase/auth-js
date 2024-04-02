@@ -339,7 +339,7 @@ export interface User {
   role?: string
   updated_at?: string
   identities?: UserIdentity[]
-  is_anonymous: boolean
+  is_anonymous?: boolean
   factors?: Factor[]
 }
 
