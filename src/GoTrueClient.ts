@@ -168,6 +168,7 @@ export default class GoTrueClient {
   protected logger: (message: string, ...args: any[]) => void = console.log
 
   protected insecureGetSessionWarningShown = false
+  private static memoryLeakWarningShown = false
 
   /**
    * Create a new client for use in the browser.
@@ -2077,6 +2078,7 @@ export default class GoTrueClient {
     const ticker = setInterval(() => this._autoRefreshTokenTick(), AUTO_REFRESH_TICK_DURATION)
     this.autoRefreshTicker = ticker
 
+    let willUnref = false
     if (ticker && typeof ticker === 'object' && typeof ticker.unref === 'function') {
       // ticker is a NodeJS Timeout object that has an `unref` method
       // https://nodejs.org/api/timers.html#timeoutunref
@@ -2085,12 +2087,19 @@ export default class GoTrueClient {
       // finished and tests run endlessly. This can be prevented by calling
       // `unref()` on the returned object.
       ticker.unref()
+      willUnref = true
       // @ts-ignore
     } else if (typeof Deno !== 'undefined' && typeof Deno.unrefTimer === 'function') {
       // similar like for NodeJS, but with the Deno API
       // https://deno.land/api@latest?unstable&s=Deno.unrefTimer
       // @ts-ignore
       Deno.unrefTimer(ticker)
+      willUnref = true
+    }
+
+    if(!willUnref && !GoTrueClient.memoryLeakWarningShown && (typeof isBrowser !== "function" || !isBrowser())) { // prevents the warning from being spammed / shown multiple times
+      console.warn("[GoTrueClient] dereferencing `setInterval` is not supported in your JavaScript Runtime. This will cause memory leaks unless you call the `stopAutoRefresh` method before losing the last reference to a `GoTrueClient` instance. If you are using `supabase-js`, this can be accomplished by calling `supabase.auth.stopAutoRefresh()`. For more information, see https://github.com/supabase/gotrue-js/issues/856")
+      GoTrueClient.memoryLeakWarningShown = true
     }
 
     // run the tick immediately, but in the next pass of the event loop so that
