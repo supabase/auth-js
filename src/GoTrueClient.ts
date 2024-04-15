@@ -1824,12 +1824,11 @@ export default class GoTrueClient {
             xform: _sessionResponse,
           })
         },
-        (attempt, _, result) => {
+        (attempt, error) => {
           const nextBackOffInterval = 200 * Math.pow(2, attempt)
           return (
-            result &&
-            result.error &&
-            isAuthRetryableFetchError(result.error) &&
+            error &&
+            isAuthRetryableFetchError(error) &&
             // retryable only if the request can be sent before the backoff overflows the tick duration
             Date.now() + nextBackOffInterval - startedAt < AUTO_REFRESH_TICK_DURATION
           )
