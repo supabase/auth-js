@@ -81,7 +81,8 @@ export type GoTrueClientOptions = {
    */
   lock?: LockFunc
   /**
-   * Set to "true" if there is a custom authorization header
+   * Set to "true" if there is a custom authorization header set globally.
+   * @experimental
    */
   hasCustomAuthorizationHeader?: boolean
 }
