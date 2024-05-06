@@ -974,6 +974,10 @@ describe('GoTrueClient with storageisServer = true', () => {
         'Using the user object as returned from supabase.auth.getSession() '
       )
     ).toEqual(true)
+
+    const user2 = session?.user // accessing the user object a second time should not emit another warning
+    expect(user2).not.toBeNull()
+    expect(warnings.length).toEqual(1)
   })
 
   test('getSession emits no warnings if getUser is called prior', async () => {
