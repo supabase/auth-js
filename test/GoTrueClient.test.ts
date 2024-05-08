@@ -10,6 +10,7 @@ import {
   clientApiAutoConfirmDisabledClient as signUpDisabledClient,
   clientApiAutoConfirmEnabledClient as signUpEnabledClient,
   authAdminApiAutoConfirmEnabledClient,
+  GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
 
@@ -100,15 +101,6 @@ describe('GoTrueClient', () => {
       })
       expect(error).toBeNull()
       expect(data.session).not.toBeNull()
-
-      /**
-       * Sign out the user to verify setSession, getSession and updateUser
-       * are truly working; because the signUp method will already save the session.
-       * And that session will be available to getSession and updateUser,
-       * even if setSession isn't called or fails to save the session.
-       * The tokens are still valid after logout, and therefore usable.
-       */
-      await authWithSession.signOut()
 
       const {
         data: { session },
@@ -363,7 +355,8 @@ describe('GoTrueClient', () => {
       expect(data.session).toBeNull()
       expect(data.user).toBeNull()
 
-      expect(error?.message).toEqual('Error sending confirmation sms: missing Twilio account SID')
+      expect(error?.message).toEqual('Unable to get SMS provider')
+      expect(error?.status).toEqual(500)
     })
 
     test('signUp() with phone', async () => {
@@ -950,7 +943,7 @@ describe('GoTrueClient with storageisServer = true', () => {
     expect(warnings.length).toEqual(0)
   })
 
-  test('getSession() emits one insecure warning', async () => {
+  test('getSession() emits insecure warning when user object is accessed', async () => {
     const storage = memoryLocalStorageAdapter({
       [STORAGE_KEY]: JSON.stringify({
         access_token: 'jwt.accesstoken.signature',
@@ -969,19 +962,46 @@ describe('GoTrueClient with storageisServer = true', () => {
       storage,
     })
 
-    await client.getUser() // should suppress the first warning
-
     const {
       data: { session },
     } = await client.getSession()
 
-    console.log('User is ', session!.user!.id)
-
+    const user = session?.user // accessing the user object from getSession should emit a warning
+    expect(user).not.toBeNull()
     expect(warnings.length).toEqual(1)
     expect(
       warnings[0][0].startsWith(
         'Using the user object as returned from supabase.auth.getSession() '
       )
     ).toEqual(true)
+  })
+
+  test('getSession emits no warnings if getUser is called prior', async () => {
+    const client = new GoTrueClient({
+      url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+      autoRefreshToken: false,
+      persistSession: true,
+      storage: {
+        ...memoryLocalStorageAdapter(),
+        isServer: true,
+      },
+    })
+    const { email, password } = mockUserCredentials()
+    await client.signUp({ email, password })
+
+    const {
+      data: { user },
+      error,
+    } = await client.getUser() // should suppress any warnings
+    expect(error).toBeNull()
+    expect(user).not.toBeNull()
+
+    const {
+      data: { session },
+    } = await client.getSession()
+
+    const sessionUser = session?.user // accessing the user object from getSession shouldn't emit a warning
+    expect(sessionUser).not.toBeNull()
+    expect(warnings.length).toEqual(0)
   })
 })
