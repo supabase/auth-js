@@ -1942,7 +1942,7 @@ export default class GoTrueClient {
   }
 
   /**
-   * Recovers the session from LocalStorage and refreshes
+   * Recovers the session from LocalStorage and refreshes the token
    * Note: this method is async to accommodate for AsyncStorage e.g. in React native.
    */
   private async _recoverAndRefresh() {
