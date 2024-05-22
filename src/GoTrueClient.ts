@@ -580,9 +580,9 @@ export default class GoTrueClient {
 
   private async _exchangeCodeForSession(authCode: string): Promise<
     | {
-      data: { session: Session; user: User; redirectType: string | null }
-      error: null
-    }
+        data: { session: Session; user: User; redirectType: string | null }
+        error: null
+      }
     | { data: { session: null; user: null; redirectType: null }; error: AuthError }
   > {
     const storageItem = await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)
@@ -1018,23 +1018,23 @@ export default class GoTrueClient {
     fn: (
       result:
         | {
-          data: {
-            session: Session
+            data: {
+              session: Session
+            }
+            error: null
           }
-          error: null
-        }
         | {
-          data: {
-            session: null
+            data: {
+              session: null
+            }
+            error: AuthError
           }
-          error: AuthError
-        }
         | {
-          data: {
-            session: null
+            data: {
+              session: null
+            }
+            error: null
           }
-          error: null
-        }
     ) => Promise<R>
   ): Promise<R> {
     this._debug('#_useSession', 'begin')
@@ -1056,23 +1056,23 @@ export default class GoTrueClient {
    */
   private async __loadSession(): Promise<
     | {
-      data: {
-        session: Session
+        data: {
+          session: Session
+        }
+        error: null
       }
-      error: null
-    }
     | {
-      data: {
-        session: null
+        data: {
+          session: null
+        }
+        error: AuthError
       }
-      error: AuthError
-    }
     | {
-      data: {
-        session: null
+        data: {
+          session: null
+        }
+        error: null
       }
-      error: null
-    }
   > {
     this._debug('#__loadSession()', 'begin')
 
@@ -1410,9 +1410,9 @@ export default class GoTrueClient {
    */
   private async _getSessionFromURL(isPKCEFlow: boolean): Promise<
     | {
-      data: { session: Session; redirectType: string | null }
-      error: null
-    }
+        data: { session: Session; redirectType: string | null }
+        error: null
+      }
     | { data: { session: null; redirectType: null }; error: AuthError }
   > {
     try {
@@ -1536,7 +1536,7 @@ export default class GoTrueClient {
    */
   private async _isPKCEFlow(): Promise<boolean> {
     const href = window.location.href
-    if (href.includes("/app/boost")) return false;
+    if (href.includes('/app/boost')) return false
     const params = parseParametersFromURL(href)
 
     const currentStorageContent = await getItemAsync(
@@ -1619,13 +1619,13 @@ export default class GoTrueClient {
     this._debug('#onAuthStateChange()', 'registered callback with id', id)
 
     this.stateChangeEmitters.set(id, subscription)
-      ; (async () => {
-        await this.initializePromise
+    ;(async () => {
+      await this.initializePromise
 
-        await this._acquireLock(-1, async () => {
-          this._emitInitialSession(id)
-        })
-      })()
+      await this._acquireLock(-1, async () => {
+        this._emitInitialSession(id)
+      })
+    })()
 
     return { data: { subscription } }
   }
@@ -1664,9 +1664,9 @@ export default class GoTrueClient {
     } = {}
   ): Promise<
     | {
-      data: {}
-      error: null
-    }
+        data: {}
+        error: null
+      }
     | { data: null; error: AuthError }
   > {
     let codeChallenge: string | null = null
@@ -1704,11 +1704,11 @@ export default class GoTrueClient {
    */
   async getUserIdentities(): Promise<
     | {
-      data: {
-        identities: UserIdentity[]
+        data: {
+          identities: UserIdentity[]
+        }
+        error: null
       }
-      error: null
-    }
     | { data: null; error: AuthError }
   > {
     try {
@@ -1764,9 +1764,9 @@ export default class GoTrueClient {
    */
   async unlinkIdentity(identity: UserIdentity): Promise<
     | {
-      data: {}
-      error: null
-    }
+        data: {}
+        error: null
+      }
     | { data: null; error: AuthError }
   > {
     try {
