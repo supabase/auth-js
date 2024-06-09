@@ -562,15 +562,15 @@ export default class GoTrueClient {
   /**
    * Log in an existing user by exchanging an Auth Code issued during the PKCE flow.
    */
-  async exchangeCodeForSession(authCode: string): Promise<AuthTokenResponse> {
+  async exchangeCodeForSession(authCode: string, signIn: boolean = true): Promise<AuthTokenResponse> {
     await this.initializePromise
 
     return this._acquireLock(-1, async () => {
-      return this._exchangeCodeForSession(authCode)
+      return this._exchangeCodeForSession(authCode, signIn)
     })
   }
 
-  private async _exchangeCodeForSession(authCode: string): Promise<
+  private async _exchangeCodeForSession(authCode: string, signIn: boolean = true): Promise<
     | {
         data: { session: Session; user: User; redirectType: string | null }
         error: null
@@ -601,7 +601,7 @@ export default class GoTrueClient {
         error: new AuthInvalidTokenResponseError(),
       }
     }
-    if (data.session) {
+    if (data.session && signIn) {
       await this._saveSession(data.session)
       await this._notifyAllSubscribers('SIGNED_IN', data.session)
     }
