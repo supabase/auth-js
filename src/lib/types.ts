@@ -241,7 +241,7 @@ export interface Session {
   /**
    * A one-time used refresh token that never expires.
    */
-  refresh_token: string
+  refresh_token?: string
   /**
    * The number of seconds until the token expires (since it was issued). Returned when a login is confirmed.
    */
