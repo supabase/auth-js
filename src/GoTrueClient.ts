@@ -1111,7 +1111,16 @@ export default class GoTrueClient {
         return { data: { session: currentSession }, error: null }
       }
 
+      if (!currentSession.refresh_token) {
+        this._debug(
+          '#__loadSession()',
+          'session has no refresh token to refresh session'
+        )
+        return { data: { session: null }, error: null };
+      }
+
       const { session, error } = await this._callRefreshToken(currentSession.refresh_token)
+
       if (error) {
         return { data: { session: null }, error }
       }
@@ -1258,13 +1267,14 @@ export default class GoTrueClient {
   }
 
   /**
-   * Sets the session data from the current session. If the current session is expired, setSession will take care of refreshing it to obtain a new session.
+   * Sets the session data from the current session. If the current session is expired,
+   * setSession will take care of refreshing it to obtain a new session when a refresh token is provided and autoRefreshToken is not disabled.
    * If the refresh token or access token in the current session is invalid, an error will be thrown.
-   * @param currentSession The current session that minimally contains an access token and refresh token.
+   * @param currentSession The current session that minimally contains an access token.
    */
   async setSession(currentSession: {
     access_token: string
-    refresh_token: string
+    refresh_token?: string
   }): Promise<AuthResponse> {
     await this.initializePromise
 
@@ -1275,10 +1285,10 @@ export default class GoTrueClient {
 
   protected async _setSession(currentSession: {
     access_token: string
-    refresh_token: string
+    refresh_token?: string
   }): Promise<AuthResponse> {
     try {
-      if (!currentSession.access_token || !currentSession.refresh_token) {
+      if (!currentSession.access_token) {
         throw new AuthSessionMissingError()
       }
 
@@ -1293,6 +1303,10 @@ export default class GoTrueClient {
       }
 
       if (hasExpired) {
+        if (!this.autoRefreshToken || !currentSession.refresh_token) {
+          return { data: { user: null, session: null }, error: null }
+        }
+
         const { session: refreshedSession, error } = await this._callRefreshToken(
           currentSession.refresh_token
         )
@@ -1303,12 +1317,15 @@ export default class GoTrueClient {
         if (!refreshedSession) {
           return { data: { user: null, session: null }, error: null }
         }
+
         session = refreshedSession
       } else {
         const { data, error } = await this._getUser(currentSession.access_token)
+
         if (error) {
           throw error
         }
+
         session = {
           access_token: currentSession.access_token,
           refresh_token: currentSession.refresh_token,
@@ -1337,11 +1354,11 @@ export default class GoTrueClient {
    * If the current session's refresh token is invalid, an error will be thrown.
    * @param currentSession The current session. If passed in, it must contain a refresh token.
    */
-  async refreshSession(currentSession?: { refresh_token: string }): Promise<AuthResponse> {
+  async refreshSession(session?: { refresh_token: string }): Promise<AuthResponse> {
     await this.initializePromise
 
     return await this._acquireLock(-1, async () => {
-      return await this._refreshSession(currentSession)
+      return await this._refreshSession(session)
     })
   }
 
@@ -1350,20 +1367,22 @@ export default class GoTrueClient {
   }): Promise<AuthResponse> {
     try {
       return await this._useSession(async (result) => {
-        if (!currentSession) {
+        let oldSession: Pick<Session, 'refresh_token'> | null = currentSession ? { ...currentSession } : null;
+
+        if (!oldSession) {
           const { data, error } = result
           if (error) {
             throw error
           }
 
-          currentSession = data.session ?? undefined
+          oldSession = data.session;
         }
 
-        if (!currentSession?.refresh_token) {
+        if (!oldSession?.refresh_token) {
           throw new AuthSessionMissingError()
         }
 
-        const { session, error } = await this._callRefreshToken(currentSession.refresh_token)
+        const { session, error } = await this._callRefreshToken(oldSession.refresh_token)
         if (error) {
           return { data: { user: null, session: null }, error: error }
         }
@@ -1822,7 +1841,6 @@ export default class GoTrueClient {
       typeof maybeSession === 'object' &&
       maybeSession !== null &&
       'access_token' in maybeSession &&
-      'refresh_token' in maybeSession &&
       'expires_at' in maybeSession
 
     return isValidSession
