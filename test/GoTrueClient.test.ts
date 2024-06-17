@@ -139,6 +139,50 @@ describe('GoTrueClient', () => {
       expect(user?.user_metadata).toMatchObject({ hello: 'world' })
     })
 
+    test('setSession should return no error without a passed-in refresh token', async () => {
+      const { email, password } = mockUserCredentials()
+
+      const { error, data } = await authWithSession.signUp({
+        email,
+        password,
+      })
+      expect(error).toBeNull()
+      expect(data.session).not.toBeNull()
+
+      const {
+        data: { session },
+        error: setSessionError,
+      } = await authWithSession.setSession({
+        // @ts-expect-error 'data.session should not be null because of the assertion above'
+        access_token: data.session.access_token
+      })
+      expect(setSessionError).toBeNull()
+      expect(session).not.toBeNull()
+      expect(session!.user).not.toBeNull()
+      expect(session!.expires_in).not.toBeNull()
+      expect(session!.expires_at).not.toBeNull()
+      expect(session!.access_token).not.toBeNull()
+      expect(session!.refresh_token).not.toBeNull()
+      expect(session!.token_type).toStrictEqual('bearer')
+
+      /**
+       * getSession has been added to verify setSession is also saving
+       * the session, not just returning it.
+       */
+      const { data: getSessionData, error: getSessionError } = await authWithSession.getSession()
+      expect(getSessionError).toBeNull()
+      expect(getSessionData).not.toBeNull()
+
+      const {
+        data: { user },
+        error: updateError,
+      } = await authWithSession.updateUser({ data: { hello: 'world' } })
+
+      expect(updateError).toBeNull()
+      expect(user).not.toBeNull()
+      expect(user?.user_metadata).toMatchObject({ hello: 'world' })
+    })
+
     test('getSession() should return the currentUser session', async () => {
       const { email, password } = mockUserCredentials()
 
@@ -265,7 +309,7 @@ describe('GoTrueClient', () => {
       // verify the deferred has been reset and successive calls can be made
       // @ts-expect-error 'Allow access to private _callRefreshToken()'
       const { session: session3, error: error3 } = await authWithSession._callRefreshToken(
-        data.session!.refresh_token
+        data.session!.refresh_token!
       )
 
       expect(error3).toBeNull()
@@ -307,7 +351,7 @@ describe('GoTrueClient', () => {
       // vreify the deferred has been reset and successive calls can be made
       // @ts-expect-error 'Allow access to private _callRefreshToken()'
       const { session: session3, error: error3 } = await authWithSession._callRefreshToken(
-        data.session!.refresh_token
+        data.session!.refresh_token!
       )
 
       expect(error3).toBeNull()
