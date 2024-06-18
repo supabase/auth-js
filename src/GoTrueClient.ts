@@ -1259,10 +1259,9 @@ export default class GoTrueClient {
   }
 
   /**
-   * Sets the session data from the current session. If the current session is expired,
-   * setSession will take care of refreshing it to obtain a new session when a refresh token is provided and autoRefreshToken is not disabled.
+   * Sets the session data from the current session. If the current session is expired, setSession will take care of refreshing it to obtain a new session.
    * If the refresh token or access token in the current session is invalid, an error will be thrown.
-   * @param currentSession The current session that minimally contains an access token.
+   * @param currentSession The current session that minimally contains an access token and refresh token.
    */
   async setSession(currentSession: {
     access_token: string
