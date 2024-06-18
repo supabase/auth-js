@@ -1830,6 +1830,7 @@ export default class GoTrueClient {
       typeof maybeSession === 'object' &&
       maybeSession !== null &&
       'access_token' in maybeSession &&
+      'refresh_token' in maybeSession &&
       'expires_at' in maybeSession
 
     return isValidSession
