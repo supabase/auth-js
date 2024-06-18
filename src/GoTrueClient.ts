@@ -1111,14 +1111,6 @@ export default class GoTrueClient {
         return { data: { session: currentSession }, error: null }
       }
 
-      if (!currentSession.refresh_token) {
-        this._debug(
-          '#__loadSession()',
-          'session has no refresh token to refresh session'
-        )
-        return { data: { session: null }, error: null };
-      }
-
       const { session, error } = await this._callRefreshToken(currentSession.refresh_token)
 
       if (error) {
@@ -1274,7 +1266,7 @@ export default class GoTrueClient {
    */
   async setSession(currentSession: {
     access_token: string
-    refresh_token?: string
+    refresh_token: string
   }): Promise<AuthResponse> {
     await this.initializePromise
 
@@ -1285,7 +1277,7 @@ export default class GoTrueClient {
 
   protected async _setSession(currentSession: {
     access_token: string
-    refresh_token?: string
+    refresh_token: string
   }): Promise<AuthResponse> {
     try {
       if (!currentSession.access_token) {
@@ -1303,7 +1295,7 @@ export default class GoTrueClient {
       }
 
       if (hasExpired) {
-        if (!this.autoRefreshToken || !currentSession.refresh_token) {
+        if (!this.autoRefreshToken) {
           return { data: { user: null, session: null }, error: null }
         }
 
@@ -1367,22 +1359,20 @@ export default class GoTrueClient {
   }): Promise<AuthResponse> {
     try {
       return await this._useSession(async (result) => {
-        let oldSession: Pick<Session, 'refresh_token'> | null = currentSession ? { ...currentSession } : null;
-
-        if (!oldSession) {
+        if (!currentSession) {
           const { data, error } = result
           if (error) {
             throw error
           }
 
-          oldSession = data.session;
+          currentSession = data.session ?? undefined
         }
 
-        if (!oldSession?.refresh_token) {
+        if (!currentSession?.refresh_token) {
           throw new AuthSessionMissingError()
         }
 
-        const { session, error } = await this._callRefreshToken(oldSession.refresh_token)
+        const { session, error } = await this._callRefreshToken(currentSession.refresh_token)
         if (error) {
           return { data: { user: null, session: null }, error: error }
         }
