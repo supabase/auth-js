@@ -471,7 +471,6 @@ export default class GoTrueClient {
 
       return { data: { user, session }, error: null }
     } catch (error) {
-
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
@@ -530,7 +529,6 @@ export default class GoTrueClient {
         await this._saveSession(data.session)
         await this._notifyAllSubscribers('SIGNED_IN', data.session)
       }
-
       return {
         data: {
           user: data.user,
@@ -615,7 +613,6 @@ export default class GoTrueClient {
    */
   async signInWithIdToken(credentials: SignInWithIdTokenCredentials): Promise<AuthTokenResponse> {
     try {
-      await this._removeSession()
       const { options, provider, token, access_token, nonce } = credentials
 
       const res = await _request(this.fetch, 'POST', `${this.url}/token?grant_type=id_token`, {
@@ -643,7 +640,6 @@ export default class GoTrueClient {
         await this._saveSession(data.session)
         await this._notifyAllSubscribers('SIGNED_IN', data.session)
       }
-
       return { data, error }
     } catch (error) {
       if (isAuthError(error)) {
