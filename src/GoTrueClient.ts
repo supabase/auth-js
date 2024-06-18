@@ -1280,7 +1280,7 @@ export default class GoTrueClient {
     refresh_token: string
   }): Promise<AuthResponse> {
     try {
-      if (!currentSession.access_token) {
+      if (!currentSession.access_token || !currentSession.refresh_token) {
         throw new AuthSessionMissingError()
       }
 
