@@ -474,6 +474,7 @@ export default class GoTrueClient {
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
+      
       throw error
     }
   }
