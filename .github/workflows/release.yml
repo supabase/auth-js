@@ -48,7 +48,7 @@ jobs:
             # Use git describe tags to identify the number of commits the branch
             # is ahead of the most recent non-release-candidate tag, which is
             # part of the rc.<commits> value.
-            RELEASE_VERSION=$MAIN_RELEASE_VERSION-rc.$(node -e "console.log('$(git describe --tags --exclude *rc*)'.split('-')[1])")
+            RELEASE_VERSION=$MAIN_RELEASE_VERSION-rc.$(node -e "console.log('$(git describe --tags --exclude rc*)'.split('-')[1])")
 
             # release-please only ignores releases that have a form like [A-Z0-9]<version>, so prefixing with rc<version>
             RELEASE_NAME="rc$RELEASE_VERSION"
@@ -94,7 +94,7 @@ jobs:
           if [ "$RELEASE_CANDIDATE" == "true" ]
           then
             DIST_TAG=rc
-          elif [ "$GITHUB_REF" == "refs/heads/main" ] && [ "$GITHUB_REF" == "refs/heads/master" ]
+          elif [ "$GITHUB_REF" == "refs/heads/main" ] || [ "$GITHUB_REF" == "refs/heads/master" ]
           then
             # This is the main branch and it's not a prerelease, so the dist-tag should be `latest`.
             DIST_TAG=latest

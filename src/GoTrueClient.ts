@@ -369,8 +369,6 @@ export default class GoTrueClient {
    */
   async signInAnonymously(credentials?: SignInAnonymouslyCredentials): Promise<AuthResponse> {
     try {
-      await this._removeSession()
-
       const res = await _request(this.fetch, 'POST', `${this.url}/signup`, {
         headers: this.headers,
         body: {
@@ -413,12 +411,7 @@ export default class GoTrueClient {
    * @returns A user if the server has "autoconfirm" OFF
    */
   async signUp(credentials: SignUpWithPasswordCredentials): Promise<AuthResponse> {
-    const currentSession = await this._useSession(async (result) => {
-      return result.data.session
-    })
     try {
-      await this._removeSession()
-
       let res: AuthResponse
       if ('email' in credentials) {
         const { email, password, options } = credentials
@@ -474,15 +467,11 @@ export default class GoTrueClient {
       if (data.session) {
         await this._saveSession(data.session)
         await this._notifyAllSubscribers('SIGNED_IN', session)
-      } else if (currentSession) {
-        await this._saveSession(currentSession)
       }
 
       return { data: { user, session }, error: null }
     } catch (error) {
-      if (currentSession) {
-        await this._saveSession(currentSession)
-      }
+
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
@@ -501,12 +490,7 @@ export default class GoTrueClient {
   async signInWithPassword(
     credentials: SignInWithPasswordCredentials
   ): Promise<AuthTokenResponsePassword> {
-    const currentSession = await this._useSession(async (result) => {
-      return result.data.session
-    })
     try {
-      await this._removeSession()
-
       let res: AuthResponsePassword
       if ('email' in credentials) {
         const { email, password, options } = credentials
@@ -545,8 +529,6 @@ export default class GoTrueClient {
       if (data.session) {
         await this._saveSession(data.session)
         await this._notifyAllSubscribers('SIGNED_IN', data.session)
-      } else if (currentSession) {
-        await this._saveSession(currentSession)
       }
 
       return {
@@ -558,9 +540,6 @@ export default class GoTrueClient {
         error,
       }
     } catch (error) {
-      if (currentSession) {
-        await this._saveSession(currentSession)
-      }
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
@@ -573,24 +552,12 @@ export default class GoTrueClient {
    * This method supports the PKCE flow.
    */
   async signInWithOAuth(credentials: SignInWithOAuthCredentials): Promise<OAuthResponse> {
-    const currentSession = await this._useSession(async (result) => {
-      return result.data.session
+    return await this._handleProviderSignIn(credentials.provider, {
+      redirectTo: credentials.options?.redirectTo,
+      scopes: credentials.options?.scopes,
+      queryParams: credentials.options?.queryParams,
+      skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
     })
-    try {
-      await this._removeSession()
-
-      return await this._handleProviderSignIn(credentials.provider, {
-        redirectTo: credentials.options?.redirectTo,
-        scopes: credentials.options?.scopes,
-        queryParams: credentials.options?.queryParams,
-        skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
-      })
-    } catch (error) {
-      if (currentSession) {
-        await this._saveSession(currentSession)
-      }
-      throw error
-    }
   }
 
   /**
@@ -647,9 +614,6 @@ export default class GoTrueClient {
    * should be enabled and configured.
    */
   async signInWithIdToken(credentials: SignInWithIdTokenCredentials): Promise<AuthTokenResponse> {
-    const currentSession = await this._useSession(async (result) => {
-      return result.data.session
-    })
     try {
       await this._removeSession()
       const { options, provider, token, access_token, nonce } = credentials
@@ -678,15 +642,10 @@ export default class GoTrueClient {
       if (data.session) {
         await this._saveSession(data.session)
         await this._notifyAllSubscribers('SIGNED_IN', data.session)
-      } else if (currentSession) {
-        await this._saveSession(currentSession)
       }
 
       return { data, error }
     } catch (error) {
-      if (currentSession) {
-        await this._saveSession(currentSession)
-      }
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
@@ -712,12 +671,7 @@ export default class GoTrueClient {
    * This method supports PKCE when an email is passed.
    */
   async signInWithOtp(credentials: SignInWithPasswordlessCredentials): Promise<AuthOtpResponse> {
-    const currentSession = await this._useSession(async (result) => {
-      return result.data.session
-    })
     try {
-      await this._removeSession()
-
       if ('email' in credentials) {
         const { email, options } = credentials
         let codeChallenge: string | null = null
@@ -758,9 +712,6 @@ export default class GoTrueClient {
       }
       throw new AuthInvalidCredentialsError('You must provide either an email or phone number.')
     } catch (error) {
-      if (currentSession) {
-        await this._saveSession(currentSession)
-      }
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
@@ -773,17 +724,9 @@ export default class GoTrueClient {
    * Log in a user given a User supplied OTP or TokenHash received through mobile or email.
    */
   async verifyOtp(params: VerifyOtpParams): Promise<AuthResponse> {
-    const currentSession = await this._useSession(async (result) => {
-      return result.data.session
-    })
     try {
-      if (params.type !== 'email_change' && params.type !== 'phone_change') {
-        // we don't want to remove the authenticated session if the user is performing an email_change or phone_change verification
-        await this._removeSession()
-      }
-
-      let redirectTo = undefined
-      let captchaToken = undefined
+      let redirectTo: string | undefined = undefined
+      let captchaToken: string | undefined = undefined
       if ('options' in params) {
         redirectTo = params.options?.redirectTo
         captchaToken = params.options?.captchaToken
@@ -815,15 +758,10 @@ export default class GoTrueClient {
           params.type == 'recovery' ? 'PASSWORD_RECOVERY' : 'SIGNED_IN',
           session
         )
-      } else if (currentSession) {
-        await this._saveSession(currentSession)
       }
 
       return { data: { user, session }, error: null }
     } catch (error) {
-      if (currentSession) {
-        await this._saveSession(currentSession)
-      }
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
@@ -847,11 +785,7 @@ export default class GoTrueClient {
    * organization's SSO Identity Provider UUID directly instead.
    */
   async signInWithSSO(params: SignInWithSSO): Promise<SSOResponse> {
-    const currentSession = await this._useSession(async (result) => {
-      return result.data.session
-    })
     try {
-      await this._removeSession()
       let codeChallenge: string | null = null
       let codeChallengeMethod: string | null = null
       if (this.flowType === 'pkce') {
@@ -877,9 +811,6 @@ export default class GoTrueClient {
         xform: _ssoResponse,
       })
     } catch (error) {
-      if (currentSession) {
-        await this._saveSession(currentSession)
-      }
       if (isAuthError(error)) {
         return { data: null, error }
       }
@@ -927,14 +858,7 @@ export default class GoTrueClient {
    * Resends an existing signup confirmation email, email change email, SMS OTP or phone change OTP.
    */
   async resend(credentials: ResendParams): Promise<AuthOtpResponse> {
-    const currentSession = await this._useSession(async (result) => {
-      return result.data.session
-    })
     try {
-      if (credentials.type != 'email_change' && credentials.type != 'phone_change') {
-        await this._removeSession()
-      }
-
       const endpoint = `${this.url}/resend`
       if ('email' in credentials) {
         const { email, type, options } = credentials
@@ -947,9 +871,6 @@ export default class GoTrueClient {
           },
           redirectTo: options?.emailRedirectTo,
         })
-        if (currentSession) {
-          await this._saveSession(currentSession)
-        }
         return { data: { user: null, session: null }, error }
       } else if ('phone' in credentials) {
         const { phone, type, options } = credentials
@@ -961,18 +882,12 @@ export default class GoTrueClient {
             gotrue_meta_security: { captcha_token: options?.captchaToken },
           },
         })
-        if (currentSession) {
-          await this._saveSession(currentSession)
-        }
         return { data: { user: null, session: null, messageId: data?.message_id }, error }
       }
       throw new AuthInvalidCredentialsError(
         'You must provide either an email or phone number and a type'
       )
     } catch (error) {
-      if (currentSession) {
-        await this._saveSession(currentSession)
-      }
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
