@@ -438,6 +438,22 @@ export interface AdminUserAttributes extends Omit<UserAttributes, 'data'> {
    * Setting this role to `service_role` is not recommended as it grants the user admin privileges.
    */
   role?: string
+
+  /**
+   * The `password_hash` for the user's password.
+   *
+   * Allows you to specify a password hash for the user. This is useful for migrating a user's password hash from another service.
+   *
+   * Supports bcryot and argon2 password hashes.
+   */
+  password_hash?: string
+
+  /**
+   * The `id` for the user.
+   *
+   * Allows you to overwrite the default `id` set for the user.
+   */
+  id?: string
 }
 
 export interface Subscription {
