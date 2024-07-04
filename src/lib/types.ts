@@ -18,6 +18,7 @@ export type Provider =
   | 'linkedin_oidc'
   | 'notion'
   | 'slack'
+  | 'slack_oidc'
   | 'spotify'
   | 'twitch'
   | 'twitter'
