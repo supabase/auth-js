@@ -1956,6 +1956,7 @@ export default class GoTrueClient {
         }
 
         this.refreshingDeferred?.resolve(result)
+        await this._notifyAllSubscribers('SIGNED_OUT', null)
 
         return result
       }
