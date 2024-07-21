@@ -2341,25 +2341,38 @@ export default class GoTrueClient {
           return { data: null, error: sessionError }
         }
 
-        const { data, error } = await _request(this.fetch, 'POST', `${this.url}/factors`, {
-          body: {
-            friendly_name: params.friendlyName,
-            factor_type: params.factorType,
-            issuer: params.issuer,
-          },
-          headers: this.headers,
-          jwt: sessionData?.session?.access_token,
-        })
-
-        if (error) {
-          return { data: null, error }
+        if (params.factorType === 'sms') {
+          const { data, error } = await _request(this.fetch, 'POST', `${this.url}/factors`, {
+            body: {
+              friendly_name: params.friendlyName,
+              factor_type: params.factorType,
+              phone_number: params.phoneNumber,
+            },
+            headers: this.headers,
+            jwt: sessionData?.session?.access_token,
+          })
+          if (error) {
+            return { data: null, error }
+          }
+          return { data, error: null }
+        } else {
+          const { data, error } = await _request(this.fetch, 'POST', `${this.url}/factors`, {
+            body: {
+              friendly_name: params.friendlyName,
+              factor_type: params.factorType,
+              issuer: params.issuer,
+            },
+            headers: this.headers,
+            jwt: sessionData?.session?.access_token,
+          })
+          if (error) {
+            return { data: null, error }
+          }
+          if (data?.totp?.qr_code) {
+            data.totp.qr_code = `data:image/svg+xml;utf-8,${data.totp.qr_code}`
+          }
+          return { data, error: null }
         }
-
-        if (data?.totp?.qr_code) {
-          data.totp.qr_code = `data:image/svg+xml;utf-8,${data.totp.qr_code}`
-        }
-
-        return { data, error: null }
       })
     } catch (error) {
       if (isAuthError(error)) {

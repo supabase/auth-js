@@ -805,18 +805,29 @@ export type GenerateLinkType =
   | 'email_change_current'
   | 'email_change_new'
 
-export type MFAEnrollParams = {
-  /** The type of factor being enrolled. */
-  factorType: 'totp'
-  /** Domain which the user is enrolled with. */
-  issuer?: string
-  /** Human readable name assigned to the factor. */
-  friendlyName?: string
-}
+export type MFAEnrollParams =
+  | {
+      /** The type of factor being enrolled. */
+      factorType: 'totp'
+      /** Domain which the user is enrolled with. */
+      issuer?: string
+      /** Human readable name assigned to the factor. */
+      friendlyName?: string
+    }
+  | {
+      /** The type of factor being enrolled. */
+      factorType: 'sms'
+      /** Human readable name assigned to the factor. */
+      friendlyName?: string
+      /** Phone number associated with a factor */
+      phoneNumber: string
+    }
 
 export type MFAUnenrollParams = {
   /** ID of the factor being unenrolled. */
   factorId: string
+  /** Phone number of the SMS Factor being enrolled */
+  phoneNumber: string
 }
 
 export type MFAVerifyParams = {
@@ -894,6 +905,22 @@ export type AuthMFAEnrollResponse =
         }
         /** Friendly name of the factor, useful for distinguishing between factors **/
         friendly_name?: string
+      }
+      error: null
+    }
+  | {
+      data: {
+        /** ID of the factor that was just enrolled (in an unverified state). */
+        id: string
+
+        /** Type of MFA factor. Only `totp` supported for now. */
+        type: 'sms'
+
+        /** Friendly name of the factor, useful for distinguishing between factors **/
+        friendly_name?: string
+
+        /** Phone number of the MFA factor. Used to send SMS-es  */
+        phone_number: string
       }
       error: null
     }
