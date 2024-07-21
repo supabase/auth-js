@@ -43,7 +43,7 @@ export async function handleError(error: unknown) {
 
   if (NETWORK_ERROR_CODES.includes(error.status)) {
     // status in 500...599 range - server had an error, request might be retryed.
-    throw new AuthRetryableFetchError(_getErrorMessage(error), error.status)
+    throw new AuthRetryableFetchError(error.statusText, error.status)
   }
 
   let data: any
