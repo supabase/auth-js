@@ -73,6 +73,12 @@ export function isAuthSessionMissingError(error: any): error is AuthSessionMissi
   return isAuthError(error) && error.name === 'AuthSessionMissingError'
 }
 
+export class UserNotFoundError extends CustomAuthError {
+  constructor() {
+    super('User not found', 'UserNotFoundError', 404, 'user_not_found')
+  }
+}
+
 export class AuthInvalidTokenResponseError extends CustomAuthError {
   constructor() {
     super('Auth session or user missing', 'AuthInvalidTokenResponseError', 500, undefined)

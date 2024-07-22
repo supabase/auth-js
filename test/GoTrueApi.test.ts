@@ -136,6 +136,22 @@ describe('GoTrueAdminApi', () => {
       expect(foundUser).not.toBeUndefined()
       expect(foundUser.user?.email).toEqual(email)
     })
+
+    test('getUserByEmail() should a registered user given its email', async () => {
+      const { email } = mockUserCredentials()
+      const { error: createError, data: createdUser } = await createNewUserWithEmail({ email })
+
+      expect(createError).toBeNull()
+      expect(createdUser.user).not.toBeUndefined()
+
+      const { error: foundError, data: foundUser } = await serviceRoleApiClient.getUserByEmail(
+        email
+      )
+
+      expect(foundError).toBeNull()
+      expect(foundUser).not.toBeUndefined()
+      expect(foundUser.user?.email).toEqual(email)
+    })
   })
 
   describe('User updates', () => {

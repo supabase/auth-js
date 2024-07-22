@@ -20,7 +20,7 @@ import {
   AuthMFAAdminListFactorsResponse,
   PageParams,
 } from './lib/types'
-import { AuthError, isAuthError } from './lib/errors'
+import { AuthError, CustomAuthError, isAuthError, UserNotFoundError } from './lib/errors'
 
 export default class GoTrueAdminApi {
   /** Contains all MFA administration methods. */
@@ -224,6 +224,38 @@ export default class GoTrueAdminApi {
         headers: this.headers,
         xform: _userResponse,
       })
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null }, error }
+      }
+
+      throw error
+    }
+  }
+
+  /**
+   * Get user by email.
+   *
+   * @param email The user's email
+   *
+   * This function should only be called on a server. Never expose your `service_role` key in the browser.
+   */
+  async getUserByEmail(email: string): Promise<UserResponse> {
+    try {
+      const response = await _request(this.fetch, 'GET', `${this.url}/admin/users`, {
+        headers: this.headers,
+        xform: _userResponse,
+        query: {
+          filter: email,
+        },
+      })
+
+      const users = response?.data?.user?.users || []
+      if (users.length > 0) {
+        return { data: { user: users[0] }, error: null }
+      }
+
+      throw new UserNotFoundError()
     } catch (error) {
       if (isAuthError(error)) {
         return { data: { user: null }, error }
