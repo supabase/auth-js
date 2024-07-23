@@ -2442,6 +2442,7 @@ export default class GoTrueClient {
             'POST',
             `${this.url}/factors/${params.factorId}/challenge`,
             {
+              body: { channel: params.channel },
               headers: this.headers,
               jwt: sessionData?.session?.access_token,
             }

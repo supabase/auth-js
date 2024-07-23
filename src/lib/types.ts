@@ -844,6 +844,8 @@ export type MFAVerifyParams = {
 export type MFAChallengeParams = {
   /** ID of the factor to be challenged. Returned in enroll(). */
   factorId: string
+  /** Messaging channel to use (e.g. whatsapp or sms). Only relevant for phone factors */
+  channel?: 'sms' | 'whatsapp'
 }
 
 export type MFAChallengeAndVerifyParams = {
