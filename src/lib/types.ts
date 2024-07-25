@@ -921,7 +921,7 @@ export type AuthMFAEnrollResponse =
         /** Friendly name of the factor, useful for distinguishing between factors **/
         friendly_name?: string
 
-        /** Phone number of the MFA factor. Used to send SMS-es  */
+        /** Phone number of the MFA factor. Used to send messages  */
         phone_number: string
       }
       error: null
