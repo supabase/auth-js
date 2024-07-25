@@ -807,7 +807,7 @@ export type GenerateLinkType =
 
 export type MFAEnrollParams = {
   /** The type of factor being enrolled. */
-  factorType: 'totp'
+  factorType: 'totp' | 'webauthn'
   /** Domain which the user is enrolled with. */
   issuer?: string
   /** Human readable name assigned to the factor. */
@@ -873,8 +873,8 @@ export type AuthMFAEnrollResponse =
         /** ID of the factor that was just enrolled (in an unverified state). */
         id: string
 
-        /** Type of MFA factor. Only `totp` supported for now. */
-        type: 'totp'
+        /** Type of MFA factor. `totp` and `webauhthn` supported for now. */
+        type: 'totp' | 'webauthn'
 
         /** TOTP enrollment information. */
         totp: {
@@ -894,6 +894,14 @@ export type AuthMFAEnrollResponse =
         }
         /** Friendly name of the factor, useful for distinguishing between factors **/
         friendly_name?: string
+      }
+      error: null
+    }
+  | {
+      data: {
+        public_key_credential_request_options: Object
+        factor_id: string
+        challenge_id: string
       }
       error: null
     }
@@ -920,6 +928,14 @@ export type AuthMFAChallengeResponse =
 
         /** Timestamp in UNIX seconds when this challenge will no longer be usable. */
         expires_at: number
+      }
+      error: null
+    }
+  | {
+      data: {
+        // TODO: Get this from simplewebauthn types
+        public_key_credential_request_options: Object
+        id: string
       }
       error: null
     }
