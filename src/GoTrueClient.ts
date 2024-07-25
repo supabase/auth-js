@@ -87,6 +87,7 @@ import type {
   LockFunc,
   UserIdentity,
   SignInAnonymouslyCredentials,
+  WebAuthnResponse,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -2383,6 +2384,16 @@ export default class GoTrueClient {
     }
   }
 
+  // TODO: find less hacky way
+  private hasPublicKey(
+    params: MFAVerifyParams
+  ): params is { factorId: string; challengeId: string; publicKey: WebAuthnResponse } {
+    return (
+      (params as { factorId: string; challengeId: string; publicKey: WebAuthnResponse })
+        .publicKey !== undefined
+    )
+  }
+
   /**
    * {@see GoTrueMFAApi#verify}
    */
@@ -2394,17 +2405,32 @@ export default class GoTrueClient {
           if (sessionError) {
             return { data: null, error: sessionError }
           }
-
-          const { data, error } = await _request(
-            this.fetch,
-            'POST',
-            `${this.url}/factors/${params.factorId}/verify`,
-            {
-              body: { code: params.code, challenge_id: params.challengeId },
-              headers: this.headers,
-              jwt: sessionData?.session?.access_token,
-            }
-          )
+          let response: { data: any; error: any } = { data: null, error: null }
+          if (this.hasPublicKey(params)) {
+            response = await _request(
+              this.fetch,
+              'POST',
+              `${this.url}/factors/${params.factorId}/verify`,
+              {
+                body: { challenge_id: params.challengeId, ...params?.publicKey },
+                headers: this.headers,
+                jwt: sessionData?.session?.access_token,
+              }
+            )
+          } else {
+            response = await _request(
+              this.fetch,
+              'POST',
+              `${this.url}/factors/${params.factorId}/verify`,
+              {
+                body: { code: params.code, challenge_id: params.challengeId },
+                headers: this.headers,
+                jwt: sessionData?.session?.access_token,
+              }
+            )
+          }
+          const { data, error } = response
+          console.log(data)
           if (error) {
             return { data: null, error }
           }
@@ -2463,6 +2489,8 @@ export default class GoTrueClient {
   private async _challengeAndVerify(
     params: MFAChallengeAndVerifyParams
   ): Promise<AuthMFAVerifyResponse> {
+    // TODO: Maybe restrict this for SMS and Webauthn?:w
+
     // both _challenge and _verify independently acquire the lock, so no need
     // to acquire it here
 

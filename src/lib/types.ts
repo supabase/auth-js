@@ -819,16 +819,43 @@ export type MFAUnenrollParams = {
   factorId: string
 }
 
-export type MFAVerifyParams = {
-  /** ID of the factor being verified. Returned in enroll(). */
-  factorId: string
-
-  /** ID of the challenge being verified. Returned in challenge(). */
-  challengeId: string
-
-  /** Verification code provided by the user. */
-  code: string
+export type WebAuthnResponse = {
+  id: string
+  rawId: string
+  response: {
+    attestationObject: string
+    clientDataJSON: string
+    transports: string[]
+    publicKeyAlgorithm: number
+    publicKey: string
+    authenticatorData: string
+  }
+  type: string
+  clientExtensionResults: Record<string, unknown>
+  authenticatorAttachment: string
 }
+
+export type MFAVerifyParams =
+  | {
+      /** ID of the factor being verified. Returned in enroll(). */
+      factorId: string
+
+      /** ID of the challenge being verified. Returned in challenge(). */
+      challengeId: string
+
+      /** Verification code provided by the user. */
+      code: string
+    }
+  | {
+      /** ID of the factor being verified. Returned in enroll(). */
+      factorId: string
+
+      /** ID of the challenge being verified. Returned in challenge(). */
+      challengeId: string
+
+      /** Webauthn Response */
+      publicKey: WebAuthnResponse
+    }
 
 export type MFAChallengeParams = {
   /** ID of the factor to be challenged. Returned in enroll(). */
@@ -933,7 +960,7 @@ export type AuthMFAChallengeResponse =
     }
   | {
       data: {
-        // TODO: Get this from simplewebauthn types
+        // TODO: make thismore specific
         public_key_credential_request_options: Object
         id: string
       }
