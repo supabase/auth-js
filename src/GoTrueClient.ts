@@ -2345,7 +2345,6 @@ export default class GoTrueClient {
             body: {
               friendly_name: params.friendlyName,
               factor_type: params.factorType,
-              // phone_number: params.phoneNumber,
             },
             headers: this.headers,
             jwt: sessionData?.session?.access_token,
