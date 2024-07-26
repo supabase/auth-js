@@ -2341,7 +2341,7 @@ export default class GoTrueClient {
           return { data: null, error: sessionError }
         }
 
-        if (params.factorType === 'sms') {
+        if (params.factorType === 'phone') {
           const { data, error } = await _request(this.fetch, 'POST', `${this.url}/factors`, {
             body: {
               friendly_name: params.friendlyName,
@@ -2497,11 +2497,15 @@ export default class GoTrueClient {
     const totp = factors.filter(
       (factor) => factor.factor_type === 'totp' && factor.status === 'verified'
     )
+    const phone = factors.filter(
+      (factor) => factor.factor_type === 'phone' && factor.status === 'verified'
+    )
 
     return {
       data: {
         all: factors,
         totp,
+        phone,
       },
       error: null,
     }

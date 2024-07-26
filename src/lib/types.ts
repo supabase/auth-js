@@ -816,7 +816,7 @@ export type MFAEnrollParams =
     }
   | {
       /** The type of factor being enrolled. */
-      factorType: 'sms'
+      factorType: 'phone'
       /** Human readable name assigned to the factor. */
       friendlyName?: string
       /** Phone number associated with a factor */
@@ -916,7 +916,7 @@ export type AuthMFAEnrollResponse =
         id: string
 
         /** Type of MFA factor. Only `totp` supported for now. */
-        type: 'sms'
+        type: 'phone'
 
         /** Friendly name of the factor, useful for distinguishing between factors **/
         friendly_name?: string
@@ -962,6 +962,8 @@ export type AuthMFAListFactorsResponse =
 
         /** Only verified TOTP factors. (A subset of `all`.) */
         totp: Factor[]
+        /** Only verified Phone factors. (A subset of `all`.) */
+        phone: Factor[]
       }
       error: null
     }
