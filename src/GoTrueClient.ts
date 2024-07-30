@@ -87,6 +87,7 @@ import type {
   LockFunc,
   UserIdentity,
   SignInAnonymouslyCredentials,
+  WebAuthnResponse,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -2340,26 +2341,41 @@ export default class GoTrueClient {
         if (sessionError) {
           return { data: null, error: sessionError }
         }
+        if (params.factorType === 'webauthn') {
+          const { data, error } = await _request(this.fetch, 'POST', `${this.url}/factors`, {
+            body: {
+              friendly_name: params.friendlyName,
+              factor_type: params.factorType,
+              web_authn: params.webAuthn,
+            },
+            headers: this.headers,
+            jwt: sessionData?.session?.access_token,
+          })
+          if (error) {
+            return { data: null, error }
+          }
+          return { data, error: null }
+        } else {
+          const { data, error } = await _request(this.fetch, 'POST', `${this.url}/factors`, {
+            body: {
+              friendly_name: params.friendlyName,
+              factor_type: params.factorType,
+              issuer: params.issuer,
+            },
+            headers: this.headers,
+            jwt: sessionData?.session?.access_token,
+          })
 
-        const { data, error } = await _request(this.fetch, 'POST', `${this.url}/factors`, {
-          body: {
-            friendly_name: params.friendlyName,
-            factor_type: params.factorType,
-            issuer: params.issuer,
-          },
-          headers: this.headers,
-          jwt: sessionData?.session?.access_token,
-        })
+          if (error) {
+            return { data: null, error }
+          }
 
-        if (error) {
-          return { data: null, error }
+          if (data?.totp?.qr_code) {
+            data.totp.qr_code = `data:image/svg+xml;utf-8,${data.totp.qr_code}`
+          }
+
+          return { data, error: null }
         }
-
-        if (data?.totp?.qr_code) {
-          data.totp.qr_code = `data:image/svg+xml;utf-8,${data.totp.qr_code}`
-        }
-
-        return { data, error: null }
       })
     } catch (error) {
       if (isAuthError(error)) {
@@ -2380,17 +2396,31 @@ export default class GoTrueClient {
           if (sessionError) {
             return { data: null, error: sessionError }
           }
-
-          const { data, error } = await _request(
-            this.fetch,
-            'POST',
-            `${this.url}/factors/${params.factorId}/verify`,
-            {
-              body: { code: params.code, challenge_id: params.challengeId },
-              headers: this.headers,
-              jwt: sessionData?.session?.access_token,
-            }
-          )
+          let response: { data: any; error: any } = { data: null, error: null }
+          if (params.webAuthn) {
+            response = await _request(
+              this.fetch,
+              'POST',
+              `${this.url}/factors/${params.factorId}/verify`,
+              {
+                body: { challenge_id: params.challengeId, web_authn: params.webAuthn },
+                headers: this.headers,
+                jwt: sessionData?.session?.access_token,
+              }
+            )
+          } else {
+            response = await _request(
+              this.fetch,
+              'POST',
+              `${this.url}/factors/${params.factorId}/verify`,
+              {
+                body: { code: params.code, challenge_id: params.challengeId },
+                headers: this.headers,
+                jwt: sessionData?.session?.access_token,
+              }
+            )
+          }
+          const { data, error } = response
           if (error) {
             return { data: null, error }
           }
@@ -2429,6 +2459,7 @@ export default class GoTrueClient {
             'POST',
             `${this.url}/factors/${params.factorId}/challenge`,
             {
+              body: { web_authn: params.webAuthn },
               headers: this.headers,
               jwt: sessionData?.session?.access_token,
             }
@@ -2449,6 +2480,8 @@ export default class GoTrueClient {
   private async _challengeAndVerify(
     params: MFAChallengeAndVerifyParams
   ): Promise<AuthMFAVerifyResponse> {
+    // TODO: Maybe restrict this for SMS and Webauthn?:w
+
     // both _challenge and _verify independently acquire the lock, so no need
     // to acquire it here
 

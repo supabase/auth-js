@@ -805,18 +805,46 @@ export type GenerateLinkType =
   | 'email_change_current'
   | 'email_change_new'
 
-export type MFAEnrollParams = {
-  /** The type of factor being enrolled. */
-  factorType: 'totp'
-  /** Domain which the user is enrolled with. */
-  issuer?: string
-  /** Human readable name assigned to the factor. */
-  friendlyName?: string
-}
+export type MFAEnrollParams =
+  | {
+      /** The type of factor being enrolled. */
+      factorType: 'totp'
+      /** Domain which the user is enrolled with. */
+      issuer?: string
+      /** Human readable name assigned to the factor. */
+      friendlyName?: string
+    }
+  | {
+      /** The type of factor being enrolled. */
+      factorType: 'webauthn'
+      /** Domain which the user is enrolled with. */
+      issuer?: string
+      /** Human readable name assigned to the factor. */
+      friendlyName?: string
+
+      /** WebAuthn specific parameters*/
+      webAuthn?: Object
+    }
 
 export type MFAUnenrollParams = {
   /** ID of the factor being unenrolled. */
   factorId: string
+}
+
+export type WebAuthnResponse = {
+  id: string
+  rawId: string
+  response: {
+    attestationObject: string
+    clientDataJSON: string
+    transports: string[]
+    publicKeyAlgorithm: number
+    publicKey: string
+    authenticatorData: string
+  }
+  type: string
+  clientExtensionResults: Record<string, unknown>
+  authenticatorAttachment: string
 }
 
 export type MFAVerifyParams = {
@@ -827,12 +855,18 @@ export type MFAVerifyParams = {
   challengeId: string
 
   /** Verification code provided by the user. */
-  code: string
+  code?: string
+
+  /** Webauthn Response */
+  // TODO: narrow this type
+  webAuthn?: Object
 }
 
 export type MFAChallengeParams = {
   /** ID of the factor to be challenged. Returned in enroll(). */
   factorId: string
+  // TODO: narrow this type
+  webAuthn?: Object
 }
 
 export type MFAChallengeAndVerifyParams = {
@@ -873,8 +907,8 @@ export type AuthMFAEnrollResponse =
         /** ID of the factor that was just enrolled (in an unverified state). */
         id: string
 
-        /** Type of MFA factor. Only `totp` supported for now. */
-        type: 'totp'
+        /** Type of MFA factor. `totp` and `webauhthn` supported for now. */
+        type: 'totp' | 'webauthn'
 
         /** TOTP enrollment information. */
         totp: {
@@ -893,6 +927,15 @@ export type AuthMFAEnrollResponse =
           uri: string
         }
         /** Friendly name of the factor, useful for distinguishing between factors **/
+        friendly_name?: string
+      }
+      error: null
+    }
+  | {
+      data: {
+        public_key_credential_request_options: Object
+        factor_id: string
+        challenge_id: string
         friendly_name?: string
       }
       error: null
@@ -920,6 +963,14 @@ export type AuthMFAChallengeResponse =
 
         /** Timestamp in UNIX seconds when this challenge will no longer be usable. */
         expires_at: number
+      }
+      error: null
+    }
+  | {
+      data: {
+        // TODO: make the type bound tighter specific
+        public_key_credential_request_options: Object
+        id: string
       }
       error: null
     }
