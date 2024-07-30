@@ -2346,6 +2346,7 @@ export default class GoTrueClient {
             body: {
               friendly_name: params.friendlyName,
               factor_type: params.factorType,
+              web_authn: params.webAuthn,
             },
             headers: this.headers,
             jwt: sessionData?.session?.access_token,
@@ -2384,16 +2385,6 @@ export default class GoTrueClient {
     }
   }
 
-  // TODO: find less hacky way
-  private hasPublicKey(
-    params: MFAVerifyParams
-  ): params is { factorId: string; challengeId: string; publicKey: WebAuthnResponse } {
-    return (
-      (params as { factorId: string; challengeId: string; publicKey: WebAuthnResponse })
-        .publicKey !== undefined
-    )
-  }
-
   /**
    * {@see GoTrueMFAApi#verify}
    */
@@ -2406,13 +2397,13 @@ export default class GoTrueClient {
             return { data: null, error: sessionError }
           }
           let response: { data: any; error: any } = { data: null, error: null }
-          if (this.hasPublicKey(params)) {
+          if (params.webAuthn) {
             response = await _request(
               this.fetch,
               'POST',
               `${this.url}/factors/${params.factorId}/verify`,
               {
-                body: { challenge_id: params.challengeId, ...params?.publicKey },
+                body: { challenge_id: params.challengeId, web_authn: params.webAuthn },
                 headers: this.headers,
                 jwt: sessionData?.session?.access_token,
               }
@@ -2430,7 +2421,6 @@ export default class GoTrueClient {
             )
           }
           const { data, error } = response
-          console.log(data)
           if (error) {
             return { data: null, error }
           }
@@ -2469,6 +2459,7 @@ export default class GoTrueClient {
             'POST',
             `${this.url}/factors/${params.factorId}/challenge`,
             {
+              body: { web_authn: params.webAuthn },
               headers: this.headers,
               jwt: sessionData?.session?.access_token,
             }

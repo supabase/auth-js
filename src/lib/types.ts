@@ -805,14 +805,26 @@ export type GenerateLinkType =
   | 'email_change_current'
   | 'email_change_new'
 
-export type MFAEnrollParams = {
-  /** The type of factor being enrolled. */
-  factorType: 'totp' | 'webauthn'
-  /** Domain which the user is enrolled with. */
-  issuer?: string
-  /** Human readable name assigned to the factor. */
-  friendlyName?: string
-}
+export type MFAEnrollParams =
+  | {
+      /** The type of factor being enrolled. */
+      factorType: 'totp'
+      /** Domain which the user is enrolled with. */
+      issuer?: string
+      /** Human readable name assigned to the factor. */
+      friendlyName?: string
+    }
+  | {
+      /** The type of factor being enrolled. */
+      factorType: 'webauthn'
+      /** Domain which the user is enrolled with. */
+      issuer?: string
+      /** Human readable name assigned to the factor. */
+      friendlyName?: string
+
+      /** WebAuthn specific parameters*/
+      webAuthn?: Object
+    }
 
 export type MFAUnenrollParams = {
   /** ID of the factor being unenrolled. */
@@ -835,31 +847,26 @@ export type WebAuthnResponse = {
   authenticatorAttachment: string
 }
 
-export type MFAVerifyParams =
-  | {
-      /** ID of the factor being verified. Returned in enroll(). */
-      factorId: string
+export type MFAVerifyParams = {
+  /** ID of the factor being verified. Returned in enroll(). */
+  factorId: string
 
-      /** ID of the challenge being verified. Returned in challenge(). */
-      challengeId: string
+  /** ID of the challenge being verified. Returned in challenge(). */
+  challengeId: string
 
-      /** Verification code provided by the user. */
-      code: string
-    }
-  | {
-      /** ID of the factor being verified. Returned in enroll(). */
-      factorId: string
+  /** Verification code provided by the user. */
+  code?: string
 
-      /** ID of the challenge being verified. Returned in challenge(). */
-      challengeId: string
-
-      /** Webauthn Response */
-      publicKey: WebAuthnResponse
-    }
+  /** Webauthn Response */
+  // TODO: narrow this type
+  webAuthn?: Object
+}
 
 export type MFAChallengeParams = {
   /** ID of the factor to be challenged. Returned in enroll(). */
   factorId: string
+  // TODO: narrow this type
+  webAuthn?: Object
 }
 
 export type MFAChallengeAndVerifyParams = {
@@ -929,6 +936,7 @@ export type AuthMFAEnrollResponse =
         public_key_credential_request_options: Object
         factor_id: string
         challenge_id: string
+        friendly_name?: string
       }
       error: null
     }
@@ -960,7 +968,7 @@ export type AuthMFAChallengeResponse =
     }
   | {
       data: {
-        // TODO: make thismore specific
+        // TODO: make the type bound tighter specific
         public_key_credential_request_options: Object
         id: string
       }
