@@ -302,10 +302,9 @@ export interface Factor {
   friendly_name?: string
 
   /**
-   * Type of factor. Only `totp` supported with this version but may change in
-   * future versions.
+   * Type of factor. `totp` and `phone` supported with this version
    */
-  factor_type: 'totp' | string
+  factor_type: 'totp' | 'phone' | string
 
   /** Factor's status. */
   status: 'verified' | 'unverified'
@@ -471,9 +470,6 @@ export interface Subscription {
   unsubscribe: () => void
 }
 
-export interface UpdatableFactorAttributes {
-  friendlyName: string
-}
 
 export type SignInAnonymouslyCredentials = {
   options?: {
@@ -826,8 +822,6 @@ export type MFAEnrollParams =
 export type MFAUnenrollParams = {
   /** ID of the factor being unenrolled. */
   factorId: string
-  /** Phone number of the SMS Factor being enrolled */
-  phoneNumber: string
 }
 
 export type MFAVerifyParams = {
@@ -886,7 +880,7 @@ export type AuthMFAEnrollResponse =
         /** ID of the factor that was just enrolled (in an unverified state). */
         id: string
 
-        /** Type of MFA factor. Only `totp` supported for now. */
+        /** Type of MFA factor.*/
         type: 'totp'
 
         /** TOTP enrollment information. */
@@ -915,7 +909,7 @@ export type AuthMFAEnrollResponse =
         /** ID of the factor that was just enrolled (in an unverified state). */
         id: string
 
-        /** Type of MFA factor. Only `totp` supported for now. */
+        /** Type of MFA factor. */
         type: 'phone'
 
         /** Friendly name of the factor, useful for distinguishing between factors **/
