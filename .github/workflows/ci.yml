@@ -27,6 +27,10 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
+      - uses: KengoTODA/actions-setup-docker-compose@v1
+        with:
+          version: '2.14.2'
+
       - name: Build
         run: |
           npm ci
