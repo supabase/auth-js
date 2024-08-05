@@ -2523,8 +2523,19 @@ export default class GoTrueClient {
 
         let nextLevel: AuthenticatorAssuranceLevels | null = currentLevel
 
+        const {
+          data: { user },
+          error: userError,
+        } = await this._getUser()
+        if (userError) {
+          return { data: null, error: userError }
+        }
+        if (!user) {
+          return { data: { currentLevel, nextLevel, currentAuthenticationMethods: [] }, error: null }
+        }
+        
         const verifiedFactors =
-          session.user.factors?.filter((factor: Factor) => factor.status === 'verified') ?? []
+          user.factors?.filter((factor: Factor) => factor.status === 'verified') ?? []
 
         if (verifiedFactors.length > 0) {
           nextLevel = 'aal2'
