@@ -1,4 +1,4 @@
-import { AuthError } from './errors'
+import { AuthError, CustomAuthError } from './errors'
 import { Fetch } from './fetch'
 
 /** One of the providers supported by GoTrue. */
@@ -223,6 +223,12 @@ export type UserResponse =
         user: null
       }
       error: AuthError
+    }
+  | {
+      data: {
+        user: null
+      }
+      error: CustomAuthError
     }
 
 export interface Session {
