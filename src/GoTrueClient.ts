@@ -457,8 +457,10 @@ export default class GoTrueClient {
 
       const { data, error } = res
 
+  
+      
       if (error || !data) {
-        return { data: { user: null, session: null }, error: error }
+        throw new Error(error?.message || 'auth/invalid-response')
       }
 
       const session: Session | null = data.session
