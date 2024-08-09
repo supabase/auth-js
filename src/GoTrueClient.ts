@@ -2357,6 +2357,11 @@ export default class GoTrueClient {
           return { data: null, error }
         }
 
+        // TODO: Remove once: https://github.com/supabase/auth/pull/1717 is deployed
+        if (params.factorType === 'phone') {
+          delete data.totp
+        }
+
         if (params.factorType === 'totp' && data?.totp?.qr_code) {
           data.totp.qr_code = `data:image/svg+xml;utf-8,${data.totp.qr_code}`
         }
