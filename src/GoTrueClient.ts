@@ -1854,7 +1854,7 @@ export default class GoTrueClient {
   }
 
   /**
-   * Recovers the session from LocalStorage and refreshes
+   * Recovers the session from LocalStorage and refreshes the token
    * Note: this method is async to accommodate for AsyncStorage e.g. in React native.
    */
   private async _recoverAndRefresh() {
@@ -1869,6 +1869,7 @@ export default class GoTrueClient {
         this._debug(debugName, 'session is not valid')
         if (currentSession !== null) {
           await this._removeSession()
+          await this._notifyAllSubscribers('SIGNED_OUT', null)
         }
 
         return
@@ -1896,6 +1897,7 @@ export default class GoTrueClient {
                 error
               )
               await this._removeSession()
+              await this._notifyAllSubscribers('SIGNED_OUT', null)
             }
           }
         }
@@ -2063,10 +2065,12 @@ export default class GoTrueClient {
       // finished and tests run endlessly. This can be prevented by calling
       // `unref()` on the returned object.
       ticker.unref()
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
     } else if (typeof Deno !== 'undefined' && typeof Deno.unrefTimer === 'function') {
       // similar like for NodeJS, but with the Deno API
       // https://deno.land/api@latest?unstable&s=Deno.unrefTimer
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
       Deno.unrefTimer(ticker)
     }
