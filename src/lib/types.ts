@@ -814,7 +814,7 @@ export type MFAEnrollParams =
       factorType: 'phone'
       /** Human readable name assigned to the factor. */
       friendlyName?: string
-      /** Phone number associated with a factor */
+      /** Phone number associated with a factor. Number should conform to E.164 format */
       phone: string
     }
 
