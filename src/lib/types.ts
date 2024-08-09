@@ -470,7 +470,6 @@ export interface Subscription {
   unsubscribe: () => void
 }
 
-
 export type SignInAnonymouslyCredentials = {
   options?: {
     /**
@@ -816,7 +815,7 @@ export type MFAEnrollParams =
       /** Human readable name assigned to the factor. */
       friendlyName?: string
       /** Phone number associated with a factor */
-      phoneNumber: string
+      phone: string
     }
 
 export type MFAUnenrollParams = {
