@@ -940,6 +940,9 @@ export type AuthMFAChallengeResponse =
         /** ID of the newly created challenge. */
         id: string
 
+        /** Factor Type which generated the challenge */
+        type: 'totp' | 'phone'
+
         /** Timestamp in UNIX seconds when this challenge will no longer be usable. */
         expires_at: number
       }
