@@ -1,4 +1,4 @@
-import { AuthError, CustomAuthError } from './errors'
+import { AuthError, UserNotFoundError } from './errors'
 import { Fetch } from './fetch'
 
 /** One of the providers supported by GoTrue. */
@@ -228,7 +228,7 @@ export type UserResponse =
       data: {
         user: null
       }
-      error: CustomAuthError
+      error: UserNotFoundError
     }
 
 export interface Session {
@@ -921,7 +921,7 @@ export type AuthMFAEnrollResponse =
         friendly_name?: string
 
         /** Phone number of the MFA factor in E.164 format. Used to send messages  */
-       phone: string
+        phone: string
       }
       error: null
     }
