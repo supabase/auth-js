@@ -915,7 +915,7 @@ export type AuthMFAEnrollResponse =
         friendly_name?: string
 
         /** Phone number of the MFA factor in E.164 format. Used to send messages  */
-       phone: string
+        phone: string
       }
       error: null
     }
