@@ -912,9 +912,11 @@ export default class GoTrueClient {
    * to the client. If that storage is based on request cookies for example,
    * the values in it may not be authentic and therefore it's strongly advised
    * against using this method and its results in such circumstances. A warning
-   * will be emitted if this is detected. Use {@link #getUser()} instead.
+   * will be emitted if this is detected, unless suppressWarning is set to true. Use {@link #getUser()} instead.
    */
-  async getSession() {
+  async getSession(options: {suppressWarning?: boolean} = {}) {
+    this.suppressGetSessionWarning = options?.suppressWarning ?? false
+
     await this.initializePromise
 
     const result = await this._acquireLock(-1, async () => {
