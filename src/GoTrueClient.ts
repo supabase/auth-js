@@ -70,12 +70,15 @@ import type {
   VerifyOtpParams,
   GoTrueMFAApi,
   MFAEnrollParams,
+  MFAVerifyParams,
   AuthMFAEnrollResponse,
   MFAChallengeParams,
   AuthMFAChallengeResponse,
   MFAUnenrollParams,
   AuthMFAUnenrollResponse,
-  MFAVerifyParams,
+  MFAVerifyTOTPParams,
+  MFAVerifyPhoneParams,
+  MFAVerifyWebAuthnParams,
   AuthMFAVerifyResponse,
   AuthMFAListFactorsResponse,
   AMREntry,
@@ -92,8 +95,10 @@ import type {
 import {
   MFAEnrollTOTPParams,
   MFAEnrollPhoneParams,
+  MFAEnrollWebAuthnParams,
   AuthMFAEnrollTOTPResponse,
   AuthMFAEnrollPhoneResponse,
+  AuthMFAEnrollWebAuthnResponse,
 } from './lib/internal-types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -2356,6 +2361,7 @@ export default class GoTrueClient {
    */
   private async _enroll(params: MFAEnrollTOTPParams): Promise<AuthMFAEnrollTOTPResponse>
   private async _enroll(params: MFAEnrollPhoneParams): Promise<AuthMFAEnrollPhoneResponse>
+  private async _enroll(params: MFAEnrollWebAuthnParams): Promise<AuthMFAEnrollWebAuthnResponse>
   private async _enroll(params: MFAEnrollParams): Promise<AuthMFAEnrollResponse> {
     try {
       return await this._useSession(async (result) => {
@@ -2397,6 +2403,9 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#verify}
    */
+  private async _verify(params: MFAVerifyTOTPParams): Promise<AuthMFAVerifyResponse>
+  private async _verify(params: MFAVerifyPhoneParams): Promise<AuthMFAVerifyResponse>
+  private async _verify(params: MFAVerifyWebAuthnParams): Promise<AuthMFAVerifyResponse>
   private async _verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse> {
     return this._acquireLock(-1, async () => {
       try {
@@ -2405,13 +2414,29 @@ export default class GoTrueClient {
           if (sessionError) {
             return { data: null, error: sessionError }
           }
+          let requestBody: Record<string, unknown>
 
+          if ('code' in params) {
+            // This handles MFAVerifyTOTPParams and MFAVerifyPhoneParams
+            requestBody = {
+              code: params.code,
+              challenge_id: params.challengeId,
+            }
+          } else {
+            // This handles MFAVerifyWebAuthnParams
+            requestBody = {
+              challenge_id: params.challengeId,
+            }
+            if (params.useMultiStepVerify !== undefined) {
+              requestBody.use_multi_step_verify = params.useMultiStepVerify
+            }
+          }
           const { data, error } = await _request(
             this.fetch,
             'POST',
             `${this.url}/factors/${params.factorId}/verify`,
             {
-              body: { code: params.code, challenge_id: params.challengeId },
+              body: requestBody,
               headers: this.headers,
               jwt: sessionData?.session?.access_token,
             }
@@ -2513,11 +2538,16 @@ export default class GoTrueClient {
       (factor) => factor.factor_type === 'phone' && factor.status === 'verified'
     )
 
+    const webauthn = factors.filter(
+      (factor) => factor.factor_type === 'webauthn' && factor.status === 'verified'
+    )
+
     return {
       data: {
         all: factors,
         totp,
         phone,
+        webauthn,
       },
       error: null,
     }

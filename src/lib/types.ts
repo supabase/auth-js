@@ -3,8 +3,10 @@ import { Fetch } from './fetch'
 import {
   MFAEnrollTOTPParams,
   MFAEnrollPhoneParams,
+  MFAEnrollWebAuthnParams,
   AuthMFAEnrollTOTPResponse,
   AuthMFAEnrollPhoneResponse,
+  AuthMFAEnrollWebAuthnResponse,
 } from './internal-types'
 
 /** One of the providers supported by GoTrue. */
@@ -806,14 +808,7 @@ export type GenerateLinkType =
   | 'email_change_current'
   | 'email_change_new'
 
-export type MFAEnrollParams = MFAEnrollTOTPParams | MFAEnrollPhoneParams
-
-export type MFAUnenrollParams = {
-  /** ID of the factor being unenrolled. */
-  factorId: string
-}
-
-export type MFAVerifyParams = {
+export type MFAVerifyTOTPParams = {
   /** ID of the factor being verified. Returned in enroll(). */
   factorId: string
 
@@ -822,6 +817,29 @@ export type MFAVerifyParams = {
 
   /** Verification code provided by the user. */
   code: string
+}
+
+// Declared as a separate type to allow for future changes
+export type MFAVerifyPhoneParams = MFAVerifyTOTPParams
+
+export type MFAVerifyWebAuthnParams = {
+  /** ID of the factor being verified. Returned in enroll(). */
+  factorId: string
+
+  /** ID of the challenge being verified. Returned in challenge(). */
+  challengeId: string
+
+  /** Have the Auth client library handle the browser-authenticator interaction for you */
+  useMultiStepVerify?: boolean
+}
+
+export type MFAEnrollParams = MFAEnrollTOTPParams | MFAEnrollPhoneParams | MFAEnrollWebAuthnParams
+
+export type MFAVerifyParams = MFAVerifyTOTPParams | MFAVerifyPhoneParams | MFAVerifyWebAuthnParams
+
+export type MFAUnenrollParams = {
+  /** ID of the factor being unenrolled. */
+  factorId: string
 }
 
 export type MFAChallengeParams = {
@@ -863,7 +881,10 @@ export type AuthMFAVerifyResponse =
       error: AuthError
     }
 
-export type AuthMFAEnrollResponse = AuthMFAEnrollTOTPResponse | AuthMFAEnrollPhoneResponse
+export type AuthMFAEnrollResponse =
+  | AuthMFAEnrollTOTPResponse
+  | AuthMFAEnrollPhoneResponse
+  | AuthMFAEnrollWebAuthnResponse
 
 export type AuthMFAUnenrollResponse =
   | {
@@ -901,6 +922,9 @@ export type AuthMFAListFactorsResponse =
         totp: Factor[]
         /** Only verified Phone factors. (A subset of `all`.) */
         phone: Factor[]
+        /** Only verified Phone factors. (A subset of `all`.) */
+        // TODO: Hgihglight that it's not webAuthn since totp and phone it's lower case, and then delete this comment.
+        webauthn: Factor[]
       }
       error: null
     }
