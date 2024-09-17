@@ -3,8 +3,10 @@ import { Fetch } from './fetch'
 import {
   MFAEnrollTOTPParams,
   MFAEnrollPhoneParams,
+  MFAEnrollWebAuthnParams,
   AuthMFAEnrollTOTPResponse,
   AuthMFAEnrollPhoneResponse,
+  AuthMFAEnrollWebAuthnResponse,
 } from './internal-types'
 
 /** One of the providers supported by GoTrue. */
@@ -308,9 +310,9 @@ export interface Factor {
   friendly_name?: string
 
   /**
-   * Type of factor. `totp` and `phone` supported with this version
+   * Type of factor. `totp`, `webauthn`, and `phone` supported with this version
    */
-  factor_type: 'totp' | 'phone' | (string & {})
+  factor_type: 'totp' | 'phone' | 'webauthn' | (string & {})
 
   /** Factor's status. */
   status: 'verified' | 'unverified'
@@ -806,14 +808,7 @@ export type GenerateLinkType =
   | 'email_change_current'
   | 'email_change_new'
 
-export type MFAEnrollParams = MFAEnrollTOTPParams | MFAEnrollPhoneParams
-
-export type MFAUnenrollParams = {
-  /** ID of the factor being unenrolled. */
-  factorId: string
-}
-
-export type MFAVerifyParams = {
+export type MFAVerifyTOTPParams = {
   /** ID of the factor being verified. Returned in enroll(). */
   factorId: string
 
@@ -824,11 +819,55 @@ export type MFAVerifyParams = {
   code: string
 }
 
-export type MFAChallengeParams = {
+// Declared as a separate type to allow for future changes
+export type MFAVerifyPhoneParams = MFAVerifyTOTPParams
+
+export type MFAVerifyWebAuthnParams =
+  | {
+      /** The type of factor being enrolled. */
+      factorType: 'webauthn'
+    }
+  | MFAVerifySingleStepWebAuthnParams
+
+export type MFAVerifySingleStepWebAuthnParams = {
+  factorId: string
+  challengeId: string
+  webAuthn?: {
+    rpId: string
+    rpOrigins: string
+    assertionResponse?: PublicKeyCredentialJSON
+    creationResponse?: PublicKeyCredentialJSON
+  }
+}
+
+export type MFAChallengeTOTPParams = {
   /** ID of the factor to be challenged. Returned in enroll(). */
   factorId: string
-  /** Messaging channel to use (e.g. whatsapp or sms). Only relevant for phone factors */
-  channel?: 'sms' | 'whatsapp'
+}
+
+export type MFAChallengePhoneParams = MFAChallengeTOTPParams & { channel?: 'sms' | 'whatsapp' }
+
+export type MFAChallengeWebAuthnParams = {
+  /** ID of the factor to be challenged. Returned in enroll(). */
+  factorId: string
+  webAuthn?: {
+    rpId: string
+    rpOrigins: string
+  }
+}
+
+export type MFAEnrollParams = MFAEnrollTOTPParams | MFAEnrollPhoneParams | MFAEnrollWebAuthnParams
+
+export type MFAChallengeParams =
+  | MFAChallengeTOTPParams
+  | MFAChallengePhoneParams
+  | MFAChallengeWebAuthnParams
+
+export type MFAVerifyParams = MFAVerifyTOTPParams | MFAVerifyPhoneParams | MFAVerifyWebAuthnParams
+
+export type MFAUnenrollParams = {
+  /** ID of the factor being unenrolled. */
+  factorId: string
 }
 
 export type MFAChallengeAndVerifyParams = {
@@ -863,7 +902,10 @@ export type AuthMFAVerifyResponse =
       error: AuthError
     }
 
-export type AuthMFAEnrollResponse = AuthMFAEnrollTOTPResponse | AuthMFAEnrollPhoneResponse
+export type AuthMFAEnrollResponse =
+  | AuthMFAEnrollTOTPResponse
+  | AuthMFAEnrollPhoneResponse
+  | AuthMFAEnrollWebAuthnResponse
 
 export type AuthMFAUnenrollResponse =
   | {
@@ -889,6 +931,21 @@ export type AuthMFAChallengeResponse =
       }
       error: null
     }
+  | {
+      data: {
+        /** ID of the newly created challenge. */
+        id: string
+
+        /** Factor Type which generated the challenge */
+        type: 'webauthn'
+
+        /** Timestamp in UNIX seconds when this challenge will no longer be usable. */
+        expires_at: number
+        credential_creation_options?: { publicKey: PublicKeyCredentialCreationOptionsJSON }
+        credential_request_options?: { publicKey: PublicKeyCredentialRequestOptionsJSON }
+      }
+      error: null
+    }
   | { data: null; error: AuthError }
 
 export type AuthMFAListFactorsResponse =
@@ -901,6 +958,8 @@ export type AuthMFAListFactorsResponse =
         totp: Factor[]
         /** Only verified Phone factors. (A subset of `all`.) */
         phone: Factor[]
+        /** Only verified webauthn factors. (A subset of `all`.) */
+        webauthn: Factor[]
       }
       error: null
     }
@@ -950,6 +1009,7 @@ export interface GoTrueMFAApi {
    */
   enroll(params: MFAEnrollTOTPParams): Promise<AuthMFAEnrollTOTPResponse>
   enroll(params: MFAEnrollPhoneParams): Promise<AuthMFAEnrollPhoneResponse>
+  enroll(params: MFAEnrollWebAuthnParams): Promise<AuthMFAEnrollWebAuthnResponse>
   enroll(params: MFAEnrollParams): Promise<AuthMFAEnrollResponse>
 
   /**
@@ -1130,4 +1190,197 @@ export type SignOut = {
    * the current session!
    */
   scope?: 'global' | 'local' | 'others'
+}
+
+type AuthenticatorAttachment = 'cross-platform' | 'platform'
+
+/**
+ * https://w3c.github.io/webauthn/#dictdef-publickeycredentialdescriptorjson
+ */
+export interface PublicKeyCredentialDescriptorJSON {
+  id: Base64URLString
+  type: PublicKeyCredentialType
+  transports?: AuthenticatorTransportFuture[]
+}
+
+export interface PublicKeyCredentialCreationOptionsJSON {
+  rp: PublicKeyCredentialRpEntity
+  user: PublicKeyCredentialUserEntityJSON
+  challenge: Base64URLString
+  pubKeyCredParams: PublicKeyCredentialParameters[]
+  timeout?: number
+  excludeCredentials?: PublicKeyCredentialDescriptorJSON[]
+  authenticatorSelection?: AuthenticatorSelectionCriteria
+  attestation?: AttestationConveyancePreference
+  extensions?: AuthenticationExtensionsClientInputs
+}
+
+/**
+ * A variant of PublicKeyCredentialRequestOptions suitable for JSON transmission to the browser to
+ * (eventually) get passed into navigator.credentials.get(...) in the browser.
+ */
+export interface PublicKeyCredentialRequestOptionsJSON {
+  challenge: Base64URLString
+  timeout?: number
+  rpId?: string
+  allowCredentials?: PublicKeyCredentialDescriptorJSON[]
+  userVerification?: UserVerificationRequirement
+  extensions?: AuthenticationExtensionsClientInputs
+}
+
+/**
+ * https://w3c.github.io/webauthn/#dictdef-publickeycredentialdescriptorjson
+ */
+export interface PublicKeyCredentialDescriptorJSON {
+  id: Base64URLString
+  type: PublicKeyCredentialType
+  transports?: AuthenticatorTransportFuture[]
+}
+
+/**
+ * https://w3c.github.io/webauthn/#dictdef-publickeycredentialuserentityjson
+ */
+export interface PublicKeyCredentialUserEntityJSON {
+  id: string
+  name: string
+  displayName: string
+}
+
+/**
+ * The value returned from navigator.credentials.create()
+ */
+export interface RegistrationCredential extends PublicKeyCredentialFuture {
+  response: AuthenticatorAttestationResponseFuture
+}
+
+/**
+ * A slightly-modified RegistrationCredential to simplify working with ArrayBuffers that
+ * are Base64URL-encoded in the browser so that they can be sent as JSON to the server.
+ *
+ * https://w3c.github.io/webauthn/#dictdef-registrationresponsejson
+ */
+export interface RegistrationResponseJSON {
+  id: Base64URLString
+  rawId: Base64URLString
+  response: AuthenticatorAttestationResponseJSON
+  authenticatorAttachment?: AuthenticatorAttachment
+  clientExtensionResults: AuthenticationExtensionsClientOutputs
+  type: PublicKeyCredentialType
+}
+
+/**
+ * The value returned from navigator.credentials.get()
+ */
+export interface AuthenticationCredential extends PublicKeyCredentialFuture {
+  response: AuthenticatorAssertionResponse
+}
+
+/**
+ * A slightly-modified AuthenticationCredential to simplify working with ArrayBuffers that
+ * are Base64URL-encoded in the browser so that they can be sent as JSON to the server.
+ *
+ * https://w3c.github.io/webauthn/#dictdef-authenticationresponsejson
+ */
+export interface AuthenticationResponseJSON {
+  id: Base64URLString
+  rawId: Base64URLString
+  response: AuthenticatorAssertionResponseJSON
+  authenticatorAttachment?: AuthenticatorAttachment
+  clientExtensionResults: AuthenticationExtensionsClientOutputs
+  type: PublicKeyCredentialType
+}
+
+export interface AuthenticatorAttestationResponse extends AuthenticatorResponse {
+  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/AuthenticatorAttestationResponse/attestationObject) */
+  readonly attestationObject: ArrayBuffer
+  getAuthenticatorData(): ArrayBuffer
+  getPublicKey(): ArrayBuffer | null
+  getPublicKeyAlgorithm(): COSEAlgorithmIdentifier
+  /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/AuthenticatorAttestationResponse/getTransports) */
+  getTransports(): string[]
+}
+
+/**
+ * A slightly-modified AuthenticatorAttestationResponse to simplify working with ArrayBuffers that
+ * are Base64URL-encoded in the browser so that they can be sent as JSON to the server.
+ *
+ * https://w3c.github.io/webauthn/#dictdef-authenticatorattestationresponsejson
+ */
+export interface AuthenticatorAttestationResponseJSON {
+  clientDataJSON: Base64URLString
+  attestationObject: Base64URLString
+  // Optional in L2, but becomes required in L3. Play it safe until L3 becomes Recommendation
+  authenticatorData?: Base64URLString
+  // Optional in L2, but becomes required in L3. Play it safe until L3 becomes Recommendation
+  transports?: AuthenticatorTransportFuture[]
+  // Optional in L2, but becomes required in L3. Play it safe until L3 becomes Recommendation
+  publicKeyAlgorithm?: COSEAlgorithmIdentifier
+  publicKey?: Base64URLString
+}
+
+/**
+ * A slightly-modified AuthenticatorAssertionResponse to simplify working with ArrayBuffers that
+ * are Base64URL-encoded in the browser so that they can be sent as JSON to the server.
+ *
+ * https://w3c.github.io/webauthn/#dictdef-authenticatorassertionresponsejson
+ */
+export interface AuthenticatorAssertionResponseJSON {
+  clientDataJSON: Base64URLString
+  authenticatorData: Base64URLString
+  signature: Base64URLString
+  userHandle?: Base64URLString
+}
+
+/**
+ * An attempt to communicate that this isn't just any string, but a Base64URL-encoded string
+ */
+export type Base64URLString = string
+
+/**
+ * AuthenticatorAttestationResponse in TypeScript's DOM lib is outdated (up through v3.9.7).
+ * Maintain an augmented version here so we can implement additional properties as the WebAuthn
+ * spec evolves.
+ *
+ * See https://www.w3.org/TR/webauthn-2/#iface-authenticatorattestationresponse
+ *
+ * Properties marked optional are not supported in all browsers.
+ */
+export interface AuthenticatorAttestationResponseFuture extends AuthenticatorAttestationResponse {
+  getTransports(): AuthenticatorTransportFuture[]
+}
+
+/**
+ * A super class of TypeScript's `AuthenticatorTransport` that includes support for the latest
+ * transports. Should eventually be replaced by TypeScript's when TypeScript gets updated to
+ * know about it (sometime after 4.6.3)
+ */
+export type AuthenticatorTransportFuture =
+  | 'ble'
+  | 'cable'
+  | 'hybrid'
+  | 'internal'
+  | 'nfc'
+  | 'smart-card'
+  | 'usb'
+
+/** */
+export type PublicKeyCredentialJSON = RegistrationResponseJSON | AuthenticationResponseJSON
+
+/**
+ * A super class of TypeScript's `PublicKeyCredential` that knows about upcoming WebAuthn features
+ */
+export interface PublicKeyCredentialFuture extends PublicKeyCredential {
+  type: PublicKeyCredentialType
+  // See https://github.com/w3c/webauthn/issues/1745
+  isConditionalMediationAvailable?(): Promise<boolean>
+  // See https://w3c.github.io/webauthn/#sctn-parseCreationOptionsFromJSON
+  parseCreationOptionsFromJSON?(
+    options: PublicKeyCredentialCreationOptionsJSON
+  ): PublicKeyCredentialCreationOptions
+  // See https://w3c.github.io/webauthn/#sctn-parseRequestOptionsFromJSON
+  parseRequestOptionsFromJSON?(
+    options: PublicKeyCredentialRequestOptionsJSON
+  ): PublicKeyCredentialRequestOptions
+  // See https://w3c.github.io/webauthn/#dom-publickeycredential-tojson
+  toJSON?(): PublicKeyCredentialJSON
 }
