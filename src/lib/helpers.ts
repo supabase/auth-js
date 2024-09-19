@@ -1,5 +1,15 @@
 import { API_VERSION_HEADER_NAME } from './constants'
-import { SupportedStorage } from './types'
+import {
+  SupportedStorage,
+  PublicKeyCredentialDescriptorJSON,
+  AuthenticatorTransportFuture,
+  RegistrationCredential,
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+  AuthenticationCredential,
+} from './types'
 
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
@@ -343,4 +353,293 @@ export function parseResponseAPIVersion(response: Response) {
   } catch (e: any) {
     return null
   }
+}
+
+// Taken from simplewebauthn
+
+/**
+ * Convert from a Base64URL-encoded string to an Array Buffer. Best used when converting a
+ * credential ID from a JSON string to an ArrayBuffer, like in allowCredentials or
+ * excludeCredentials
+ *
+ * Helper method to compliment `bufferToBase64URLString`
+ */
+export function base64URLStringToBuffer(base64URLString: string): ArrayBuffer {
+  // Convert from Base64URL to Base64
+  const base64 = base64URLString.replace(/-/g, '+').replace(/_/g, '/')
+  /**
+   * Pad with '=' until it's a multiple of four
+   * (4 - (85 % 4 = 1) = 3) % 4 = 3 padding
+   * (4 - (86 % 4 = 2) = 2) % 4 = 2 padding
+   * (4 - (87 % 4 = 3) = 1) % 4 = 1 padding
+   * (4 - (88 % 4 = 0) = 4) % 4 = 0 padding
+   */
+  const padLength = (4 - (base64.length % 4)) % 4
+  const padded = base64.padEnd(base64.length + padLength, '=')
+
+  // Convert to a binary string
+  const binary = atob(padded)
+
+  // Convert binary string to buffer
+  const buffer = new ArrayBuffer(binary.length)
+  const bytes = new Uint8Array(buffer)
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+
+  return buffer
+}
+
+/**
+ * Convert the given array buffer into a Base64URL-encoded string. Ideal for converting various
+ * credential response ArrayBuffers to string for sending back to the server as JSON.
+ *
+ * Helper method to compliment `base64URLStringToBuffer`
+ */
+export function bufferToBase64URLString(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  let str = ''
+
+  for (const charCode of bytes) {
+    str += String.fromCharCode(charCode)
+  }
+
+  const base64String = btoa(str)
+
+  return base64String.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+}
+
+function toPublicKeyCredentialDescriptor(
+  descriptor: PublicKeyCredentialDescriptorJSON
+): PublicKeyCredentialDescriptor {
+  const { id } = descriptor
+
+  return {
+    ...descriptor,
+    id: base64URLStringToBuffer(id),
+    /**
+     * `descriptor.transports` is an array of our `AuthenticatorTransportFuture` that includes newer
+     * transports that TypeScript's DOM lib is ignorant of. Convince TS that our list of transports
+     * are fine to pass to WebAuthn since browsers will recognize the new value.
+     */
+    transports: descriptor.transports as AuthenticatorTransport[],
+  }
+}
+
+/**
+ * Visibly warn when we detect an issue related to a passkey provider intercepting WebAuthn API
+ * calls
+ */
+function warnOnBrokenImplementation(methodName: string, cause: Error): void {
+  console.warn(
+    `The browser extension that intercepted this WebAuthn API call incorrectly implemented ${methodName}. You should report this error to them.\n`,
+    cause
+  )
+}
+
+class BaseWebAuthnAbortService {
+  private controller: AbortController | undefined
+
+  /**
+   * Prepare an abort signal that will help support multiple auth attempts without needing to
+   * reload the page. This is automatically called whenever `startRegistration()` and
+   * `startAuthentication()` are called.
+   */
+  createNewAbortSignal() {
+    // Abort any existing calls to navigator.credentials.create() or navigator.credentials.get()
+    if (this.controller) {
+      const abortError = new Error('Cancelling existing WebAuthn API call for new one')
+      abortError.name = 'AbortError'
+      this.controller.abort(abortError)
+    }
+
+    const newController = new AbortController()
+
+    this.controller = newController
+    return newController.signal
+  }
+
+  /**
+   * Manually cancel any active WebAuthn registration or authentication attempt.
+   */
+  cancelCeremony() {
+    if (this.controller) {
+      const abortError = new Error('Manually cancelling existing WebAuthn API call')
+      abortError.name = 'AbortError'
+      this.controller.abort(abortError)
+
+      this.controller = undefined
+    }
+  }
+}
+
+/**
+ * A service singleton to help ensure that only a single WebAuthn ceremony is active at a time.
+ *
+ * Users of **@simplewebauthn/browser** shouldn't typically need to use this, but it can help e.g.
+ * developers building projects that use client-side routing to better control the behavior of
+ * their UX in response to router navigation events.
+ */
+export const WebAuthnAbortService = new BaseWebAuthnAbortService()
+
+/**
+ * Begin authenticator "registration" via WebAuthn attestation
+ *
+ * @param optionsJSON Output from **@simplewebauthn/server**'s `generateRegistrationOptions()`
+ */
+export async function startRegistration(
+  optionsJSON: PublicKeyCredentialCreationOptionsJSON
+): Promise<RegistrationResponseJSON> {
+  if (!browserSupportsWebAuthn()) {
+    throw new Error('WebAuthn is not supported in this browser')
+  }
+
+  // We need to convert some values to Uint8Arrays before passing the credentials to the navigator
+  const publicKey: PublicKeyCredentialCreationOptions = {
+    ...optionsJSON,
+    challenge: base64URLStringToBuffer(optionsJSON.challenge),
+    user: {
+      ...optionsJSON.user,
+      id: base64URLStringToBuffer(optionsJSON.user.id),
+    },
+    excludeCredentials: optionsJSON.excludeCredentials?.map(toPublicKeyCredentialDescriptor),
+  }
+
+  // Finalize options
+  const options: CredentialCreationOptions = { publicKey }
+  // Set up the ability to cancel this request if the user attempts another
+  options.signal = WebAuthnAbortService.createNewAbortSignal()
+
+  // Wait for the user to complete attestation
+  const credential = (await navigator.credentials.create(options)) as RegistrationCredential
+
+  if (!credential) {
+    throw new Error('Registration was not completed')
+  }
+
+  const { id, rawId, response, type } = credential
+
+  // Continue to play it safe with `getTransports()` for now, even when L3 types say it's required
+  let transports: AuthenticatorTransportFuture[] | undefined = undefined
+  if (typeof response.getTransports === 'function') {
+    transports = response.getTransports()
+  }
+
+  // L3 says this is required, but browser and webview support are still not guaranteed.
+  let responsePublicKeyAlgorithm: number | undefined = undefined
+  if (typeof response.getPublicKeyAlgorithm === 'function') {
+    try {
+      responsePublicKeyAlgorithm = response.getPublicKeyAlgorithm()
+    } catch (error) {
+      warnOnBrokenImplementation('getPublicKeyAlgorithm()', error as Error)
+    }
+  }
+
+  let responsePublicKey: string | undefined = undefined
+  if (typeof response.getPublicKey === 'function') {
+    try {
+      const _publicKey = response.getPublicKey()
+      if (_publicKey !== null) {
+        responsePublicKey = bufferToBase64URLString(_publicKey)
+      }
+    } catch (error) {
+      warnOnBrokenImplementation('getPublicKey()', error as Error)
+    }
+  }
+
+  // L3 says this is required, but browser and webview support are still not guaranteed.
+  let responseAuthenticatorData: string | undefined
+  if (typeof response.getAuthenticatorData === 'function') {
+    try {
+      responseAuthenticatorData = bufferToBase64URLString(response.getAuthenticatorData())
+    } catch (error) {
+      warnOnBrokenImplementation('getAuthenticatorData()', error as Error)
+    }
+  }
+
+  return {
+    id,
+    rawId: bufferToBase64URLString(rawId),
+    response: {
+      attestationObject: bufferToBase64URLString(response.attestationObject),
+      clientDataJSON: bufferToBase64URLString(response.clientDataJSON),
+      transports,
+      publicKeyAlgorithm: responsePublicKeyAlgorithm,
+      publicKey: responsePublicKey,
+      authenticatorData: responseAuthenticatorData,
+    },
+    type,
+    clientExtensionResults: credential.getClientExtensionResults(),
+  }
+}
+
+/**
+ * Begin authenticator "login" via WebAuthn assertion
+ *
+ * @param optionsJSON Output from **@simplewebauthn/server**'s `generateAuthenticationOptions()`
+ * @param useBrowserAutofill (Optional) Initialize conditional UI to enable logging in via browser autofill prompts. Defaults to `false`.
+ */
+export async function startAuthentication(
+  optionsJSON: PublicKeyCredentialRequestOptionsJSON
+): Promise<AuthenticationResponseJSON> {
+  if (!browserSupportsWebAuthn()) {
+    throw new Error('WebAuthn is not supported in this browser')
+  }
+
+  // We need to avoid passing empty array to avoid blocking retrieval
+  // of public key
+  let allowCredentials
+  if (optionsJSON.allowCredentials?.length !== 0) {
+    allowCredentials = optionsJSON.allowCredentials?.map(toPublicKeyCredentialDescriptor)
+  }
+
+  // We need to convert some values to Uint8Arrays before passing the credentials to the navigator
+  const publicKey: PublicKeyCredentialRequestOptions = {
+    ...optionsJSON,
+    challenge: base64URLStringToBuffer(optionsJSON.challenge),
+    allowCredentials,
+  }
+
+  // Prepare options for `.get()`
+  const options: CredentialRequestOptions = {}
+
+  // Finalize options
+  options.publicKey = publicKey
+  // Set up the ability to cancel this request if the user attempts another
+  options.signal = WebAuthnAbortService.createNewAbortSignal()
+
+  // Wait for the user to complete assertion
+  const credential = (await navigator.credentials.get(options)) as AuthenticationCredential
+
+  if (!credential) {
+    throw new Error('Authentication was not completed')
+  }
+
+  const { id, rawId, response, type } = credential
+
+  let userHandle = undefined
+  if (response.userHandle) {
+    userHandle = bufferToBase64URLString(response.userHandle)
+  }
+
+  // Convert values to base64 to make it easier to send back to the server
+  return {
+    id,
+    rawId: bufferToBase64URLString(rawId),
+    response: {
+      authenticatorData: bufferToBase64URLString(response.authenticatorData),
+      clientDataJSON: bufferToBase64URLString(response.clientDataJSON),
+      signature: bufferToBase64URLString(response.signature),
+      userHandle,
+    },
+    type,
+    clientExtensionResults: credential.getClientExtensionResults(),
+  }
+}
+
+export function browserSupportsWebAuthn(): boolean {
+  return (
+    window?.PublicKeyCredential !== undefined && typeof window.PublicKeyCredential === 'function'
+  )
 }

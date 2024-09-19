@@ -28,7 +28,7 @@ export type MFAEnrollWebAuthnParams = {
   webAuthn?: Object
 
   /** Have the Auth client library handle the browser-authenticator interaction for you */
-  useMultiStepEnroll: boolean
+  useMultiStep: boolean
 }
 
 export type AuthMFAEnrollTOTPResponse =
