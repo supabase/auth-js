@@ -2409,50 +2409,67 @@ export default class GoTrueClient {
   private async _verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse> {
     return this._acquireLock(-1, async () => {
       try {
-        return await this._useSession(async (result) => {
+        const result = await this._useSession(async (result) => {
           const { data: sessionData, error: sessionError } = result
           if (sessionError) {
             return { data: null, error: sessionError }
           }
-          let requestBody: Record<string, unknown>
 
-          if ('code' in params) {
+          if ('code' in params && 'challengeId' in params && 'factorId' in params) {
             // This handles MFAVerifyTOTPParams and MFAVerifyPhoneParams
-            requestBody = {
-              code: params.code,
-              challenge_id: params.challengeId,
+            const { data, error } = await _request(
+              this.fetch,
+              'POST',
+              `${this.url}/factors/${params.factorId}/verify`,
+              {
+                body: {
+                  code: params.code,
+                  challenge_id: params.challengeId,
+                },
+                headers: this.headers,
+                jwt: sessionData?.session?.access_token,
+              }
+            )
+            if (error) {
+              return { data: null, error }
             }
-          } else {
-            // This handles MFAVerifyWebAuthnParams
-            requestBody = {
-              challenge_id: params.challengeId,
+            await this._saveSession({
+              expires_at: Math.round(Date.now() / 1000) + data.expires_in,
+              ...data,
+            })
+            await this._notifyAllSubscribers('MFA_CHALLENGE_VERIFIED', data)
+            return { data, error }
+          } else if ('factorType' in params && params.factorType === 'webauthn') {
+            // TODO: Replace the placeholder
+            const { data, error } = await _request(
+              this.fetch,
+              'POST',
+              `${this.url}/factors/verify`,
+              {
+                body: {
+                  use_multi_step: params.useMultiStep,
+                  factorType: params.factorType,
+                },
+                headers: this.headers,
+                jwt: sessionData?.session?.access_token,
+              }
+            )
+            if (error) {
+              return { data: null, error }
             }
-            if (params.useMultiStepVerify !== undefined) {
-              requestBody.use_multi_step_verify = params.useMultiStepVerify
-            }
+            await this._saveSession({
+              expires_at: Math.round(Date.now() / 1000) + data.expires_in,
+              ...data,
+            })
+            await this._notifyAllSubscribers('MFA_CHALLENGE_VERIFIED', data)
+            return { data, error }
           }
-          const { data, error } = await _request(
-            this.fetch,
-            'POST',
-            `${this.url}/factors/${params.factorId}/verify`,
-            {
-              body: requestBody,
-              headers: this.headers,
-              jwt: sessionData?.session?.access_token,
-            }
-          )
-          if (error) {
-            return { data: null, error }
-          }
-
-          await this._saveSession({
-            expires_at: Math.round(Date.now() / 1000) + data.expires_in,
-            ...data,
-          })
-          await this._notifyAllSubscribers('MFA_CHALLENGE_VERIFIED', data)
-
-          return { data, error }
+          // TODO: fix this hack
+          // If we reach here, it means none of the conditions were met
+          return { data: null, error: new Error('Invalid MFA parameters') }
         })
+        // TODO: Fix thsi hack
+        return result
       } catch (error) {
         if (isAuthError(error)) {
           return { data: null, error }

@@ -808,6 +808,7 @@ export type GenerateLinkType =
   | 'email_change_current'
   | 'email_change_new'
 
+
 export type MFAVerifyTOTPParams = {
   /** ID of the factor being verified. Returned in enroll(). */
   factorId: string
@@ -823,14 +824,11 @@ export type MFAVerifyTOTPParams = {
 export type MFAVerifyPhoneParams = MFAVerifyTOTPParams
 
 export type MFAVerifyWebAuthnParams = {
-  /** ID of the factor being verified. Returned in enroll(). */
-  factorId: string
-
-  /** ID of the challenge being verified. Returned in challenge(). */
-  challengeId: string
+  /** The type of factor being enrolled. */
+  factorType: 'webauthn'
 
   /** Have the Auth client library handle the browser-authenticator interaction for you */
-  useMultiStepVerify?: boolean
+  useMultiStep?: boolean
 }
 
 export type MFAEnrollParams = MFAEnrollTOTPParams | MFAEnrollPhoneParams | MFAEnrollWebAuthnParams
