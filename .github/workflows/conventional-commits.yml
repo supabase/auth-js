@@ -29,15 +29,14 @@ jobs:
       - if: ${{ github.event_name == 'pull_request_target' }}
         run: |
           set -ex
-
-          node .github/workflows/conventional-commits-lint.js pr <<EOF
-          ${{ toJSON(github.event) }}
-          EOF
+          TMP_FILE=$(mktemp)
+          echo '${{ toJSON(github.event) }}' > "$TMP_FILE"
+          node .github/workflows/conventional-commits-lint.js pr "$TMP_FILE"
 
       - if: ${{ github.event_name == 'push' }}
         run: |
           set -ex
 
-          node .github/workflows/conventional-commits-lint.js push <<EOF
-          ${{ toJSON(github.event) }}
-          EOF
+          TMP_FILE=$(mktemp)
+          echo '${{ toJSON(github.event) }}' > "$TMP_FILE"
+          node .github/workflows/conventional-commits-lint.js push "$TMP_FILE"
