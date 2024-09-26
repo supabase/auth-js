@@ -314,7 +314,7 @@ export default class GoTrueClient {
           this._debug('#_initialize()', 'error detecting session from URL', error)
 
           if (
-            error?.code === identity_already_exists
+            error?.code === 'identity_already_exists'
           ) {
             return { error }
           }
