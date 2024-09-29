@@ -313,9 +313,7 @@ export default class GoTrueClient {
         if (error) {
           this._debug('#_initialize()', 'error detecting session from URL', error)
 
-          if (
-            error?.code === 'identity_already_exists'
-          ) {
+          if (error?.code === 'identity_already_exists') {
             return { error }
           }
 
@@ -1191,7 +1189,6 @@ export default class GoTrueClient {
 
           await this._removeSession()
           await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-          await this._notifyAllSubscribers('SIGNED_OUT', null)
         }
 
         return { data: { user: null }, error }
@@ -1588,7 +1585,6 @@ export default class GoTrueClient {
       if (scope !== 'others') {
         await this._removeSession()
         await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-        await this._notifyAllSubscribers('SIGNED_OUT', null)
       }
       return { error: null }
     })
@@ -1891,7 +1887,6 @@ export default class GoTrueClient {
         this._debug(debugName, 'session is not valid')
         if (currentSession !== null) {
           await this._removeSession()
-          await this._notifyAllSubscribers('SIGNED_OUT', null)
         }
 
         return
@@ -1919,7 +1914,6 @@ export default class GoTrueClient {
                 error
               )
               await this._removeSession()
-              await this._notifyAllSubscribers('SIGNED_OUT', null)
             }
           }
         }
@@ -1976,7 +1970,6 @@ export default class GoTrueClient {
 
         if (!isAuthRetryableFetchError(error)) {
           await this._removeSession()
-          await this._notifyAllSubscribers('SIGNED_OUT', null)
         }
 
         this.refreshingDeferred?.resolve(result)
@@ -2044,6 +2037,7 @@ export default class GoTrueClient {
     this._debug('#_removeSession()')
 
     await removeItemAsync(this.storage, this.storageKey)
+    await this._notifyAllSubscribers('SIGNED_OUT', null)
   }
 
   /**
@@ -2087,13 +2081,11 @@ export default class GoTrueClient {
       // finished and tests run endlessly. This can be prevented by calling
       // `unref()` on the returned object.
       ticker.unref()
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
+      // @ts-expect-error TS has no context of Deno
     } else if (typeof Deno !== 'undefined' && typeof Deno.unrefTimer === 'function') {
       // similar like for NodeJS, but with the Deno API
       // https://deno.land/api@latest?unstable&s=Deno.unrefTimer
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
+      // @ts-expect-error TS has no context of Deno
       Deno.unrefTimer(ticker)
     }
 
