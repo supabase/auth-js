@@ -172,7 +172,7 @@ export default class GoTrueAdminApi {
    * @param params An object which supports `page` and `perPage` as numbers, to alter the paginated results.
    */
   async listUsers(
-    params?: PageParams
+    params?: PageParams & {keywords?: string}
   ): Promise<
     | { data: { users: User[]; aud: string } & Pagination; error: null }
     | { data: { users: [] }; error: AuthError }
@@ -185,6 +185,7 @@ export default class GoTrueAdminApi {
         query: {
           page: params?.page?.toString() ?? '',
           per_page: params?.perPage?.toString() ?? '',
+          keywords: params?.keywords ?? '',
         },
         xform: _noResolveJsonResponse,
       })
