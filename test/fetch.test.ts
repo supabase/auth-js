@@ -106,6 +106,26 @@ describe('fetch', () => {
       await server.start()
     })
 
+    test('should throw AuthRetryableFetchError when response is a network error', async () => {
+      const route = server
+        .get('/')
+        .mockImplementationOnce((ctx) => {
+          ctx.status = 504
+          ctx.statusText = 'Gateway Timeout'
+          ctx.body = 'Gateway Timeout'
+        })
+        .mockImplementation((ctx) => {
+          ctx.status = 200
+        })
+
+      const url = server.getURL().toString()
+      const result = _request(fetch, 'GET', url)
+      await expect(result).rejects.toBeInstanceOf(AuthRetryableFetchError)
+      await expect(result).rejects.toMatchObject({ status: 504, message: 'Gateway Timeout' })
+
+      expect(route).toHaveBeenCalledTimes(1)
+    })
+
     test('should work with custom fetch implementation', async () => {
       const customFetch = (async () => {
         return {
