@@ -422,7 +422,7 @@ function toPublicKeyCredentialDescriptor(
 }
 
 /**
- * Visibly warn when we detect an issue related to a passkey provider intercepting WebAuthn API
+ * Visibly warn when we detect an issue related to a key provider intercepting WebAuthn API
  * calls
  */
 function warnOnBrokenImplementation(methodName: string, cause: Error): void {
