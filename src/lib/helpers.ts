@@ -432,38 +432,6 @@ function warnOnBrokenImplementation(methodName: string, cause: Error): void {
   )
 }
 
-class BaseWebAuthnAbortService {
-  private controller: AbortController | undefined
-
-  /**
-   * Prepare an abort signal that will help support multiple auth attempts without needing to
-   * reload the page. This is automatically called whenever `startRegistration()` and
-   * `startAuthentication()` are called.
-   */
-  createNewAbortSignal() {
-    // Abort any existing calls to navigator.credentials.create() or navigator.credentials.get()
-    if (this.controller) {
-      const abortError = new Error('Cancelling existing WebAuthn API call for new one')
-      abortError.name = 'AbortError'
-      this.controller.abort(abortError)
-    }
-
-    const newController = new AbortController()
-
-    this.controller = newController
-    return newController.signal
-  }
-}
-
-/**
- * A service singleton to help ensure that only a single WebAuthn ceremony is active at a time.
- *
- * Users of **@simplewebauthn/browser** shouldn't typically need to use this, but it can help e.g.
- * developers building projects that use client-side routing to better control the behavior of
- * their UX in response to router navigation events.
- */
-export const WebAuthnAbortService = new BaseWebAuthnAbortService()
-
 /**
  * Begin authenticator "registration" via WebAuthn attestation
  *
@@ -491,8 +459,6 @@ export async function startRegistration(
 
   // Finalize options
   const options: CredentialCreationOptions = { publicKey }
-  // Set up the ability to cancel this request if the user attempts another
-  options.signal = WebAuthnAbortService.createNewAbortSignal()
 
   // Wait for the user to complete attestation
   const credential = (await navigator.credentials.create(options)) as RegistrationCredential
@@ -561,7 +527,6 @@ export async function startRegistration(
  * Begin authenticator "login" via WebAuthn assertion
  *
  * @param optionsJSON Output from **@simplewebauthn/server**'s `generateAuthenticationOptions()`
- * @param useBrowserAutofill (Optional) Initialize conditional UI to enable logging in via browser autofill prompts. Defaults to `false`.
  */
 export async function startAuthentication(
   optionsJSON: PublicKeyCredentialRequestOptionsJSON
@@ -591,8 +556,6 @@ export async function startAuthentication(
 
   // Finalize options
   options.publicKey = publicKey
-  // Set up the ability to cancel this request if the user attempts another
-  options.signal = WebAuthnAbortService.createNewAbortSignal()
 
   // Wait for the user to complete assertion
   const credential = (await navigator.credentials.get(options)) as AuthenticationCredential

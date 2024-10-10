@@ -1192,13 +1192,7 @@ export type SignOut = {
   scope?: 'global' | 'local' | 'others'
 }
 
-/**
- * The two types of credentials as defined by bit 3 ("Backup Eligibility") in authenticator data:
- * - `"singleDevice"` credentials will never be backed up
- * - `"multiDevice"` credentials can be backed up
- */
-export type CredentialDeviceType = 'singleDevice' | 'multiDevice'
-export type AuthenticatorAttachment = 'cross-platform' | 'platform'
+type AuthenticatorAttachment = 'cross-platform' | 'platform'
 
 /**
  * https://w3c.github.io/webauthn/#dictdef-publickeycredentialdescriptorjson
