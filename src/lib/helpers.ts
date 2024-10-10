@@ -488,7 +488,9 @@ export async function startRegistration(
   optionsJSON: PublicKeyCredentialCreationOptionsJSON
 ): Promise<RegistrationResponseJSON> {
   if (!browserSupportsWebAuthn()) {
-    throw new Error('WebAuthn is not supported in this browser')
+    throw new Error(
+      'WebAuthn is not supported in this browser. If using in SSR please use this in client components or pages.'
+    )
   }
 
   // We need to convert some values to Uint8Arrays before passing the credentials to the navigator
@@ -580,7 +582,9 @@ export async function startAuthentication(
   optionsJSON: PublicKeyCredentialRequestOptionsJSON
 ): Promise<AuthenticationResponseJSON> {
   if (!browserSupportsWebAuthn()) {
-    throw new Error('WebAuthn is not supported in this browser')
+    throw new Error(
+      'WebAuthn is not supported in this browser. If using in SSR please use this in client components or pages.'
+    )
   }
 
   // We need to avoid passing empty array to avoid blocking retrieval

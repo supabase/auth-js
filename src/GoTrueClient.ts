@@ -95,7 +95,6 @@ import type {
   UserIdentity,
   SignInAnonymouslyCredentials,
   AuthenticatorTransportFuture,
-  RegistrationCredential,
   PublicKeyCredentialCreationOptionsJSON,
   RegistrationResponseJSON,
   AuthenticationCredential,
