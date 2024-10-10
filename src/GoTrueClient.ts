@@ -97,7 +97,6 @@ import type {
   AuthenticatorTransportFuture,
   PublicKeyCredentialCreationOptionsJSON,
   RegistrationResponseJSON,
-  AuthenticationCredential,
   MFAVerifySingleStepWebAuthnParams,
   AuthMFAEnrollResponse,
 } from './lib/types'

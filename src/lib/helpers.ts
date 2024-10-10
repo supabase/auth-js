@@ -357,8 +357,6 @@ export function parseResponseAPIVersion(response: Response) {
   }
 }
 
-// Taken from simplewebauthn
-
 /**
  * Convert from a Base64URL-encoded string to an Array Buffer. Best used when converting a
  * credential ID from a JSON string to an ArrayBuffer, like in allowCredentials or
@@ -454,19 +452,6 @@ class BaseWebAuthnAbortService {
 
     this.controller = newController
     return newController.signal
-  }
-
-  /**
-   * Manually cancel any active WebAuthn registration or authentication attempt.
-   */
-  cancelCeremony() {
-    if (this.controller) {
-      const abortError = new Error('Manually cancelling existing WebAuthn API call')
-      abortError.name = 'AbortError'
-      this.controller.abort(abortError)
-
-      this.controller = undefined
-    }
   }
 }
 
