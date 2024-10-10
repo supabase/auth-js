@@ -11,6 +11,8 @@ import {
   AuthenticationCredential,
 } from './types'
 
+import { byteToBase64URL, byteFromBase64URL } from './base64url'
+
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
   return timeNow + expiresIn
@@ -365,30 +367,19 @@ export function parseResponseAPIVersion(response: Response) {
  * Helper method to compliment `bufferToBase64URLString`
  */
 export function base64URLStringToBuffer(base64URLString: string): ArrayBuffer {
-  // Convert from Base64URL to Base64
-  const base64 = base64URLString.replace(/-/g, '+').replace(/_/g, '/')
-  /**
-   * Pad with '=' until it's a multiple of four
-   * (4 - (85 % 4 = 1) = 3) % 4 = 3 padding
-   * (4 - (86 % 4 = 2) = 2) % 4 = 2 padding
-   * (4 - (87 % 4 = 3) = 1) % 4 = 1 padding
-   * (4 - (88 % 4 = 0) = 4) % 4 = 0 padding
-   */
-  const padLength = (4 - (base64.length % 4)) % 4
-  const padded = base64.padEnd(base64.length + padLength, '=')
+  const result: number[] = []
+  const state = { queue: 0, queuedBits: 0 }
 
-  // Convert to a binary string
-  const binary = atob(padded)
-
-  // Convert binary string to buffer
-  const buffer = new ArrayBuffer(binary.length)
-  const bytes = new Uint8Array(buffer)
-
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i)
+  const onByte = (byte: number) => {
+    result.push(byte)
   }
 
-  return buffer
+  for (let i = 0; i < base64URLString.length; i += 1) {
+    byteFromBase64URL(base64URLString.charCodeAt(i), state, onByte)
+  }
+
+  const bytes = new Uint8Array(result)
+  return bytes
 }
 
 /**
@@ -399,15 +390,20 @@ export function base64URLStringToBuffer(base64URLString: string): ArrayBuffer {
  */
 export function bufferToBase64URLString(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer)
-  let str = ''
-
-  for (const charCode of bytes) {
-    str += String.fromCharCode(charCode)
+  const result: string[] = []
+  const state = { queue: 0, queuedBits: 0 }
+  const onChar = (char: string) => {
+    result.push(char)
   }
 
-  const base64String = btoa(str)
+  for (let i = 0; i < bytes.length; i++) {
+    byteToBase64URL(bytes[i], state, onChar)
+  }
 
-  return base64String.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+  // always call with `null` after processing all bytes
+  byteToBase64URL(null, state, onChar)
+
+  return result.join('')
 }
 
 function toPublicKeyCredentialDescriptor(
