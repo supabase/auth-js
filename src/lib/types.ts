@@ -13,6 +13,7 @@ export type Provider =
   | 'azure'
   | 'bitbucket'
   | 'discord'
+  | 'descope'
   | 'facebook'
   | 'figma'
   | 'github'
