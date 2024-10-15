@@ -35,6 +35,10 @@ import {
   supportsLocalStorage,
   parseParametersFromURL,
   getCodeChallengeAndMethod,
+  base64URLStringToBuffer,
+  bufferToBase64URLString,
+  startRegistration,
+  startAuthentication,
 } from './lib/helpers'
 import { localStorageAdapter, memoryLocalStorageAdapter } from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
@@ -70,12 +74,14 @@ import type {
   VerifyOtpParams,
   GoTrueMFAApi,
   MFAEnrollParams,
-  AuthMFAEnrollResponse,
+  MFAVerifyParams,
   MFAChallengeParams,
   AuthMFAChallengeResponse,
   MFAUnenrollParams,
   AuthMFAUnenrollResponse,
-  MFAVerifyParams,
+  MFAVerifyTOTPParams,
+  MFAVerifyPhoneParams,
+  MFAVerifyWebAuthnParams,
   AuthMFAVerifyResponse,
   AuthMFAListFactorsResponse,
   AMREntry,
@@ -88,12 +94,19 @@ import type {
   LockFunc,
   UserIdentity,
   SignInAnonymouslyCredentials,
+  AuthenticatorTransportFuture,
+  PublicKeyCredentialCreationOptionsJSON,
+  RegistrationResponseJSON,
+  MFAVerifySingleStepWebAuthnParams,
+  AuthMFAEnrollResponse,
 } from './lib/types'
 import {
   MFAEnrollTOTPParams,
   MFAEnrollPhoneParams,
+  MFAEnrollWebAuthnParams,
   AuthMFAEnrollTOTPResponse,
   AuthMFAEnrollPhoneResponse,
+  AuthMFAEnrollWebAuthnResponse,
 } from './lib/internal-types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -2354,6 +2367,7 @@ export default class GoTrueClient {
    */
   private async _enroll(params: MFAEnrollTOTPParams): Promise<AuthMFAEnrollTOTPResponse>
   private async _enroll(params: MFAEnrollPhoneParams): Promise<AuthMFAEnrollPhoneResponse>
+  private async _enroll(params: MFAEnrollWebAuthnParams): Promise<AuthMFAEnrollWebAuthnResponse>
   private async _enroll(params: MFAEnrollParams): Promise<AuthMFAEnrollResponse> {
     try {
       return await this._useSession(async (result) => {
@@ -2377,9 +2391,35 @@ export default class GoTrueClient {
         if (error) {
           return { data: null, error }
         }
-
         if (params.factorType === 'totp' && data?.totp?.qr_code) {
           data.totp.qr_code = `data:image/svg+xml;utf-8,${data.totp.qr_code}`
+        }
+        if (params.factorType === 'webauthn' && data.type === 'webauthn') {
+          if (params.useMultiStep) {
+            return { data, error: null }
+          }
+          const factorId = data.id
+          const webAuthn = this._getWebAuthnRpDetails()
+          const { data: challengeData, error: challengeError } = await this._challenge({
+            factorId,
+            webAuthn,
+          })
+          if (challengeError) {
+            return { data: null, error: challengeError }
+          }
+
+          if (!(challengeData.type === 'webauthn' && challengeData?.credential_creation_options)) {
+            return { data: null, error: new Error('Invalid challenge data for WebAuthn') }
+          }
+          let challengeOptions = challengeData?.credential_creation_options.publicKey
+          let credential = await startRegistration(challengeOptions)
+          const verifyWebAuthnParams = { ...webAuthn, creationResponse: credential }
+
+          return await this._verify({
+            factorId,
+            challengeId: challengeData.id,
+            webAuthn: verifyWebAuthnParams,
+          })
         }
 
         return { data, error: null }
@@ -2392,46 +2432,179 @@ export default class GoTrueClient {
     }
   }
 
+  private _getWebAuthnRpDetails() {
+    const rpId = window.location.hostname
+    const rpOrigins = new URL(window.location.href).origin
+    return { rpId, rpOrigins }
+  }
+
   /**
    * {@see GoTrueMFAApi#verify}
    */
+  private async _verify(params: MFAVerifyTOTPParams): Promise<AuthMFAVerifyResponse>
+  private async _verify(params: MFAVerifyPhoneParams): Promise<AuthMFAVerifyResponse>
+  private async _verify(params: MFAVerifyWebAuthnParams): Promise<AuthMFAVerifyResponse>
   private async _verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse> {
     return this._acquireLock(-1, async () => {
       try {
-        return await this._useSession(async (result) => {
-          const { data: sessionData, error: sessionError } = result
-          if (sessionError) {
-            return { data: null, error: sessionError }
-          }
-
-          const { data, error } = await _request(
-            this.fetch,
-            'POST',
-            `${this.url}/factors/${params.factorId}/verify`,
-            {
-              body: { code: params.code, challenge_id: params.challengeId },
-              headers: this.headers,
-              jwt: sessionData?.session?.access_token,
-            }
-          )
-          if (error) {
-            return { data: null, error }
-          }
-
-          await this._saveSession({
-            expires_at: Math.round(Date.now() / 1000) + data.expires_in,
-            ...data,
-          })
-          await this._notifyAllSubscribers('MFA_CHALLENGE_VERIFIED', data)
-
-          return { data, error }
-        })
+        if ('code' in params && 'challengeId' in params && 'factorId' in params) {
+          return this._verifyCodeChallenge(params)
+        } else if ('factorType' in params && params.factorType === 'webauthn') {
+          return this._verifyWebAuthnSingleStep(params)
+        } else if ('webAuthn' in params && params.webAuthn) {
+          return this._verifyWebAuthnCreation(params)
+        }
+        return { data: null, error: new AuthError('Invalid MFA parameters') }
       } catch (error) {
         if (isAuthError(error)) {
           return { data: null, error }
         }
         throw error
       }
+    })
+  }
+
+  private async _verifyWebAuthnSingleStep(
+    params: MFAVerifyWebAuthnParams
+  ): Promise<AuthMFAVerifyResponse> {
+    const {
+      data: { user },
+      error: userError,
+    } = await this._getUser()
+    const factors = user?.factors || []
+
+    const webauthn = factors.filter(
+      (factor) => factor.factor_type === 'webauthn' && factor.status === 'verified'
+    )
+
+    const webAuthnFactor = webauthn[0]
+    if (!webAuthnFactor) {
+      return { data: null, error: new AuthError('No WebAuthn factor found') }
+    }
+    return this._useSession(async (sessionResult) => {
+      const { data: sessionData, error: sessionError } = sessionResult
+      if (sessionError) {
+        return { data: null, error: sessionError }
+      }
+      // Single Step enroll
+      const webAuthn = this._getWebAuthnRpDetails()
+
+      const { data: challengeData, error: challengeError } = await this._challenge({
+        factorId: webAuthnFactor.id,
+        webAuthn,
+      })
+      if (
+        !challengeData ||
+        !(challengeData.type === 'webauthn' && challengeData?.credential_request_options)
+      ) {
+        return {
+          data: null,
+          error: new Error('Invalid challenge data for WebAuthn'),
+        }
+      }
+      const challengeOptions = challengeData?.credential_request_options.publicKey
+      const finalCredential = await startAuthentication(challengeOptions)
+      const verifyWebAuthnParams = { ...webAuthn, assertionResponse: finalCredential }
+
+      const { data, error } = await _request(
+        this.fetch,
+        'POST',
+        `${this.url}/factors/${webAuthnFactor.id}/verify`,
+        {
+          body: {
+            challenge_id: challengeData.id,
+            web_authn: {
+              rp_id: verifyWebAuthnParams.rpId,
+              rp_origins: verifyWebAuthnParams.rpOrigins,
+              assertion_response: verifyWebAuthnParams.assertionResponse,
+            },
+          },
+          headers: this.headers,
+          jwt: sessionData?.session?.access_token,
+        }
+      )
+      if (error) {
+        return { data: null, error }
+      }
+
+      await this._saveSession({
+        expires_at: Math.round(Date.now() / 1000) + data.expires_in,
+        ...data,
+      })
+      await this._notifyAllSubscribers('MFA_CHALLENGE_VERIFIED', data)
+      return { data, error }
+    })
+  }
+
+  private async _verifyWebAuthnCreation(
+    params: MFAVerifySingleStepWebAuthnParams
+  ): Promise<AuthMFAVerifyResponse> {
+    return this._useSession(async (sessionResult) => {
+      const { data: sessionData, error: sessionError } = sessionResult
+      if (sessionError) return { data: null, error: sessionError }
+
+      if (!params.webAuthn) {
+        return { data: null, error: new AuthError('Invalid MFA parameters') }
+      }
+
+      const { data, error } = await _request(
+        this.fetch,
+        'POST',
+        `${this.url}/factors/${params.factorId}/verify`,
+        {
+          body: {
+            challenge_id: params.challengeId,
+            web_authn: {
+              rp_id: params.webAuthn.rpId,
+              rp_origins: params.webAuthn.rpOrigins,
+              creation_response: params.webAuthn.creationResponse,
+            },
+          },
+          headers: this.headers,
+          jwt: sessionData?.session?.access_token,
+        }
+      )
+
+      if (error) return { data: null, error }
+
+      await this._saveSession({
+        expires_at: Math.round(Date.now() / 1000) + data.expires_in,
+        ...data,
+      })
+      await this._notifyAllSubscribers('MFA_CHALLENGE_VERIFIED', data)
+      return { data, error }
+    })
+  }
+
+  private async _verifyCodeChallenge(
+    params: MFAVerifyTOTPParams | MFAVerifyPhoneParams
+  ): Promise<AuthMFAVerifyResponse> {
+    return this._useSession(async (sessionResult) => {
+      const { data: sessionData, error: sessionError } = sessionResult
+      if (sessionError) return { data: null, error: sessionError }
+
+      const { data, error } = await _request(
+        this.fetch,
+        'POST',
+        `${this.url}/factors/${params.factorId}/verify`,
+        {
+          body: {
+            code: params.code,
+            challenge_id: params.challengeId,
+          },
+          headers: this.headers,
+          jwt: sessionData?.session?.access_token,
+        }
+      )
+
+      if (error) return { data: null, error }
+
+      await this._saveSession({
+        expires_at: Math.round(Date.now() / 1000) + data.expires_in,
+        ...data,
+      })
+      await this._notifyAllSubscribers('MFA_CHALLENGE_VERIFIED', data)
+      return { data, error }
     })
   }
 
@@ -2447,12 +2620,24 @@ export default class GoTrueClient {
             return { data: null, error: sessionError }
           }
 
+          let body: Record<string, any> = {}
+          if ('webAuthn' in params && params.webAuthn?.rpId) {
+            body = {
+              web_authn: {
+                rp_id: params.webAuthn.rpId,
+                rp_origins: params.webAuthn.rpOrigins,
+              },
+            }
+          } else if ('channel' in params) {
+            body = { channel: params.channel }
+          }
+
           return await _request(
             this.fetch,
             'POST',
             `${this.url}/factors/${params.factorId}/challenge`,
             {
-              body: { channel: params.channel },
+              body,
               headers: this.headers,
               jwt: sessionData?.session?.access_token,
             }
@@ -2470,22 +2655,29 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#challengeAndVerify}
    */
+  private async _challengeAndVerify(params: {
+    factorId: string
+    code: string
+  }): Promise<AuthMFAVerifyResponse>
   private async _challengeAndVerify(
     params: MFAChallengeAndVerifyParams
   ): Promise<AuthMFAVerifyResponse> {
-    // both _challenge and _verify independently acquire the lock, so no need
-    // to acquire it here
-
-    const { data: challengeData, error: challengeError } = await this._challenge({
+    if (!('factorId' in params && 'code' in params)) {
+      return {
+        data: null,
+        error: new AuthError('Invalid parameters', 400, 'invalid_parameters'),
+      }
+    }
+    const { factorId, code } = params
+    const { data: challengeResponse, error: challengeError } = await this._challenge({
       factorId: params.factorId,
     })
     if (challengeError) {
       return { data: null, error: challengeError }
     }
-
     return await this._verify({
       factorId: params.factorId,
-      challengeId: challengeData.id,
+      challengeId: challengeResponse.id,
       code: params.code,
     })
   }
@@ -2511,11 +2703,16 @@ export default class GoTrueClient {
       (factor) => factor.factor_type === 'phone' && factor.status === 'verified'
     )
 
+    const webauthn = factors.filter(
+      (factor) => factor.factor_type === 'webauthn' && factor.status === 'verified'
+    )
+
     return {
       data: {
         all: factors,
         totp,
         phone,
+        webauthn,
       },
       error: null,
     }
