@@ -11,6 +11,7 @@ import {
 export type Provider =
   | 'apple'
   | 'azure'
+  | 'beyondidentity'
   | 'bitbucket'
   | 'discord'
   | 'facebook'
