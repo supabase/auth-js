@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.65.2](https://github.com/supabase/auth-js/compare/v2.65.1...v2.65.2) (2024-10-21)
+
+
+### Bug Fixes
+
+* update soft-deletion docs ([#973](https://github.com/supabase/auth-js/issues/973)) ([cb052a9](https://github.com/supabase/auth-js/commit/cb052a9b0846048feef18080d830cc36a9ed7282))
+
 ## [2.65.1](https://github.com/supabase/auth-js/compare/v2.65.0...v2.65.1) (2024-10-14)
 
 
