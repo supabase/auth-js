@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { AuthClient } from '@supabase/auth-js'
 import './tailwind.output.css'
+import { Routes, Route, useNavigate } from 'react-router-dom';
+import MFAPage from './mfa'
+
 
 const supabaseURL = process.env.REACT_APP_SUPABASE_URL
 const supabaseAnon = process.env.REACT_APP_SUPABASE_ANON_KEY
@@ -13,7 +16,7 @@ const auth = new AuthClient({
   },
 })
 
-function App() {
+function HomePage() {
   let [session, setSession] = useState()
   let [email, setEmail] = useState(localStorage.getItem('email') ?? '')
   let [phone, setPhone] = useState(localStorage.getItem('phone') ?? '')
@@ -412,6 +415,15 @@ function App() {
       </div>
     </div>
   )
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/mfa" element={<MFAPage />} />
+    </Routes>
+  );
 }
 
 export default App
