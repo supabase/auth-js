@@ -1,11 +1,80 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from './context/AuthContext';
 
-const MFAPage = ({ onSuccess, onCancel, auth }) => {
+const MFAPage = ({ onSuccess, onCancel }) => {
+  const { auth } = useAuth()
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Handle input change for each digit
+  const [factorId, setFactorId] = useState('');
+  const [challengeId, setChallengeId] = useState('');
+
+  // TODO: Change this
+  const phoneNumber = ''
+
+  useEffect(() => {
+    const checkAndEnrollFactor = async () => {
+      try {
+        setIsLoading(true);
+
+        // Check for existing factors
+        console.log(auth.auth)
+        const factors = await auth.mfa.listFactors();
+        if (factors.error) {
+          throw factors.error;
+        }
+
+        const phoneFactor = factors.data.phone?.[0];
+
+        if (!phoneFactor) {
+          // No factor found, need to enroll
+          const factor = await auth.mfa.enroll({
+            phone: phoneNumber,
+            factorType: 'phone',
+          });
+
+          if (factor.error) {
+            setError(factor.error.message);
+            throw factor.error;
+          }
+
+          setFactorId(factor.data.id);
+
+          // Create initial challenge for the new factor
+          const challenge = await auth.mfa.challenge({
+            factorId: factor.data.id
+          });
+
+          if (challenge.error) {
+            throw challenge.error;
+          }
+
+          setChallengeId(challenge.data.id);
+        } else {
+          // Existing factor found, create challenge
+          setFactorId(phoneFactor.id);
+          const challenge = await auth.mfa.challenge({
+            factorId: phoneFactor.id
+          });
+
+          if (challenge.error) {
+            throw challenge.error;
+          }
+
+          setChallengeId(challenge.data.id);
+        }
+      } catch (err) {
+        setError(err.message || 'Failed to setup MFA. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAndEnrollFactor();
+  }, [auth, phoneNumber]);
+
+
   const handleInputChange = (index, value) => {
     if (!/^[0-9]*$/.test(value)) return;
 
@@ -14,7 +83,8 @@ const MFAPage = ({ onSuccess, onCancel, auth }) => {
     setVerificationCode(newCode);
 
     // Auto-focus next input
-    if (value && index < 5) {
+    const codeLength = 6
+    if (value && index < (codeLength - 1)) {
       const nextInput = document.getElementById(`mfa-input-${index + 1}`);
       if (nextInput) nextInput.focus();
     }
@@ -39,7 +109,16 @@ const MFAPage = ({ onSuccess, onCancel, auth }) => {
 
     try {
       const code = verificationCode.join('');
-        // Enroll, Challenge, and Verify
+
+      const verify = await auth.mfa.verify({
+        factorId,
+        challengeId,
+        code,
+      })
+      if (verify.error) {
+        setError(verify.error.message)
+        throw verify.error
+      }
 
       onSuccess?.();
     } catch (err) {
@@ -51,7 +130,12 @@ const MFAPage = ({ onSuccess, onCancel, auth }) => {
 
   const handleResendCode = async () => {
     try {
-      // TODO: Replace with Challenge
+      const challenge = await auth.mfa.challenge({ factorId })
+      if (challenge.error) {
+        setError(challenge.error.message)
+        throw challenge.error
+      }
+
       alert('New code sent successfully');
     } catch (err) {
       setError(err.message || 'Failed to resend code. Please try again.');

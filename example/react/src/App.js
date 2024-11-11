@@ -6,19 +6,12 @@ import MFAPage from './mfa'
 import MFASelectionPage from './mfa-selection-page'
 import MFAWebAuthn from './mfa-webauthn'
 
+import { AuthProvider, useAuth } from './context/AuthContext';
 
-const supabaseURL = process.env.REACT_APP_SUPABASE_URL
-const supabaseAnon = process.env.REACT_APP_SUPABASE_ANON_KEY
-
-const auth = new AuthClient({
-  url: `${supabaseURL}/auth/v1`,
-  headers: {
-    accept: 'json',
-    apikey: supabaseAnon,
-  },
-})
 
 function HomePage() {
+
+  const { auth } = useAuth();
   let [session, setSession] = useState()
   let [email, setEmail] = useState(localStorage.getItem('email') ?? '')
   let [phone, setPhone] = useState(localStorage.getItem('phone') ?? '')
@@ -421,12 +414,14 @@ function HomePage() {
 
 function App() {
   return (
+    <AuthProvider>
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/mfa" element={<MFAPage />} />
       <Route path="/mfa-selection" element={<MFASelectionPage/>}/>
       <Route path="/mfa-webauthn" element={<MFAWebAuthn/>}/>
     </Routes>
+    </AuthProvider>
   );
 }
 
