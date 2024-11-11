@@ -3,6 +3,8 @@ import { AuthClient } from '@supabase/auth-js'
 import './tailwind.output.css'
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import MFAPage from './mfa'
+import MFASelectionPage from './mfa-selection-page'
+import MFAWebAuthn from './mfa-webauthn'
 
 
 const supabaseURL = process.env.REACT_APP_SUPABASE_URL
@@ -422,6 +424,8 @@ function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/mfa" element={<MFAPage />} />
+      <Route path="/mfa-selection" element={<MFASelectionPage/>}/>
+      <Route path="/mfa-webauthn" element={<MFAWebAuthn/>}/>
     </Routes>
   );
 }

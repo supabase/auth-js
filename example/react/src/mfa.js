@@ -41,7 +41,7 @@ const MFAPage = ({ onSuccess, onCancel, auth }) => {
       const code = verificationCode.join('');
         // Enroll, Challenge, and Verify
 
-      nSuccess?.();
+      onSuccess?.();
     } catch (err) {
       setError(err.message || 'Verification failed. Please try again.');
     } finally {
