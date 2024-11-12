@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { Smartphone, Key } from 'lucide-react'
+import { useNavigate } from 'react-router-dom';
+
 
 const styles = {
   container: {
@@ -92,6 +94,8 @@ const styles = {
 export default function MFASelectionPage() {
   const [selectedMethod, setSelectedMethod] = useState(undefined)
   const [rememberMethod, setRememberMethod] = useState(false)
+  const navigate = useNavigate();
+
 
   return (
     <div style={styles.container}>
@@ -156,16 +160,18 @@ export default function MFASelectionPage() {
           }}
           disabled={!selectedMethod}
           onClick={() => {
-            // Handle continue action
-            console.log('Continuing with method:', selectedMethod)
+            if (selectedMethod === 'authenticator') {
+              navigate('/mfa');
+            } else if (selectedMethod === 'passkey') {
+              navigate('/mfa-webauthn');
+            }
           }}
         >
           Continue
         </button>
         <a href="#" style={styles.link} onClick={() => {
-          // Handle sign in to different account
-          console.log('Signing in to a different account')
-        }}>
+             console.log("Sign in with different account")
+           }}>
           Sign in to a different account
         </a>
       </div>

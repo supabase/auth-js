@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Shield, AlertCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom';
+
 
 const styles = {
   container: {
@@ -86,6 +88,8 @@ const simulateWebAuthnAuthentication = (): Promise<void> => {
 export default function MFAWebAuthn() {
   const [error, setError] = useState(null)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const navigate = useNavigate();
+
 
   useEffect(() => {
     startAuthentication()
@@ -134,6 +138,9 @@ export default function MFAWebAuthn() {
         </button>
         <a href="#" style={styles.link} onClick={() => {
           // Handle selecting another MFA method
+          navigate('/mfa-selection');
+
+
           console.log('Selecting another MFA method')
         }}>
           Select another MFA method

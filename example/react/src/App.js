@@ -415,6 +415,7 @@ function HomePage() {
 function App() {
   return (
     <AuthProvider>
+
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/mfa" element={<MFAPage />} />
@@ -422,6 +423,7 @@ function App() {
       <Route path="/mfa-webauthn" element={<MFAWebAuthn/>}/>
     </Routes>
     </AuthProvider>
+
   );
 }
 
