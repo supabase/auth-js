@@ -72,17 +72,14 @@ const styles = {
 }
 
 // Simulated WebAuthn API call
-const simulateWebAuthnAuthentication = (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      // Simulate a 50% chance of success
-      if (Math.random() < 0.5) {
-        resolve()
-      } else {
-        reject(new Error('The operation either timed out or was not allowed.'))
-      }
-    }, 2000) // Simulate a 2-second delay
-  })
+const simulateWebAuthnAuthentication = () => {
+  // TODO: Perform single step verification. Enroll to be done on the list factors page
+  // Function is _verifyWebAuthn
+  return new auth.mfa.verify({
+    // factorId: <fill this in>
+    // challengeId: <fill this in>
+    // factorType:'webauthn'
+      })
 }
 
 export default function MFAWebAuthn() {
@@ -100,7 +97,7 @@ export default function MFAWebAuthn() {
     setError(null)
     try {
       await simulateWebAuthnAuthentication()
-      // If successful, you would typically redirect the user or update the app state
+      // Authenticate
       console.log('Authentication successful')
     } catch (err) {
       setError((err).message)

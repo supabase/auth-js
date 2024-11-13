@@ -5,6 +5,7 @@ import { Routes, Route, useNavigate } from 'react-router-dom';
 import MFAPage from './mfa'
 import MFASelectionPage from './mfa-selection-page'
 import MFAWebAuthn from './mfa-webauthn'
+import MFAFactorOverview from './mfa-factor-overview'
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -421,6 +422,7 @@ function App() {
       <Route path="/mfa" element={<MFAPage />} />
       <Route path="/mfa-selection" element={<MFASelectionPage/>}/>
       <Route path="/mfa-webauthn" element={<MFAWebAuthn/>}/>
+      <Route path="/factor-overview" element={<MFAFactorOverview/>}/>
     </Routes>
     </AuthProvider>
 
