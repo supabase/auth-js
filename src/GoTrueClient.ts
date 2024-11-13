@@ -2400,10 +2400,24 @@ export default class GoTrueClient {
           }
           const factorId = data.id
           const webAuthn = this._getWebAuthnRpDetails()
-          const { data: challengeData, error: challengeError } = await this._challenge({
-            factorId,
-            webAuthn,
-          })
+
+          const challengeBody = {
+            web_authn: {
+              rp_id: webAuthn.rpId,
+              rp_origins: webAuthn.rpOrigins,
+            },
+          }
+          const { data: challengeData, error: challengeError } = await _request(
+            this.fetch,
+            'POST',
+            `${this.url}/factors/${factorId}/challenge`,
+            {
+              body: challengeBody,
+              headers: this.headers,
+              jwt: sessionData?.session?.access_token,
+            }
+          )
+
           if (challengeError) {
             return { data: null, error: challengeError }
           }
@@ -2415,8 +2429,8 @@ export default class GoTrueClient {
           let credential = await startRegistration(challengeOptions)
           const verifyWebAuthnParams = { ...webAuthn, creationResponse: credential }
 
-          return await this._verify({
-            factorId,
+          return await this._verifyWebAuthnCreation({
+            factorId: factorId,
             challengeId: challengeData.id,
             webAuthn: verifyWebAuthnParams,
           })
@@ -2445,6 +2459,10 @@ export default class GoTrueClient {
   private async _verify(params: MFAVerifyPhoneParams): Promise<AuthMFAVerifyResponse>
   private async _verify(params: MFAVerifyWebAuthnParams): Promise<AuthMFAVerifyResponse>
   private async _verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse> {
+    if ('factorType' in params && params.factorType === 'webauthn') {
+      return this._verifyWebAuthnSingleStep(params)
+    }
+
     return this._acquireLock(-1, async () => {
       try {
         if ('code' in params && 'challengeId' in params && 'factorId' in params) {
@@ -2481,6 +2499,7 @@ export default class GoTrueClient {
     if (!webAuthnFactor) {
       return { data: null, error: new AuthError('No WebAuthn factor found') }
     }
+
     return this._useSession(async (sessionResult) => {
       const { data: sessionData, error: sessionError } = sessionResult
       if (sessionError) {
@@ -2488,11 +2507,27 @@ export default class GoTrueClient {
       }
       // Single Step enroll
       const webAuthn = this._getWebAuthnRpDetails()
+      const factorId = webAuthnFactor.id
 
-      const { data: challengeData, error: challengeError } = await this._challenge({
-        factorId: webAuthnFactor.id,
-        webAuthn,
-      })
+      const challengeBody = {
+        factorId: factorId,
+
+        web_authn: {
+          rp_id: webAuthn.rpId,
+          rp_origins: webAuthn.rpOrigins,
+        },
+      }
+      const { data: challengeData, error: challengeError } = await _request(
+        this.fetch,
+        'POST',
+        `${this.url}/factors/${factorId}/challenge`,
+        {
+          body: challengeBody,
+          headers: this.headers,
+          jwt: sessionData?.session?.access_token,
+        }
+      )
+
       if (
         !challengeData ||
         !(challengeData.type === 'webauthn' && challengeData?.credential_request_options)
