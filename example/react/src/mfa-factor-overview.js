@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Key, Shield, Smartphone, X, Plus, ChevronRight, Loader2 } from 'lucide-react';
+import { useAuth } from './context/AuthContext';
 
 
 const styles = {
@@ -292,39 +293,15 @@ const FactorCard = ({ factor, onDelete, onEnroll }) => {
     </div>
   );
 };
-
 const AddFactorDialog = ({ open, onClose, onFactorAdded }) => {
-  const [step, setStep] = useState('select');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [factorData, setFactorData] = useState({
-    friendlyName: '',
-    phoneNumber: '',
-    totpSecret: '',
-    qrCodeUrl: '',
-  });
-
-  const resetState = () => {
-    setStep('select');
-    setLoading(false);
-    setError(null);
-    setFactorData({
-      friendlyName: '',
-      phoneNumber: '',
-      totpSecret: '',
-      qrCodeUrl: '',
-    });
-  };
-
-  const factorOptions = [
-    {
-      type: 'webauthn',
-      title: 'Security Key or Biometric',
-      description: 'Use a hardware security key, fingerprint, or face recognition',
-      icon: <Shield size={24} />,
-    },
-    {
-      type: 'totp',
+    const { auth } = useAuth()
+    const [step, setStep] = useState('select');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [friendlyName, setFriendlyName] = useState('')
+    const [factorData, setFactorData] = useState({friendlyName: '', phoneNumber: '', totpSecret: '', qrCodeUrl: '',});
+    const resetState = () => {setStep('select'); setLoading(false); setError(null); setFactorData({friendlyName: '', phoneNumber: '', totpSecret: '', qrCodeUrl: '',});};
+    const factorOptions = [{type: 'webauthn', title: 'Security Key or Biometric', description: 'Use a hardware security key, fingerprint, or face recognition', icon: <Shield size={24} />,}, {type: 'totp',
       title: 'Authenticator App',
       description: 'Use an app like Google Authenticator or Authy',
       icon: <Key size={24} />,
@@ -337,12 +314,13 @@ const AddFactorDialog = ({ open, onClose, onFactorAdded }) => {
     },
   ];
 
+
   const handleFactorSelect = async (factorType) => {
     setLoading(true);
     setError(null);
     try {
       switch (factorType) {
-        case 'webauthn': setStep('setup-webauthn'); break;
+      case 'webauthn': setStep('setup-webauthn'); handleWebAuthnFactorSelect(); break;
         case 'totp': setStep('setup-totp'); break;
         case 'phone': setStep('setup-phone'); break;
       }
@@ -352,6 +330,15 @@ const AddFactorDialog = ({ open, onClose, onFactorAdded }) => {
       setLoading(false);
     }
   };
+    const handleWebAuthnFactorSelect = async () => {
+        // Check the friendly name
+        const { data, error } = await auth.mfa.enroll({ factorType: 'webauthn', friendlyName: friendlyName})
+        if (error) {
+            setError(error.message)
+        }
+        console.log("selected webuathn");
+
+    }
 
   const renderStep = () => {
     switch (step) {
@@ -390,11 +377,10 @@ const AddFactorDialog = ({ open, onClose, onFactorAdded }) => {
                 type="text"
                 style={styles.input}
                 placeholder="e.g., Work Laptop TouchID"
-                value={factorData.friendlyName}
-                onChange={(e) => setFactorData(prev => ({
-                  ...prev,
-                  friendlyName: e.target.value
-                }))}
+                value={friendlyName}
+                onChange={(e) => {
+                      setFriendlyName(e.target.value)
+                  }}
               />
             </div>
             <button

@@ -2489,6 +2489,8 @@ export default class GoTrueClient {
       data: { user },
       error: userError,
     } = await this._getUser()
+    if (userError) throw userError
+
     const factors = user?.factors || []
 
     const webauthn = factors.filter(
@@ -2500,6 +2502,10 @@ export default class GoTrueClient {
       return { data: null, error: new AuthError('No WebAuthn factor found') }
     }
 
+
+    // return
+    // this._acquireLock(-1, async () => {
+    // try {
     return this._useSession(async (sessionResult) => {
       const { data: sessionData, error: sessionError } = sessionResult
       if (sessionError) {
@@ -2511,7 +2517,6 @@ export default class GoTrueClient {
 
       const challengeBody = {
         factorId: factorId,
-
         web_authn: {
           rp_id: webAuthn.rpId,
           rp_origins: webAuthn.rpOrigins,
@@ -2569,6 +2574,12 @@ export default class GoTrueClient {
       await this._notifyAllSubscribers('MFA_CHALLENGE_VERIFIED', data)
       return { data, error }
     })
+    //} catch (error) {
+    // if (isAuthError(error)) {
+    //   return { data: null, error }
+    // }
+    // throw error
+    //       }
   }
 
   private async _verifyWebAuthnCreation(

@@ -18,8 +18,6 @@ const MFAPage = ({ onSuccess, onCancel }) => {
       try {
         setIsLoading(true);
 
-        // Check for existing factors
-        console.log(auth.auth)
         const factors = await auth.mfa.listFactors();
         if (factors.error) {
           throw factors.error;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Shield, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
 
 
 const styles = {
@@ -71,21 +72,13 @@ const styles = {
   },
 }
 
-// Simulated WebAuthn API call
-const simulateWebAuthnAuthentication = () => {
-  // TODO: Perform single step verification. Enroll to be done on the list factors page
-  // Function is _verifyWebAuthn
-  return new auth.mfa.verify({
-    // factorId: <fill this in>
-    // challengeId: <fill this in>
-    // factorType:'webauthn'
-      })
-}
 
 export default function MFAWebAuthn() {
   const [error, setError] = useState(null)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
+
   const navigate = useNavigate();
+  const { auth } = useAuth()
 
 
   useEffect(() => {
@@ -96,11 +89,13 @@ export default function MFAWebAuthn() {
     setIsAuthenticating(true)
     setError(null)
     try {
-      await simulateWebAuthnAuthentication()
-      // Authenticate
-      console.log('Authentication successful')
+      const { data, error } = await auth.mfa.verify({ factorType: 'webauthn' })
+      console.log(data)
+      if (error) {
+        setError((error).message)
+      }
     } catch (err) {
-      setError((err).message)
+      setError((error).message)
     } finally {
       setIsAuthenticating(false)
     }
