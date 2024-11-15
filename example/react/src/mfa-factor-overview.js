@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Key, Shield, Smartphone, X, Plus, ChevronRight, Loader2 } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 
@@ -495,41 +495,45 @@ const AddFactorDialog = ({ open, onClose, onFactorAdded }) => {
 };
 
 const MFAFactorsPage = () => {
+const { auth } = useAuth()
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [factorsList, setFactorsList] = useState({
+
+    const [factorsList, setFactorsList] = useState({
     data: {
-      all: [
-        {
-          id: "1",
-          friendly_name: "iPhone Face ID",
-          factor_type: "webauthn",
-          status: "verified",
-          created_at: "2024-01-01",
-          updated_at: "2024-01-01"
-        },
-        {
-          id: "2",
-          friendly_name: "Google Authenticator",
-          factor_type: "totp",
-          status: "verified",
-          created_at: "2024-01-02",
-          updated_at: "2024-01-02"
-        }
-      ],
-      totp: [
-        {
-          id: "2",
-          friendly_name: "Google Authenticator",
-          factor_type: "totp",
-          status: "verified",
-          created_at: "2024-01-02",
-          updated_at: "2024-01-02"
-        }
-      ],
+      all: [],
+      totp: [],
       phone: []
     },
     error: null
   });
+
+  // Add useEffect to fetch factors when component mounts
+  useEffect(() => {
+    fetchFactors();
+  }, [factorsList]);
+
+  const fetchFactors = async () => {
+    try {
+      const { data: factors, error } = await auth.mfa.listFactors();
+
+      if (error) {
+        setFactorsList(prev => ({ ...prev, error }));
+        return;
+      }
+
+
+      setFactorsList({
+        data: factors,
+        error: null
+      });
+    } catch (err) {
+      setFactorsList(prev => ({
+        ...prev,
+        error: err
+      }));
+    }
+  };
+
 
   const handleDelete = async (factor) => {
     console.log('Deleting factor:', factor);
@@ -540,7 +544,7 @@ const MFAFactorsPage = () => {
   };
 
   const handleFactorAdded = async () => {
-    console.log('Factor added');
+      fetchFactors()
   };
 
   return (
