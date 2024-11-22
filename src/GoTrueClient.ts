@@ -1403,6 +1403,20 @@ export default class GoTrueClient {
     }
   }
 
+  // TODO: come back and type this
+  private async handlePKCEFlow(params: any) {
+    if (!params.code) throw new AuthPKCEGrantCodeExchangeError('No code detected.')
+    const { data, error } = await this._exchangeCodeForSession(params.code)
+    if (error) throw error
+
+    const url = new URL(window.location.href)
+    url.searchParams.delete('code')
+
+    window.history.replaceState(window.history.state, '', url.toString())
+
+    return { data: { session: data.session, redirectType: null }, error: null }
+  }
+
   /**
    * Gets the session data from a URL string
    */
@@ -1424,19 +1438,8 @@ export default class GoTrueClient {
       const params = parseParametersFromURL(window.location.href)
 
       if (isPKCEFlow) {
-        if (!params.code) throw new AuthPKCEGrantCodeExchangeError('No code detected.')
-        const { data, error } = await this._exchangeCodeForSession(params.code)
-        if (error) throw error
-
-        const url = new URL(window.location.href)
-        url.searchParams.delete('code')
-
-        window.history.replaceState(window.history.state, '', url.toString())
-
-        return { data: { session: data.session, redirectType: null }, error: null }
-      }
-
-      if (params.error || params.error_description || params.error_code) {
+        return await this.handlePKCEFlow(params)
+      } else if (params.error || params.error_description || params.error_code) {
         throw new AuthImplicitGrantRedirectError(
           params.error_description || 'Error in URL with unspecified error_description',
           {
