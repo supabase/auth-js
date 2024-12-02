@@ -460,6 +460,8 @@ export default class GoTrueClient {
       const { data, error } = res
 
       if (error || !data) {
+        await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
+        await this._notifyAllSubscribers('STORAGE_UPDATED', null)
         return { data: { user: null, session: null }, error: error }
       }
 
@@ -473,6 +475,8 @@ export default class GoTrueClient {
 
       return { data: { user, session }, error: null }
     } catch (error) {
+      await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
+      await this._notifyAllSubscribers('STORAGE_UPDATED', null)
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
@@ -613,6 +617,8 @@ export default class GoTrueClient {
       return { data: { ...data, redirectType: redirectType ?? null }, error }
     } catch (error) {
       if (isAuthError(error)) {
+        await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
+        await this._notifyAllSubscribers('STORAGE_UPDATED', null)
         return { data: { user: null, session: null, redirectType: null }, error }
       }
 
@@ -721,6 +727,8 @@ export default class GoTrueClient {
       }
       throw new AuthInvalidCredentialsError('You must provide either an email or phone number.')
     } catch (error) {
+      await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
+      await this._notifyAllSubscribers('STORAGE_UPDATED', null)
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
@@ -820,6 +828,8 @@ export default class GoTrueClient {
         xform: _ssoResponse,
       })
     } catch (error) {
+      await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
+      await this._notifyAllSubscribers('STORAGE_UPDATED', null)
       if (isAuthError(error)) {
         return { data: null, error }
       }
@@ -1221,6 +1231,7 @@ export default class GoTrueClient {
       emailRedirectTo?: string | undefined
     } = {}
   ): Promise<UserResponse> {
+    let session: Session | null = null
     try {
       return await this._useSession(async (result) => {
         const { data: sessionData, error: sessionError } = result
@@ -1230,7 +1241,7 @@ export default class GoTrueClient {
         if (!sessionData.session) {
           throw new AuthSessionMissingError()
         }
-        const session: Session = sessionData.session
+        session = sessionData.session
         let codeChallenge: string | null = null
         let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce' && attributes.email != null) {
@@ -1258,6 +1269,8 @@ export default class GoTrueClient {
         return { data: { user: session.user }, error: null }
       })
     } catch (error) {
+      await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
+      await this._notifyAllSubscribers('STORAGE_UPDATED', session)
       if (isAuthError(error)) {
         return { data: { user: null }, error }
       }
@@ -1686,6 +1699,8 @@ export default class GoTrueClient {
         redirectTo: options.redirectTo,
       })
     } catch (error) {
+      await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
+      await this._notifyAllSubscribers('STORAGE_UPDATED', null)
       if (isAuthError(error)) {
         return { data: null, error }
       }
@@ -1722,9 +1737,11 @@ export default class GoTrueClient {
    * This method supports the PKCE flow.
    */
   async linkIdentity(credentials: SignInWithOAuthCredentials): Promise<OAuthResponse> {
+    let session: Session | null = null
     try {
       const { data, error } = await this._useSession(async (result) => {
         const { data, error } = result
+        session = data.session
         if (error) throw error
         const url: string = await this._getUrlForProvider(
           `${this.url}/user/identities/authorize`,
@@ -1747,6 +1764,8 @@ export default class GoTrueClient {
       }
       return { data: { provider: credentials.provider, url: data?.url }, error: null }
     } catch (error) {
+      await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
+      await this._notifyAllSubscribers('STORAGE_UPDATED', session)
       if (isAuthError(error)) {
         return { data: { provider: credentials.provider, url: null }, error }
       }
@@ -2032,6 +2051,9 @@ export default class GoTrueClient {
     // so we can safely suppress the warning returned by future getSession calls
     this.suppressGetSessionWarning = true
     await setItemAsync(this.storage, this.storageKey, session)
+    
+    // cleanup potentially unused code verifier
+    await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
   }
 
   private async _removeSession() {
