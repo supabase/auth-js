@@ -1532,9 +1532,13 @@ export default class GoTrueClient {
    * Checks if the current URL contains parameters given by an implicit oauth grant flow (https://www.rfc-editor.org/rfc/rfc6749.html#section-4.2)
    */
   private _isImplicitGrantFlow(): boolean {
+    if (!isBrowser()) {
+      return false
+    }
+
     const params = parseParametersFromURL(window.location.href)
 
-    return !!(isBrowser() && (params.access_token || params.error_description))
+    return !!(params.access_token || params.error_description)
   }
 
   /**
