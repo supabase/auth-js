@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.67.0](https://github.com/supabase/auth-js/compare/v2.66.1...v2.67.0) (2024-12-06)
+
+
+### Features
+
+* wrap navigator.locks.request with plain promise to help zone.js ([#989](https://github.com/supabase/auth-js/issues/989)) ([2e6e07c](https://github.com/supabase/auth-js/commit/2e6e07c21a561ca13d5e74b69609c2cc93f104f4)), closes [#830](https://github.com/supabase/auth-js/issues/830)
+
 ## [2.66.1](https://github.com/supabase/auth-js/compare/v2.66.0...v2.66.1) (2024-12-04)
 
 
