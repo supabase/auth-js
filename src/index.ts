@@ -5,6 +5,7 @@ import AuthClient from './AuthClient'
 export { GoTrueAdminApi, GoTrueClient, AuthAdminApi, AuthClient }
 export * from './lib/types'
 export * from './lib/errors'
+export { AUTH_ERROR_CODES } from './lib/error-codes'
 export {
   navigatorLock,
   NavigatorLockAcquireTimeoutError,
