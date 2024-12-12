@@ -1423,13 +1423,23 @@ export default class GoTrueClient {
   > {
     try {
       if (!isBrowser()) throw new AuthImplicitGrantRedirectError('No browser detected.')
+
+      const params = parseParametersFromURL(window.location.href)
+      if (params.error || params.error_description || params.error_code) {
+        throw new AuthImplicitGrantRedirectError(
+          params.error_description || 'Error in URL with unspecified error_description',
+          {
+            error: params.error || 'unspecified_error',
+            code: params.error_code || 'unspecified_code',
+          }
+        )
+      }
+
       if (this.flowType === 'implicit' && !this._isImplicitGrantFlow()) {
         throw new AuthImplicitGrantRedirectError('Not a valid implicit grant flow url.')
       } else if (this.flowType == 'pkce' && !isPKCEFlow) {
         throw new AuthPKCEGrantCodeExchangeError('Not a valid PKCE flow url.')
       }
-
-      const params = parseParametersFromURL(window.location.href)
 
       if (isPKCEFlow) {
         if (!params.code) throw new AuthPKCEGrantCodeExchangeError('No code detected.')
@@ -1442,16 +1452,6 @@ export default class GoTrueClient {
         window.history.replaceState(window.history.state, '', url.toString())
 
         return { data: { session: data.session, redirectType: null }, error: null }
-      }
-
-      if (params.error || params.error_description || params.error_code) {
-        throw new AuthImplicitGrantRedirectError(
-          params.error_description || 'Error in URL with unspecified error_description',
-          {
-            error: params.error || 'unspecified_error',
-            code: params.error_code || 'unspecified_code',
-          }
-        )
       }
 
       const {
