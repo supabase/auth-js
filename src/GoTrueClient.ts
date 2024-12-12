@@ -1425,7 +1425,11 @@ export default class GoTrueClient {
       if (!isBrowser()) throw new AuthImplicitGrantRedirectError('No browser detected.')
 
       const params = parseParametersFromURL(window.location.href)
+
+      // If there's an error in the URL, it doesn't matter what flow it is, we just return the error.
       if (params.error || params.error_description || params.error_code) {
+        // The error class returned implies that the redirect is from an implicit grant flow
+        // but it could also be from a redirect error from a PKCE flow.
         throw new AuthImplicitGrantRedirectError(
           params.error_description || 'Error in URL with unspecified error_description',
           {
@@ -1435,6 +1439,7 @@ export default class GoTrueClient {
         )
       }
 
+      // Checks for mismatches between the flowType initialised in the client and the URL parameters
       if (this.flowType === 'implicit' && !this._isImplicitGrantFlow()) {
         throw new AuthImplicitGrantRedirectError('Not a valid implicit grant flow url.')
       } else if (this.flowType == 'pkce' && !isPKCEFlow) {
