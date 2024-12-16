@@ -307,8 +307,22 @@ export default class GoTrueClient {
    */
   private async _initialize(): Promise<InitializeResult> {
     try {
-      if (isBrowser() && this.detectSessionInUrl) {
-        const { data, error } = await this._getSessionFromURL()
+      const params = parseParametersFromURL(window.location.href)
+      let callbackUrlType = 'none'
+      if (this._isImplicitGrantCallback(params)) {
+        callbackUrlType = 'implicit'
+      } else if (await this._isPKCECallback(params)) {
+        callbackUrlType = 'pkce'
+      }
+
+      /**
+       * Attempt to get the session from the URL only if these conditions are fulfilled
+       *
+       * Note: If the URL isn't one of the callback url types (implicit or pkce),
+       * then there could be an existing session so we don't want to prematurely remove it
+       */
+      if (isBrowser() && this.detectSessionInUrl && callbackUrlType !== 'none') {
+        const { data, error } = await this._getSessionFromURL(params, callbackUrlType)
         if (error) {
           this._debug('#_initialize()', 'error detecting session from URL', error)
 
@@ -1411,7 +1425,10 @@ export default class GoTrueClient {
   /**
    * Gets the session data from a URL string
    */
-  private async _getSessionFromURL(): Promise<
+  private async _getSessionFromURL(
+    params: { [parameter: string]: string },
+    callbackUrlType: string
+  ): Promise<
     | {
         data: { session: Session; redirectType: string | null }
         error: null
@@ -1420,8 +1437,6 @@ export default class GoTrueClient {
   > {
     try {
       if (!isBrowser()) throw new AuthImplicitGrantRedirectError('No browser detected.')
-
-      const params = parseParametersFromURL(window.location.href)
 
       // If there's an error in the URL, it doesn't matter what flow it is, we just return the error.
       if (params.error || params.error_description || params.error_code) {
@@ -1436,23 +1451,25 @@ export default class GoTrueClient {
         )
       }
 
-      const isRedirectFromImplicitGrantFlow = this._isImplicitGrantFlow(params)
-      const isRedirectFromPKCEFlow = await this._isPKCEFlow(params)
-
       // Checks for mismatches between the flowType initialised in the client and the URL parameters
-      if (!isRedirectFromImplicitGrantFlow && !isRedirectFromPKCEFlow) {
-        if (this.flowType === 'implicit') {
-          throw new AuthImplicitGrantRedirectError('Not a valid implicit grant flow url.')
-        } else if (this.flowType === 'pkce') {
-          throw new AuthPKCEGrantCodeExchangeError('Not a valid PKCE flow url.')
-        } else {
-          throw new AuthError('Invalid flow type.')
-        }
+      switch (callbackUrlType) {
+        case 'implicit':
+          if (this.flowType === 'pkce') {
+            throw new AuthPKCEGrantCodeExchangeError('Not a valid PKCE flow url.')
+          }
+          break
+        case 'pkce':
+          if (this.flowType === 'implicit') {
+            throw new AuthImplicitGrantRedirectError('Not a valid implicit grant flow url.')
+          }
+          break
+        default:
+        // there's no mismatch so we continue
       }
 
       // Since this is a redirect for PKCE, we attempt to retrieve the code from the URL for the code exchange
-      if (isRedirectFromPKCEFlow) {
-        this._debug('#_initialize()', 'begin', 'is PKCE flow', isRedirectFromPKCEFlow)
+      if (callbackUrlType === 'pkce') {
+        this._debug('#_initialize()', 'begin', 'is PKCE flow', true)
         if (!params.code) throw new AuthPKCEGrantCodeExchangeError('No code detected.')
         const { data, error } = await this._exchangeCodeForSession(params.code)
         if (error) throw error
@@ -1542,20 +1559,20 @@ export default class GoTrueClient {
   /**
    * Checks if the current URL contains parameters given by an implicit oauth grant flow (https://www.rfc-editor.org/rfc/rfc6749.html#section-4.2)
    */
-  private _isImplicitGrantFlow(params: { [parameter: string]: string }): boolean {
-    return !!((params.access_token || params.error_description) && this.flowType === 'implicit')
+  private _isImplicitGrantCallback(params: { [parameter: string]: string }): boolean {
+    return Boolean(params.access_token || params.error_description)
   }
 
   /**
    * Checks if the current URL and backing storage contain parameters given by a PKCE flow
    */
-  private async _isPKCEFlow(params: { [parameter: string]: string }): Promise<boolean> {
+  private async _isPKCECallback(params: { [parameter: string]: string }): Promise<boolean> {
     const currentStorageContent = await getItemAsync(
       this.storage,
       `${this.storageKey}-code-verifier`
     )
 
-    return !!(params.code && currentStorageContent && this.flowType === 'pkce')
+    return !!(params.code && currentStorageContent)
   }
 
   /**
