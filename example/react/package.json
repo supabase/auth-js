@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@supabase/auth-js": "file:../..",
+    "@supabase/supabase-js": "^2.47.6",
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.5.0",
     "@testing-library/user-event": "^7.2.1",
@@ -13,7 +14,8 @@
     "tailwindcss": "^1.8.10"
   },
   "devDependencies": {
-    "@babel/plugin-proposal-private-property-in-object": "^7.21.11"
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "postcss-flexbugs-fixes": "^5.0.2"
   },
   "scripts": {
     "build:tailwind": "tailwindcss build src/App.css -o src/tailwind.output.css",
