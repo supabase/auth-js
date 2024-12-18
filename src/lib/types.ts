@@ -39,6 +39,7 @@ export type AuthChangeEvent =
   | 'PASSWORD_RECOVERY'
   | 'SIGNED_IN'
   | 'SIGNED_OUT'
+  | 'STORAGE_UPDATED'
   | 'TOKEN_REFRESHED'
   | 'USER_UPDATED'
   | AuthChangeEventMFA
