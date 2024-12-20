@@ -16,6 +16,20 @@ export type MFAEnrollPhoneParams = {
   /** Phone number associated with a factor. Number should conform to E.164 format */
   phone: string
 }
+export type MFAEnrollWebAuthnParams = {
+  /** The type of factor being enrolled. */
+  factorType: 'webauthn'
+  /** Domain which the user is enrolled with. */
+  issuer?: string
+  /** Human readable name assigned to the factor. */
+  friendlyName?: string
+
+  /** WebAuthn specific parameters*/
+  webAuthn?: Object
+
+  /** Have the Auth client library handle the browser-authenticator interaction for you */
+  useMultiStep: boolean
+}
 
 export type AuthMFAEnrollTOTPResponse =
   | {
@@ -66,6 +80,25 @@ export type AuthMFAEnrollPhoneResponse =
 
         /** Phone number of the MFA factor in E.164 format. Used to send messages  */
         phone: string
+      }
+      error: null
+    }
+  | {
+      data: null
+      error: AuthError
+    }
+
+export type AuthMFAEnrollWebAuthnResponse =
+  | {
+      data: {
+        /** ID of the factor that was just enrolled (in an unverified state). */
+        id: string
+
+        /** Type of MFA factor. */
+        type: 'phone'
+
+        /** Friendly name of the factor, useful for distinguishing between factors **/
+        friendly_name?: string
       }
       error: null
     }
