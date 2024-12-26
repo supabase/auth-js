@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.67.4](https://github.com/supabase/auth-js/compare/v2.67.3...v2.67.4) (2024-12-26)
+
+
+### Bug Fixes
+
+* remove `internal-types.ts` ([#1014](https://github.com/supabase/auth-js/issues/1014)) ([28ead89](https://github.com/supabase/auth-js/commit/28ead89af47bcdaccc6cc2f2c7f013bed8cf3d50))
+* update docs to add scrypt ([#1012](https://github.com/supabase/auth-js/issues/1012)) ([1225239](https://github.com/supabase/auth-js/commit/1225239e239bde1b25037a88867d4c484caf8301))
+
 ## [2.67.3](https://github.com/supabase/auth-js/compare/v2.67.2...v2.67.3) (2024-12-17)
 
 
