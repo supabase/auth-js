@@ -256,7 +256,7 @@ export interface Session {
 }
 
 /**
- * An authentication methord reference (AMR) entry.
+ * An authentication method reference (AMR) entry.
  *
  * An entry designates what method was used by the user to verify their
  * identity and at what time.
