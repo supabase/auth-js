@@ -1,17 +1,34 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { AuthClient } from '@supabase/auth-js'
+// import { createClient } from '@supabase/supabase-js'
 import './tailwind.output.css'
 
 const supabaseURL = process.env.REACT_APP_SUPABASE_URL
 const supabaseAnon = process.env.REACT_APP_SUPABASE_ANON_KEY
 
+/**
+ * Comment to test auth-js standalone.
+ * To test changes made in auth-js, you need to run npm run build in the root of the repo first.
+ */
 const auth = new AuthClient({
   url: `${supabaseURL}/auth/v1`,
   headers: {
     accept: 'json',
     apikey: supabaseAnon,
   },
+  flowType: 'pkce',
 })
+
+/**
+ * Uncomment to test supabase-js
+ *
+ */
+// const supabase = createClient(supabaseURL, supabaseAnon, {
+//   auth: {
+//     flowType: 'pkce',
+//   },
+// })
+// const auth = supabase.auth
 
 function App() {
   let [session, setSession] = useState()
@@ -43,10 +60,9 @@ function App() {
         setSession(session)
       }
     })
-
     return () => {
       if (subscription.subscription) {
-        subscription.unsubscribe()
+        subscription.subscription.unsubscribe()
       }
     }
   }, [])
