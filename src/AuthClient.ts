@@ -1,5 +1,10 @@
 import GoTrueClient from './GoTrueClient'
 
-const AuthClient = GoTrueClient
+const AuthClient = (options) => {
+  return new GoTrueClient({
+    ...options,
+    throwOnError: options.throwOnError || false,
+  })
+}
 
 export default AuthClient

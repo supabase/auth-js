@@ -90,7 +90,7 @@ describe('GoTrueClient', () => {
       expect(session!.token_type).toStrictEqual('bearer')
       expect(refreshAccessTokenSpy).toBeCalledTimes(1)
       // @ts-expect-error 'data.session and session should not be null because of the assertion above'
-      expect(data.session.refresh_token).not.toEqual(session.refresh_token)
+      expect(data.session.refresh_token).not toEqual(session.refresh_token)
     })
 
     test('setSession should return no error', async () => {
@@ -101,7 +101,7 @@ describe('GoTrueClient', () => {
         password,
       })
       expect(error).toBeNull()
-      expect(data.session).not.toBeNull()
+      expect(data.session).not toBeNull()
 
       const {
         data: { session },
@@ -113,12 +113,12 @@ describe('GoTrueClient', () => {
         refresh_token: data.session.refresh_token,
       })
       expect(setSessionError).toBeNull()
-      expect(session).not.toBeNull()
-      expect(session!.user).not.toBeNull()
-      expect(session!.expires_in).not.toBeNull()
-      expect(session!.expires_at).not.toBeNull()
-      expect(session!.access_token).not.toBeNull()
-      expect(session!.refresh_token).not.toBeNull()
+      expect(session).not toBeNull()
+      expect(session!.user).not toBeNull()
+      expect(session!.expires_in).not toBeNull()
+      expect(session!.expires_at).not toBeNull()
+      expect(session!.access_token).not toBeNull()
+      expect(session!.refresh_token).not toBeNull()
       expect(session!.token_type).toStrictEqual('bearer')
 
       /**
@@ -127,7 +127,7 @@ describe('GoTrueClient', () => {
        */
       const { data: getSessionData, error: getSessionError } = await authWithSession.getSession()
       expect(getSessionError).toBeNull()
-      expect(getSessionData).not.toBeNull()
+      expect(getSessionData).not toBeNull()
 
       const {
         data: { user },
@@ -135,7 +135,7 @@ describe('GoTrueClient', () => {
       } = await authWithSession.updateUser({ data: { hello: 'world' } })
 
       expect(updateError).toBeNull()
-      expect(user).not.toBeNull()
+      expect(user).not toBeNull()
       expect(user?.user_metadata).toMatchObject({ hello: 'world' })
     })
 
@@ -148,12 +148,12 @@ describe('GoTrueClient', () => {
       })
 
       expect(error).toBeNull()
-      expect(data.session).not.toBeNull()
+      expect(data.session).not toBeNull()
 
       const { data: userSession, error: userError } = await authWithSession.getSession()
 
       expect(userError).toBeNull()
-      expect(userSession.session).not.toBeNull()
+      expect(userSession.session).not toBeNull()
       expect(userSession.session).toHaveProperty('access_token')
       expect(userSession.session).toHaveProperty('user')
     })
@@ -167,7 +167,7 @@ describe('GoTrueClient', () => {
       })
 
       expect(error).toBeNull()
-      expect(data.session).not.toBeNull()
+      expect(data.session).not toBeNull()
 
       const expired = new Date()
       expired.setMinutes(expired.getMinutes() - 1)
@@ -192,10 +192,10 @@ describe('GoTrueClient', () => {
       const { data: userSession, error: userError } = await authWithSession.getSession()
 
       expect(userError).toBeNull()
-      expect(userSession.session).not.toBeNull()
+      expect(userSession.session).not toBeNull()
       expect(userSession.session).toHaveProperty('access_token')
       expect(refreshAccessTokenSpy).toBeCalledTimes(1)
-      expect(data.session?.access_token).not.toEqual(userSession.session?.access_token)
+      expect(data.session?.access_token).not toEqual(userSession.session?.access_token)
     })
 
     test('refresh should only happen once', async () => {
@@ -207,7 +207,7 @@ describe('GoTrueClient', () => {
       })
 
       expect(error).toBeNull()
-      expect(data.session).not.toBeNull()
+      expect(data.session).not toBeNull()
 
       const [{ session: session1, error: error1 }, { session: session2, error: error2 }] =
         await Promise.all([
@@ -245,7 +245,7 @@ describe('GoTrueClient', () => {
       })
 
       expect(error).toBeNull()
-      expect(data.session).not.toBeNull()
+      expect(data.session).not toBeNull()
 
       const [{ session: session1, error: error1 }, { session: session2, error: error2 }] =
         await Promise.all([
@@ -286,7 +286,7 @@ describe('GoTrueClient', () => {
       })
 
       expect(error).toBeNull()
-      expect(data.session).not.toBeNull()
+      expect(data.session).not toBeNull()
 
       const [error1, error2] = await Promise.allSettled([
         // @ts-expect-error 'Allow access to private _callRefreshToken()'
@@ -336,8 +336,8 @@ describe('GoTrueClient', () => {
       })
 
       expect(error).toBeNull()
-      expect(data.session).not.toBeNull()
-      expect(data.user).not.toBeNull()
+      expect(data.session).not toBeNull()
+      expect(data.user).not toBeNull()
 
       expect(data.user?.email).toEqual(email)
     })
@@ -352,7 +352,7 @@ describe('GoTrueClient', () => {
         password,
       })
 
-      expect(error).not.toBeNull()
+      expect(error).not toBeNull()
       expect(data.session).toBeNull()
       expect(data.user).toBeNull()
 
@@ -368,7 +368,7 @@ describe('GoTrueClient', () => {
         password,
       })
 
-      expect(error).not.toBeNull()
+      expect(error).not toBeNull()
       expect(data.session).toBeNull()
       expect(data.user).toBeNull()
     })
@@ -379,7 +379,7 @@ describe('GoTrueClient', () => {
       const { data, error } = await phoneClient.signInWithOtp({
         phone,
       })
-      expect(error).not.toBeNull()
+      expect(error).not toBeNull()
       expect(data.session).toBeNull()
       expect(data.user).toBeNull()
     })
@@ -509,7 +509,7 @@ describe('GoTrueClient', () => {
 
     expect(initialError).toBeNull()
     const initialSession = data.session
-    expect(initialSession).not.toBeNull()
+    expect(initialSession).not toBeNull()
 
     const { data: userSession, error } = await authWithSession.getSession()
 
@@ -547,7 +547,7 @@ describe('GoTrueClient', () => {
       },
     })
 
-    expect(userSession.session?.user).not.toBeNull()
+    expect(userSession.session?.user).not toBeNull()
     expect(userSession.session?.user?.email).toBe(email)
   })
 })
@@ -591,13 +591,13 @@ describe('Signout behaviour', () => {
       password,
     })
     expect(signInError).toBe(null)
-    expect(user).not.toBe(null)
+    expect(user).not toBe(null)
 
     const {
       data: { session },
       error: sessionError,
     } = await authWithSession.getSession()
-    expect(session).not.toBe(null)
+    expect(session).not toBe(null)
     expect(sessionError).toBe(null)
 
     const id = user ? user.id : '' // user should not be null
@@ -664,7 +664,7 @@ describe('User management', () => {
       },
     })
 
-    expect(user).not.toBeNull()
+    expect(user).not toBeNull()
     expect(user?.email).toBe(email)
     expect(user?.user_metadata).toMatchObject(userMetadata)
   })
@@ -712,7 +712,7 @@ describe('User management', () => {
       password,
     })
 
-    expect(data.user).not.toBeNull()
+    expect(data.user).not toBeNull()
 
     await authWithSession.signOut()
     const { data: userSession, error } = await authWithSession.getSession()
@@ -728,8 +728,8 @@ describe('User management', () => {
       password: password + '-wrong',
     })
 
-    expect(error).not.toBeNull()
-    expect(error?.message).not.toBeNull()
+    expect(error).not toBeNull()
+    expect(error?.message).not toBeNull()
     expect(data.session).toBeNull()
   })
 })
@@ -824,7 +824,7 @@ describe('The auth client can signin with third-party oAuth providers', () => {
       })
 
       expect(error).toBeNull()
-      expect(user).not.toBeNull()
+      expect(user).not toBeNull()
 
       expect(user?.email).toEqual(email)
     })
@@ -843,7 +843,7 @@ describe('The auth client can signin with third-party oAuth providers', () => {
       })
 
       expect(user).toBeNull()
-      expect(error).not.toBeNull()
+      expect(error).not toBeNull()
       expect(error?.message).toEqual('Signups not allowed for this instance')
     })
   })
@@ -859,7 +859,7 @@ describe('User management', () => {
     })
 
     expect(initialError).toBeNull()
-    expect(data.session).not.toBeNull()
+    expect(data.session).not toBeNull()
 
     const redirectTo = 'http://localhost:9999/welcome'
     const { error, data: user } = await authWithSession.resetPasswordForEmail(email, {
@@ -899,7 +899,7 @@ describe('User management', () => {
     const user = refreshedSession?.user
 
     expect(error).toBeNull()
-    expect(user).not.toBeNull()
+    expect(user).not toBeNull()
     expect(user?.email).toEqual(email)
   })
 })
@@ -914,7 +914,7 @@ describe('MFA', () => {
       throw error
     }
 
-    expect(data.totp.qr_code).not.toBeNull()
+    expect(data.totp.qr_code).not toBeNull()
   })
 })
 
@@ -982,7 +982,7 @@ describe('GoTrueClient with storageisServer = true', () => {
     } = await client.getSession()
 
     const user = session?.user // accessing the user object from getSession should emit a warning the first time
-    expect(user).not.toBeNull()
+    expect(user).not toBeNull()
     expect(warnings.length).toEqual(1)
     expect(
       warnings[0][0].startsWith(
@@ -991,7 +991,7 @@ describe('GoTrueClient with storageisServer = true', () => {
     ).toEqual(true)
 
     const user2 = session?.user // accessing the user object further should not emit a warning
-    expect(user2).not.toBeNull()
+    expect(user2).not toBeNull()
     expect(warnings.length).toEqual(1)
 
     const {
@@ -999,7 +999,7 @@ describe('GoTrueClient with storageisServer = true', () => {
     } = await client.getSession() // create new proxy instance
 
     const user3 = session2?.user // accessing the user object in subsequent proxy instances, for this client, should not emit a warning
-    expect(user3).not.toBeNull()
+    expect(user3).not toBeNull()
     expect(warnings.length).toEqual(1)
   })
 
@@ -1021,14 +1021,14 @@ describe('GoTrueClient with storageisServer = true', () => {
       error,
     } = await client.getUser() // should suppress any warnings
     expect(error).toBeNull()
-    expect(user).not.toBeNull()
+    expect(user).not toBeNull()
 
     const {
       data: { session },
     } = await client.getSession()
 
     const sessionUser = session?.user // accessing the user object from getSession shouldn't emit a warning
-    expect(sessionUser).not.toBeNull()
+    expect(sessionUser).not toBeNull()
     expect(warnings.length).toEqual(0)
   })
 
@@ -1078,5 +1078,35 @@ describe('GoTrueClient with storageisServer = true', () => {
     // @ts-ignore 'Allow access to private _saveSession'
     await client._saveSession(newSession)
     expect(store.getItem('test-storage-key')).toEqual(JSON.stringify(newSession))
+  })
+})
+
+describe('GoTrueClient with throwOnError option', () => {
+  const client = new GoTrueClient({
+    url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+    autoRefreshToken: false,
+    persistSession: true,
+    storage: new MemoryStorage(),
+    throwOnError: true,
+  })
+
+  test('signUp() should throw an error when throwOnError is true', async () => {
+    const { email, password } = mockUserCredentials()
+
+    await expect(client.signUp({ email, password: '' })).rejects.toThrow()
+  })
+
+  test('signInWithPassword() should throw an error when throwOnError is true', async () => {
+    const { email, password } = mockUserCredentials()
+
+    await expect(client.signInWithPassword({ email, password: '' })).rejects.toThrow()
+  })
+
+  test('updateUser() should throw an error when throwOnError is true', async () => {
+    const { email, password } = mockUserCredentials()
+
+    await client.signUp({ email, password })
+
+    await expect(client.updateUser({ email: 'invalid-email' })).rejects.toThrow()
   })
 })
