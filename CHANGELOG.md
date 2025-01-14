@@ -1,5 +1,48 @@
 # Changelog
 
+## [2.67.3](https://github.com/supabase/auth-js/compare/v2.67.2...v2.67.3) (2024-12-17)
+
+
+### Bug Fixes
+
+* return redirect errors early  ([#1003](https://github.com/supabase/auth-js/issues/1003)) ([9751b80](https://github.com/supabase/auth-js/commit/9751b8029b4235a63dcb525e7ce7cc942c85daf5))
+
+## [2.67.2](https://github.com/supabase/auth-js/compare/v2.67.1...v2.67.2) (2024-12-16)
+
+
+### Bug Fixes
+
+* `isBrowser()` to include check on `window` ([#982](https://github.com/supabase/auth-js/issues/982)) ([645f224](https://github.com/supabase/auth-js/commit/645f22447e68ba13e43e359d1524e95fe025d771))
+
+## [2.67.1](https://github.com/supabase/auth-js/compare/v2.67.0...v2.67.1) (2024-12-13)
+
+
+### Bug Fixes
+
+* revert [#992](https://github.com/supabase/auth-js/issues/992) and [#993](https://github.com/supabase/auth-js/issues/993) ([#999](https://github.com/supabase/auth-js/issues/999)) ([12b2848](https://github.com/supabase/auth-js/commit/12b2848237854f3d70b9989920ad50e2c4186fff))
+
+## [2.67.0](https://github.com/supabase/auth-js/compare/v2.66.1...v2.67.0) (2024-12-12)
+
+
+### Features
+
+* wrap navigator.locks.request with plain promise to help zone.js ([#989](https://github.com/supabase/auth-js/issues/989)) ([2e6e07c](https://github.com/supabase/auth-js/commit/2e6e07c21a561ca13d5e74b69609c2cc93f104f4)), closes [#830](https://github.com/supabase/auth-js/issues/830)
+
+
+### Bug Fixes
+
+* add email_address_invalid error code ([#994](https://github.com/supabase/auth-js/issues/994)) ([232f133](https://github.com/supabase/auth-js/commit/232f133b1a84b4c667e994f472098aa5cde2088d))
+* return error early for redirects ([#992](https://github.com/supabase/auth-js/issues/992)) ([9f32d30](https://github.com/supabase/auth-js/commit/9f32d30e17954c5d4320b374a108617cda5ab357))
+
+## [2.66.1](https://github.com/supabase/auth-js/compare/v2.66.0...v2.66.1) (2024-12-04)
+
+
+### Bug Fixes
+
+* add loose auto complete to string literals where applicable ([#966](https://github.com/supabase/auth-js/issues/966)) ([fd9248d](https://github.com/supabase/auth-js/commit/fd9248d7aecd0bd00381dff162969d8014a3359a))
+* add new error codes ([#979](https://github.com/supabase/auth-js/issues/979)) ([dfb40d2](https://github.com/supabase/auth-js/commit/dfb40d24188f7e8b0d34e51ded15582086250c51))
+* don't remove session for identity linking errors ([#987](https://github.com/supabase/auth-js/issues/987)) ([e68ebe6](https://github.com/supabase/auth-js/commit/e68ebe604d15d881b23678d180cccb7115f16f4e))
+
 ## [2.66.0](https://github.com/supabase/auth-js/compare/v2.65.1...v2.66.0) (2024-11-01)
 
 
