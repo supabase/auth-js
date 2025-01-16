@@ -1,5 +1,5 @@
 import { API_VERSION_HEADER_NAME } from './constants'
-import { SupportedStorage } from './types'
+import { SupportedStorage, User } from './types'
 
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
@@ -343,4 +343,24 @@ export function parseResponseAPIVersion(response: Response) {
   } catch (e: any) {
     return null
   }
+}
+
+export function userNotAvailableProxy(): User {
+  return new Proxy({} as User, {
+    get: (_target: any, prop: string) => {
+      throw new Error(
+        `@supabase/auth-js: client was created with userStorage option and there was no user stored in the user storage. Accessing the "${prop}" property of the session object is not supported. Please use getUser() instead.`
+      )
+    },
+    set: (_target: any, prop: string) => {
+      throw new Error(
+        `@supabase/auth-js: client was created with userStorage option and there was no user stored in the user storage. Setting the "${prop}" property of the session object is not supported. Please use getUser() to fetch a user object you can manipulate.`
+      )
+    },
+    deleteProperty: (_target: any, prop: string) => {
+      throw new Error(
+        `@supabase/auth-js: client was created with userStorage option and there was no user stored in the user storage. Deleting the "${prop}" property of the session object is not supported. Please use getUser() to fetch a user object you can manipulate.`
+      )
+    },
+  })
 }
