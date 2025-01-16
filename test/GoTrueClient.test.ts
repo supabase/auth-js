@@ -1082,11 +1082,15 @@ describe('GoTrueClient with storageisServer = true', () => {
 })
 
 describe('GoTrueClient with throwOnError option', () => {
+  const store = memoryLocalStorageAdapter()
   const client = new GoTrueClient({
     url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+    storageKey: 'test-storage-key',
     autoRefreshToken: false,
     persistSession: true,
-    storage: new MemoryStorage(),
+    storage: {
+      ...store
+    },
     throwOnError: true,
   })
 
