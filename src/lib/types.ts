@@ -90,7 +90,7 @@ export type GoTrueClientOptions = {
    * If there is an error with the query, throwOnError will reject the promise by
    * throwing the error instead of returning it as part of a successful response.
    */
-  throwOnError?: false
+  throwOnError?: boolean
 }
 
 export type WeakPasswordReasons = 'length' | 'characters' | 'pwned' | (string & {})
