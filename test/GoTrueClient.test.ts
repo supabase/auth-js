@@ -1091,7 +1091,7 @@ describe('GoTrueClient with throwOnError option', () => {
     storage: {
       ...store
     },
-    throwOnError: true,
+    throwOnError: true, // test that the client throws errors
   })
 
   test('signUp() should throw an error when throwOnError is true', async () => {
