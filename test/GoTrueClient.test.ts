@@ -958,7 +958,7 @@ describe('GoTrueClient with storageisServer = true', () => {
     expect(warnings.length).toEqual(0)
   })
 
-  test('getSession() emits insecure warning, once per server client, when user object is accessed', async () => {
+  test('getSession() emits insecure warning, once per server client, when property on user object is accessed', async () => {
     const storage = memoryLocalStorageAdapter({
       [STORAGE_KEY]: JSON.stringify({
         access_token: 'jwt.accesstoken.signature',
@@ -981,29 +981,26 @@ describe('GoTrueClient with storageisServer = true', () => {
       data: { session },
     } = await client.getSession()
 
-    const user = session?.user // accessing the user object from getSession should emit a warning the first time
-    expect(user).not.toBeNull()
-    expect(warnings.length).toEqual(1)
-    expect(
-      warnings[0][0].startsWith(
-        'Using the user object as returned from supabase.auth.getSession() '
-      )
-    ).toEqual(true)
-
-    const user2 = session?.user // accessing the user object further should not emit a warning
-    expect(user2).not.toBeNull()
-    expect(warnings.length).toEqual(1)
-
-    const {
-      data: { session: session2 },
-    } = await client.getSession() // create new proxy instance
-
-    const user3 = session2?.user // accessing the user object in subsequent proxy instances, for this client, should not emit a warning
-    expect(user3).not.toBeNull()
-    expect(warnings.length).toEqual(1)
+    expect(session?.user).not.toBeNull()
+    expect(session?.user?.id).toMatchInlineSnapshot(`"random-user-id"`)
+    expect(warnings).toMatchInlineSnapshot(`
+      Array [
+        Array [
+          "@supabase/auth-js: Accessing the \\"id\\" (or any other) property of the user object is not secure. Reason: User object comes from insecure storage and may not be authentic. Call getUser() instead to prevent security issues.",
+        ],
+      ]
+    `)
+    expect(session?.user?.app_metadata).not.toBeNull()
+    expect(warnings).toMatchInlineSnapshot(`
+      Array [
+        Array [
+          "@supabase/auth-js: Accessing the \\"id\\" (or any other) property of the user object is not secure. Reason: User object comes from insecure storage and may not be authentic. Call getUser() instead to prevent security issues.",
+        ],
+      ]
+    `)
   })
 
-  test('getSession emits no warnings if getUser is called prior', async () => {
+  test('getSession() emits no warnings if getUser() is called prior', async () => {
     const client = new GoTrueClient({
       url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
       autoRefreshToken: false,
@@ -1021,15 +1018,14 @@ describe('GoTrueClient with storageisServer = true', () => {
       error,
     } = await client.getUser() // should suppress any warnings
     expect(error).toBeNull()
-    expect(user).not.toBeNull()
 
     const {
       data: { session },
     } = await client.getSession()
 
-    const sessionUser = session?.user // accessing the user object from getSession shouldn't emit a warning
-    expect(sessionUser).not.toBeNull()
-    expect(warnings.length).toEqual(0)
+    // accessing the user object from getSession shouldn't emit a warning
+    expect(session?.user?.id).not.toBeNull()
+    expect(warnings).toMatchInlineSnapshot(`Array []`)
   })
 
   test('saveSession should overwrite the existing session', async () => {
