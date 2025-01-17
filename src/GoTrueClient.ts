@@ -163,7 +163,6 @@ export default class GoTrueClient {
     [key: string]: string
   }
   protected hasCustomAuthorizationHeader = false
-  protected suppressGetSessionWarning = false
   protected fetch: Fetch
   protected lock: LockFunc
   protected lockAcquired = false
@@ -2048,9 +2047,6 @@ export default class GoTrueClient {
    */
   private async _saveSession(session: Session) {
     this._debug('#_saveSession()', session)
-    // _saveSession is always called whenever a new session has been acquired
-    // so we can safely suppress the warning returned by future getSession calls
-    this.suppressGetSessionWarning = true
     await setItemAsync(this.storage, this.storageKey, session)
   }
 
