@@ -102,6 +102,7 @@ import type {
   MFAEnrollPhoneParams,
   AuthMFAEnrollTOTPResponse,
   AuthMFAEnrollPhoneResponse,
+  JWK,
 } from './lib/types'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -142,7 +143,10 @@ export default class GoTrueClient {
   protected storageKey: string
 
   protected flowType: AuthFlowType
-
+  /**
+   * The JWKS used for verifying asymmetric JWTs
+   */
+  protected jwks: { keys: JWK[] }
   protected autoRefreshToken: boolean
   protected persistSession: boolean
   protected storage: SupportedStorage
@@ -222,7 +226,7 @@ export default class GoTrueClient {
     } else {
       this.lock = lockNoOp
     }
-
+    this.jwks = { keys: [] }
     this.mfa = {
       verify: this._verify.bind(this),
       enroll: this._enroll.bind(this),
@@ -2591,11 +2595,47 @@ export default class GoTrueClient {
     })
   }
 
+  private async fetchJwk(kid: string, jwks: { keys: JWK[] } = { keys: [] }): Promise<JWK> {
+    // try fetching from the supplied jwks
+    let jwk = jwks.keys.find((key) => key.kid === kid)
+    if (jwk) {
+      return jwk
+    }
+
+    // try fetching from cache
+    jwk = this.jwks.keys.find((key) => key.kid === kid)
+    if (jwk) {
+      return jwk
+    }
+    // jwk isn't cached in memory so we need to fetch it from the well-known endpoint
+    const {
+      data: { keys },
+      error,
+    } = await _request(this.fetch, 'GET', `${this.url}/.well-known/jwks.json`, {
+      headers: this.headers,
+    })
+    if (error) {
+      throw error
+    }
+    if (!keys || keys.length === 0) {
+      throw new AuthInvalidJwtError('JWKS is empty')
+    }
+    // Find the signing key
+    jwk = keys.find((key: any) => key.kid === kid)
+    if (!jwk) {
+      throw new AuthInvalidJwtError('No matching signing key found in JWKS')
+    }
+    return jwk
+  }
+
   /**
    * Gets the claims from a JWT. If the JWT is symmetric JWTs, it will call getUser() to verify against the server.
    * If the JWT is asymmetric, it will be verified against the JWKS using the WebCrypto API.
    */
-  async getClaims(jwt?: string): Promise<
+  async getClaims(
+    jwt?: string,
+    jwks: { keys: JWK[] } = { keys: [] }
+  ): Promise<
     | {
         data: { claims: { [key: string]: any } }
         error: null
@@ -2643,26 +2683,7 @@ export default class GoTrueClient {
       }
 
       const algorithm = getAlgorithm(header.alg)
-
-      // Fetch JWKS
-      const {
-        data: { keys },
-        error,
-      } = await _request(this.fetch, 'GET', `${this.url}/.well-known/jwks.json`, {
-        headers: this.headers,
-      })
-      if (error) {
-        throw error
-      }
-      if (!keys || keys.length === 0) {
-        throw new AuthInvalidJwtError('JWKS is empty')
-      }
-
-      // Find the signing key
-      const signingKey = keys.find((key: any) => key.kid === header.kid)
-      if (!signingKey) {
-        throw new AuthInvalidJwtError('No matching signing key found in JWKS')
-      }
+      const signingKey = await this.fetchJwk(header.kid, jwks)
 
       // Convert JWK to CryptoKey
       const publicKey = await crypto.subtle.importKey('jwk', signingKey, algorithm, true, [

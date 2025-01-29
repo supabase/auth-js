@@ -1216,3 +1216,11 @@ export interface JwtPayload {
   // any other non-standard claim in the payload
   [key: string]: any
 }
+
+export interface JWK {
+  kty: 'RSA' | 'EC' | 'OCT'
+  key_ops: string[]
+  alg?: string
+  kid?: string
+  [key: string]: any
+}
