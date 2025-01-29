@@ -1122,7 +1122,7 @@ export default class GoTrueClient {
         if (this.storage.isServer) {
           currentSession.user = userNotAvailableProxy(
             currentSession.user,
-            'User object comes from insecure storage and may not be authentic. Call getUser() instead to prevent security issues.'
+            'User object comes from insecure storage and cannot be trusted. Call getUser() instead to obtain a trusted user object.'
           )
         }
 
