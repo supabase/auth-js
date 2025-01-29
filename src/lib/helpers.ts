@@ -186,7 +186,7 @@ export function decodeJWT(token: string): {
   // Regex checks for base64url format
   const base64UrlRegex = /^([a-z0-9_-]{4})*($|[a-z0-9_-]{3}=?$|[a-z0-9_-]{2}(==)?$)$/i
   for (let i = 0; i < parts.length; i++) {
-    if (!base64UrlRegex.test(parts[i])) {
+    if (!base64UrlRegex.test(parts[i] as string)) {
       throw new AuthInvalidJwtError('JWT not in base64url format')
     }
   }
