@@ -1199,3 +1199,20 @@ export type AuthMFAEnrollPhoneResponse =
       data: null
       error: AuthError
     }
+
+export interface JwtHeader {
+  alg: 'RS256' | 'ES256' | 'HS256'
+  kid: string
+  typ: string
+}
+
+export interface JwtPayload {
+  iss: string
+  sub: string
+  aud: string | string[]
+  exp: number
+  iat: number
+
+  // any other non-standard claim in the payload
+  [key: string]: any
+}

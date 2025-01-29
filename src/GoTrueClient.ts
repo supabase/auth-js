@@ -20,7 +20,6 @@ import {
   isAuthRetryableFetchError,
   isAuthSessionMissingError,
   isAuthImplicitGrantRedirectError,
-  CustomAuthError,
   AuthInvalidJwtError,
 } from './lib/errors'
 import {
@@ -32,7 +31,6 @@ import {
   _ssoResponse,
 } from './lib/fetch'
 import {
-  decodeJWTPayload,
   Deferred,
   getItemAsync,
   isBrowser,
@@ -47,8 +45,8 @@ import {
   getCodeChallengeAndMethod,
   getAlgorithm,
   validateExp,
+  decodeJWT,
 } from './lib/helpers'
-import { base64url } from './lib/rfc4648'
 import { localStorageAdapter, memoryLocalStorageAdapter } from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
 import { version } from './lib/version'
@@ -91,7 +89,6 @@ import type {
   MFAVerifyParams,
   AuthMFAVerifyResponse,
   AuthMFAListFactorsResponse,
-  AMREntry,
   AuthMFAGetAuthenticatorAssuranceLevelResponse,
   AuthenticatorAssuranceLevels,
   Factor,
@@ -1294,17 +1291,6 @@ export default class GoTrueClient {
   }
 
   /**
-   * Decodes a JWT (without performing any validation).
-   */
-  private _decodeJWT(jwt: string): {
-    exp?: number
-    aal?: AuthenticatorAssuranceLevels | null
-    amr?: AMREntry[] | null
-  } {
-    return decodeJWTPayload(jwt)
-  }
-
-  /**
    * Sets the session data from the current session. If the current session is expired, setSession will take care of refreshing it to obtain a new session.
    * If the refresh token or access token in the current session is invalid, an error will be thrown.
    * @param currentSession The current session that minimally contains an access token and refresh token.
@@ -1333,7 +1319,7 @@ export default class GoTrueClient {
       let expiresAt = timeNow
       let hasExpired = true
       let session: Session | null = null
-      const payload = decodeJWTPayload(currentSession.access_token)
+      const { payload } = decodeJWT(currentSession.access_token)
       if (payload.exp) {
         expiresAt = payload.exp
         hasExpired = expiresAt <= timeNow
@@ -2581,7 +2567,7 @@ export default class GoTrueClient {
           }
         }
 
-        const payload = this._decodeJWT(session.access_token)
+        const { payload } = decodeJWT(session.access_token)
 
         let currentLevel: AuthenticatorAssuranceLevels | null = null
 
@@ -2627,15 +2613,12 @@ export default class GoTrueClient {
         token = data.session.access_token
       }
 
-      const parts = token.split('.')
-      if (parts.length !== 3) {
-        throw new AuthInvalidJwtError('Invalid JWT structure')
-      }
-
-      const [rawHeader, rawPayload, rawSignature] = parts
-      const decoder = new TextDecoder()
-      const header = JSON.parse(decoder.decode(base64url.parse(rawHeader, { loose: true })))
-      const payload = JSON.parse(decoder.decode(base64url.parse(rawPayload, { loose: true })))
+      const {
+        header,
+        payload,
+        signature,
+        raw: { header: rawHeader, payload: rawPayload },
+      } = decodeJWT(token)
 
       // Reject expired JWTs
       validateExp(payload.exp)
@@ -2649,18 +2632,17 @@ export default class GoTrueClient {
         // getUser succeeds so the claims in the JWT can be trusted
         return {
           data: {
-            claims: this._decodeJWT(token),
+            claims: payload,
           },
           error: null,
         }
       }
 
-      const { kid, alg } = header
-      if (!kid) {
+      if (!header.kid) {
         throw new AuthInvalidJwtError('Missing kid claim')
       }
 
-      const algorithm = getAlgorithm(alg)
+      const algorithm = getAlgorithm(header.alg)
 
       // Fetch JWKS
       const {
@@ -2686,8 +2668,6 @@ export default class GoTrueClient {
       const publicKey = await crypto.subtle.importKey('jwk', signingKey, algorithm, true, [
         'verify',
       ])
-      // Convert rawSignature from base64url to binary array
-      const signature = base64url.parse(rawSignature, { loose: true })
       // Verify the signature
       const isValid = await crypto.subtle.verify(
         algorithm,
