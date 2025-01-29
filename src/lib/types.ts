@@ -1200,20 +1200,24 @@ export type AuthMFAEnrollPhoneResponse =
       error: AuthError
     }
 
-export interface JwtHeader {
+export type JwtHeader = {
   alg: 'RS256' | 'ES256' | 'HS256'
   kid: string
   typ: string
 }
 
-export interface JwtPayload {
+export type RequiredClaims = {
   iss: string
   sub: string
   aud: string | string[]
   exp: number
   iat: number
+  role: string
+  aal: AuthenticatorAssuranceLevels
+  session_id: string
+}
 
-  // any other non-standard claim in the payload
+export type JwtPayload = RequiredClaims & {
   [key: string]: any
 }
 

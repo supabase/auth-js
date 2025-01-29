@@ -103,6 +103,7 @@ import type {
   AuthMFAEnrollTOTPResponse,
   AuthMFAEnrollPhoneResponse,
   JWK,
+  JwtPayload,
 } from './lib/types'
 import { stringToUint8Array } from './lib/base64url'
 
@@ -2636,7 +2637,7 @@ export default class GoTrueClient {
     jwks: { keys: JWK[] } = { keys: [] }
   ): Promise<
     | {
-        data: { claims: { [key: string]: any } }
+        data: { claims: JwtPayload }
         error: null
       }
     | { data: null; error: AuthError }
@@ -2662,8 +2663,8 @@ export default class GoTrueClient {
       // Reject expired JWTs
       validateExp(payload.exp)
 
-      // If symmetric algorithm, fallback to getUser()
-      if (header.alg === 'HS256') {
+      // If symmetric algorithm or WebCrypto API is unavailable, fallback to getUser()
+      if (header.alg === 'HS256' || !('crypto' in globalThis && 'subtle' in globalThis.crypto)) {
         const { error } = await this.getUser(token)
         if (error) {
           throw error
@@ -2712,10 +2713,7 @@ export default class GoTrueClient {
       if (isAuthError(error)) {
         return { data: null, error }
       }
-      return {
-        data: null,
-        error: new AuthUnknownError('Unknown error occurred while getting claims', error),
-      }
+      throw error
     }
   }
 }
