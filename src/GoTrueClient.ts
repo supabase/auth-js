@@ -2629,8 +2629,8 @@ export default class GoTrueClient {
   }
 
   /**
-   * Gets the claims from a JWT. If the JWT is symmetric JWTs, it will call getUser() to verify against the server.
-   * If the JWT is asymmetric, it will be verified against the JWKS using the WebCrypto API.
+   * @experimental This method may change in future versions.
+   * @description Gets the claims from a JWT. If the JWT is symmetric JWTs, it will call getUser() to verify against the server. If the JWT is asymmetric, it will be verified against the JWKS using the WebCrypto API.
    */
   async getClaims(
     jwt?: string,
