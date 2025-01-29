@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.68.1](https://github.com/supabase/auth-js/compare/v2.68.0...v2.68.1) (2025-01-29)
+
+
+### Bug Fixes
+
+* assert type in `decodeJWTPayload` ([#1018](https://github.com/supabase/auth-js/issues/1018)) ([3d80039](https://github.com/supabase/auth-js/commit/3d80039e8b64402b615a924ff82f6562405ff705))
+
 ## [2.68.0](https://github.com/supabase/auth-js/compare/v2.67.3...v2.68.0) (2025-01-21)
 
 
