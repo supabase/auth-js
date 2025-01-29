@@ -1,5 +1,5 @@
 import { API_VERSION_HEADER_NAME } from './constants'
-import { SupportedStorage } from './types'
+import { SupportedStorage, User } from './types'
 
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
@@ -7,6 +7,20 @@ export function expiresAt(expiresIn: number) {
 }
 
 export function uuid() {
+  if (
+    'crypto' in globalThis &&
+    typeof globalThis.crypto === 'object' &&
+    'randomUUID' in globalThis.crypto &&
+    typeof globalThis.crypto.randomUUID === 'function'
+  ) {
+    try {
+      return globalThis.crypto.randomUUID()
+    } catch (e: any) {
+      // ignore and fall back to below implementation, as crypto.randomUUID()
+      // only works in secure contexts
+    }
+  }
+
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = (Math.random() * 16) | 0,
       v = c == 'x' ? r : (r & 0x3) | 0x8
@@ -343,4 +357,53 @@ export function parseResponseAPIVersion(response: Response) {
   } catch (e: any) {
     return null
   }
+}
+
+function hasOwnProperty(target: any, property: any) {
+  if (!(target instanceof Object) || target === null) {
+    return false
+  }
+
+  if ('hasOwn' in Object && typeof (Object as any).hasOwn === 'function') {
+    return (Object as any).hasOwn(target, property)
+  }
+
+  return Object.prototype.hasOwnProperty.call(target, property)
+}
+
+const WARNING_SYMBOL = Symbol('WARNING')
+const PROPERTY_WARNINGS_SHOWN: { [reason: string]: boolean } = {}
+
+export function userNotAvailableProxy(target: User, reason: string): User {
+  const warning = `@supabase/auth-js: Accessing any property of this object is insecure. Reason: ${reason}` // this shows the warning in console.log, Inspector or other object dumps
+
+  ;(target as any)[WARNING_SYMBOL] = warning
+
+  return new Proxy(target, {
+    get: (target: User, prop: PropertyKey, receiver: any) => {
+      if (prop === 'toString') {
+        return () => `WARNING: ${warning} -- ${Reflect.get(target, prop, receiver).call(target)}`
+      }
+
+      if (
+        !PROPERTY_WARNINGS_SHOWN[reason] &&
+        typeof prop === 'string' &&
+        hasOwnProperty(target, prop)
+      ) {
+        PROPERTY_WARNINGS_SHOWN[reason] = true
+
+        console.warn(
+          `@supabase/auth-js: Accessing the "${prop}" (or any other) property of the user object is not secure. Reason: ${reason}`
+        )
+      }
+
+      const value = Reflect.get(target, prop, receiver)
+
+      if (typeof value === 'object' && value && !value[WARNING_SYMBOL]) {
+        value[WARNING_SYMBOL] = warning
+      }
+
+      return value
+    },
+  })
 }
