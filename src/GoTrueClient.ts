@@ -2608,20 +2608,18 @@ export default class GoTrueClient {
       return jwk
     }
     // jwk isn't cached in memory so we need to fetch it from the well-known endpoint
-    const {
-      data: { keys },
-      error,
-    } = await _request(this.fetch, 'GET', `${this.url}/.well-known/jwks.json`, {
+    const { data, error } = await _request(this.fetch, 'GET', `${this.url}/.well-known/jwks.json`, {
       headers: this.headers,
     })
     if (error) {
       throw error
     }
-    if (!keys || keys.length === 0) {
+    if (!data.keys || data.keys.length === 0) {
       throw new AuthInvalidJwtError('JWKS is empty')
     }
+    this.jwks = data
     // Find the signing key
-    jwk = keys.find((key: any) => key.kid === kid)
+    jwk = data.keys.find((key: any) => key.kid === kid)
     if (!jwk) {
       throw new AuthInvalidJwtError('No matching signing key found in JWKS')
     }
