@@ -104,6 +104,7 @@ import type {
   AuthMFAEnrollPhoneResponse,
   JWK,
 } from './lib/types'
+import { stringToUint8Array } from './lib/base64url'
 
 polyfillGlobalThis() // Make "globalThis" available
 
@@ -2687,12 +2688,13 @@ export default class GoTrueClient {
       const publicKey = await crypto.subtle.importKey('jwk', signingKey, algorithm, true, [
         'verify',
       ])
+
       // Verify the signature
       const isValid = await crypto.subtle.verify(
         algorithm,
         publicKey,
         signature,
-        new TextEncoder().encode(`${rawHeader}.${rawPayload}`)
+        stringToUint8Array(`${rawHeader}.${rawPayload}`)
       )
 
       if (!isValid) {

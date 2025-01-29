@@ -1,6 +1,6 @@
-import { API_VERSION_HEADER_NAME } from './constants'
+import { API_VERSION_HEADER_NAME, BASE64URL_REGEX } from './constants'
 import { AuthInvalidJwtError } from './errors'
-import { base64url } from './rfc4648'
+import { base64UrlToUint8Array, stringFromBase64URL } from './base64url'
 import { JwtHeader, JwtPayload, SupportedStorage } from './types'
 
 export function expiresAt(expiresIn: number) {
@@ -184,17 +184,16 @@ export function decodeJWT(token: string): {
   }
 
   // Regex checks for base64url format
-  const base64UrlRegex = /^([a-z0-9_-]{4})*($|[a-z0-9_-]{3}=?$|[a-z0-9_-]{2}(==)?$)$/i
   for (let i = 0; i < parts.length; i++) {
-    if (!base64UrlRegex.test(parts[i] as string)) {
+    if (!BASE64URL_REGEX.test(parts[i] as string)) {
       throw new AuthInvalidJwtError('JWT not in base64url format')
     }
   }
-  const decoder = new TextDecoder()
   const data = {
-    header: JSON.parse(decoder.decode(base64url.parse(parts[0], { loose: true }))),
-    payload: JSON.parse(decoder.decode(base64url.parse(parts[1], { loose: true }))),
-    signature: base64url.parse(parts[2], { loose: true }),
+    // using base64url lib
+    header: JSON.parse(stringFromBase64URL(parts[0])),
+    payload: JSON.parse(stringFromBase64URL(parts[1])),
+    signature: base64UrlToUint8Array(parts[2]),
     raw: {
       header: parts[0],
       payload: parts[1],
