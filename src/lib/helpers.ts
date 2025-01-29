@@ -344,3 +344,31 @@ export function parseResponseAPIVersion(response: Response) {
     return null
   }
 }
+
+export function validateExp(exp: number) {
+  if (!exp) {
+    throw new Error('Missing exp claim')
+  }
+  const timeNow = Date.now() / 1000
+  if (exp <= timeNow) {
+    throw new Error('JWT has expired')
+  }
+}
+
+export function getAlgorithm(alg: 'RS256' | 'ES256'): RsaHashedImportParams | EcKeyImportParams {
+  switch (alg) {
+    case 'RS256':
+      return {
+        name: 'RSASSA-PKCS1-v1_5',
+        hash: { name: 'SHA-256' },
+      }
+    case 'ES256':
+      return {
+        name: 'ECDSA',
+        namedCurve: 'P-256',
+        hash: { name: 'SHA-256' },
+      }
+    default:
+      throw new Error('Invalid alg claim')
+  }
+}

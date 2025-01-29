@@ -20,6 +20,8 @@ import {
   isAuthRetryableFetchError,
   isAuthSessionMissingError,
   isAuthImplicitGrantRedirectError,
+  CustomAuthError,
+  AuthInvalidJwtError,
 } from './lib/errors'
 import {
   Fetch,
@@ -43,7 +45,10 @@ import {
   supportsLocalStorage,
   parseParametersFromURL,
   getCodeChallengeAndMethod,
+  getAlgorithm,
+  validateExp,
 } from './lib/helpers'
+import { base64url } from './lib/rfc4648'
 import { localStorageAdapter, memoryLocalStorageAdapter } from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
 import { version } from './lib/version'
@@ -2598,5 +2603,118 @@ export default class GoTrueClient {
         return { data: { currentLevel, nextLevel, currentAuthenticationMethods }, error: null }
       })
     })
+  }
+
+  /**
+   * Gets the claims from a JWT. If the JWT is symmetric JWTs, it will call getUser() to verify against the server.
+   * If the JWT is asymmetric, it will be verified against the JWKS using the WebCrypto API.
+   */
+  async getClaims(jwt?: string): Promise<
+    | {
+        data: { claims: { [key: string]: any } }
+        error: null
+      }
+    | { data: null; error: AuthError }
+    | { data: null; error: null }
+  > {
+    try {
+      let token = jwt
+      if (!token) {
+        const { data, error } = await this.getSession()
+        if (error || !data.session) {
+          return { data: null, error }
+        }
+        token = data.session.access_token
+      }
+
+      const parts = token.split('.')
+      if (parts.length !== 3) {
+        throw new AuthInvalidJwtError('Invalid JWT structure')
+      }
+
+      const [rawHeader, rawPayload, rawSignature] = parts
+      const decoder = new TextDecoder()
+      const header = JSON.parse(decoder.decode(base64url.parse(rawHeader, { loose: true })))
+      const payload = JSON.parse(decoder.decode(base64url.parse(rawPayload, { loose: true })))
+
+      // Reject expired JWTs
+      validateExp(payload.exp)
+
+      // If symmetric algorithm, fallback to getUser()
+      if (header.alg === 'HS256') {
+        const { error } = await this.getUser(token)
+        if (error) {
+          throw error
+        }
+        // getUser succeeds so the claims in the JWT can be trusted
+        return {
+          data: {
+            claims: this._decodeJWT(token),
+          },
+          error: null,
+        }
+      }
+
+      const { kid, alg } = header
+      if (!kid) {
+        throw new AuthInvalidJwtError('Missing kid claim')
+      }
+
+      const algorithm = getAlgorithm(alg)
+
+      // Fetch JWKS
+      const {
+        data: { keys },
+        error,
+      } = await _request(this.fetch, 'GET', `${this.url}/.well-known/jwks.json`, {
+        headers: this.headers,
+      })
+      if (error) {
+        throw error
+      }
+      if (!keys || keys.length === 0) {
+        throw new AuthInvalidJwtError('JWKS is empty')
+      }
+
+      // Find the signing key
+      const signingKey = keys.find((key: any) => key.kid === header.kid)
+      if (!signingKey) {
+        throw new AuthInvalidJwtError('No matching signing key found in JWKS')
+      }
+
+      // Convert JWK to CryptoKey
+      const publicKey = await crypto.subtle.importKey('jwk', signingKey, algorithm, true, [
+        'verify',
+      ])
+      // Convert rawSignature from base64url to binary array
+      const signature = base64url.parse(rawSignature, { loose: true })
+      // Verify the signature
+      const isValid = await crypto.subtle.verify(
+        algorithm,
+        publicKey,
+        signature,
+        new TextEncoder().encode(`${rawHeader}.${rawPayload}`)
+      )
+
+      if (!isValid) {
+        throw new AuthInvalidJwtError('Invalid JWT signature')
+      }
+
+      // If verification succeeds, decode and return claims
+      return {
+        data: {
+          claims: payload,
+        },
+        error: null,
+      }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: null, error }
+      }
+      return {
+        data: null,
+        error: new AuthUnknownError('Unknown error occurred while getting claims', error),
+      }
+    }
   }
 }
