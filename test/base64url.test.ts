@@ -3,7 +3,7 @@ import {
   stringFromBase64URL,
   stringFromUTF8,
   stringToBase64URL,
-} from './base64url'
+} from '../src/lib/base64url'
 
 const EXAMPLES = [
   'a',
