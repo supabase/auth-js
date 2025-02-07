@@ -974,9 +974,13 @@ describe('getClaims', () => {
     const { data, error } = await authWithAsymmetricSession.getClaims()
     expect(error).toBeNull()
     expect(data?.claims.email).toEqual(user?.email)
-    expect(fetchedUrls).toContain(
-      GOTRUE_URL_SIGNUP_ENABLED_ASYMMETRIC_AUTO_CONFIRM_ON + '/.well-known/jwks.json'
-    )
+
+    // node 18 doesn't support crypto.subtle API by default unless built with the experimental-global-webcrypto flag
+    if (parseInt(process.version.slice(1).split('.')[0]) === 20) {
+      expect(fetchedUrls).toContain(
+        GOTRUE_URL_SIGNUP_ENABLED_ASYMMETRIC_AUTO_CONFIRM_ON + '/.well-known/jwks.json'
+      )
+    }
 
     // contains the response for getSession and fetchJwk
     expect(fetchedResponse).toHaveLength(2)
