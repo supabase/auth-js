@@ -1,8 +1,8 @@
 import {
-  stringToBase64URL,
+  codepointToUTF8,
   stringFromBase64URL,
   stringFromUTF8,
-  codepointToUTF8,
+  stringToBase64URL,
 } from './base64url'
 
 const EXAMPLES = [

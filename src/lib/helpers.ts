@@ -1,6 +1,6 @@
 import { API_VERSION_HEADER_NAME, BASE64URL_REGEX } from './constants'
 import { AuthInvalidJwtError } from './errors'
-import { base64UrlToUint8Array, stringFromBase64URL } from './base64url'
+import { base64UrlToUint8Array, stringFromBase64URL, stringToBase64URL } from './base64url'
 import { JwtHeader, JwtPayload, SupportedStorage } from './types'
 
 export function expiresAt(expiresIn: number) {
@@ -276,10 +276,6 @@ async function sha256(randomString: string) {
     .join('')
 }
 
-function base64urlencode(str: string) {
-  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
 export async function generatePKCEChallenge(verifier: string) {
   const hasCryptoSupport =
     typeof crypto !== 'undefined' &&
@@ -293,7 +289,7 @@ export async function generatePKCEChallenge(verifier: string) {
     return verifier
   }
   const hashed = await sha256(verifier)
-  return base64urlencode(hashed)
+  return stringToBase64URL(hashed)
 }
 
 export async function getCodeChallengeAndMethod(
