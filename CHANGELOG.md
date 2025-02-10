@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.69.0](https://github.com/supabase/auth-js/compare/v2.68.0...v2.69.0) (2025-02-10)
+
+
+### Features
+
+* introduce getClaims method to verify asymmetric JWTs ([#1030](https://github.com/supabase/auth-js/issues/1030)) ([daa2669](https://github.com/supabase/auth-js/commit/daa266949b336d2e78f2a7b9c9837b70abeab7a6))
+
+
+### Bug Fixes
+
+* assert type in `decodeJWTPayload` ([#1018](https://github.com/supabase/auth-js/issues/1018)) ([3d80039](https://github.com/supabase/auth-js/commit/3d80039e8b64402b615a924ff82f6562405ff705))
+
 ## [2.68.0](https://github.com/supabase/auth-js/compare/v2.67.3...v2.68.0) (2025-01-21)
 
 
