@@ -1222,7 +1222,7 @@ export type JwtPayload = RequiredClaims & {
 }
 
 export interface JWK {
-  kty: 'RSA' | 'EC' | 'OCT'
+  kty: 'RSA' | 'EC' | 'oct'
   key_ops: string[]
   alg?: string
   kid?: string
