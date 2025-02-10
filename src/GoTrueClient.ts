@@ -104,6 +104,7 @@ import type {
   AuthMFAEnrollPhoneResponse,
   JWK,
   JwtPayload,
+  JwtHeader,
 } from './lib/types'
 import { stringToUint8Array } from './lib/base64url'
 
@@ -2637,7 +2638,7 @@ export default class GoTrueClient {
     jwks: { keys: JWK[] } = { keys: [] }
   ): Promise<
     | {
-        data: { claims: JwtPayload }
+        data: { claims: JwtPayload; header: JwtHeader; signature: Uint8Array }
         error: null
       }
     | { data: null; error: AuthError }
@@ -2677,6 +2678,8 @@ export default class GoTrueClient {
         return {
           data: {
             claims: payload,
+            header,
+            signature,
           },
           error: null,
         }
@@ -2706,6 +2709,8 @@ export default class GoTrueClient {
       return {
         data: {
           claims: payload,
+          header,
+          signature,
         },
         error: null,
       }
