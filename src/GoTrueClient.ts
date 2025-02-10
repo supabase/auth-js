@@ -2664,7 +2664,11 @@ export default class GoTrueClient {
       validateExp(payload.exp)
 
       // If symmetric algorithm or WebCrypto API is unavailable, fallback to getUser()
-      if (header.alg === 'HS256' || !('crypto' in globalThis && 'subtle' in globalThis.crypto)) {
+      if (
+        !header.kid ||
+        header.alg === 'HS256' ||
+        !('crypto' in globalThis && 'subtle' in globalThis.crypto)
+      ) {
         const { error } = await this.getUser(token)
         if (error) {
           throw error
@@ -2676,10 +2680,6 @@ export default class GoTrueClient {
           },
           error: null,
         }
-      }
-
-      if (!header.kid) {
-        throw new AuthInvalidJwtError('Missing kid claim')
       }
 
       const algorithm = getAlgorithm(header.alg)
