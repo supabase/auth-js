@@ -334,7 +334,7 @@ export function validateExp(exp: number) {
   if (!exp) {
     throw new Error('Missing exp claim')
   }
-  const timeNow = Date.now() / 1000
+  const timeNow = Math.floor(Date.now() / 1000)
   if (exp <= timeNow) {
     throw new Error('JWT has expired')
   }
