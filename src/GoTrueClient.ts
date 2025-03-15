@@ -487,7 +487,6 @@ export default class GoTrueClient {
 
       if (error || !data) {
         await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-        await this._notifyAllSubscribers('STORAGE_UPDATED', null)
         return { data: { user: null, session: null }, error: error }
       }
 
@@ -502,7 +501,6 @@ export default class GoTrueClient {
       return { data: { user, session }, error: null }
     } catch (error) {
       await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-      await this._notifyAllSubscribers('STORAGE_UPDATED', null)
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
@@ -644,7 +642,6 @@ export default class GoTrueClient {
     } catch (error) {
       if (isAuthError(error)) {
         await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-        await this._notifyAllSubscribers('STORAGE_UPDATED', null)
         return { data: { user: null, session: null, redirectType: null }, error }
       }
 
@@ -754,7 +751,6 @@ export default class GoTrueClient {
       throw new AuthInvalidCredentialsError('You must provide either an email or phone number.')
     } catch (error) {
       await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-      await this._notifyAllSubscribers('STORAGE_UPDATED', null)
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
@@ -855,7 +851,6 @@ export default class GoTrueClient {
       })
     } catch (error) {
       await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-      await this._notifyAllSubscribers('STORAGE_UPDATED', null)
       if (isAuthError(error)) {
         return { data: null, error }
       }
@@ -1301,7 +1296,6 @@ export default class GoTrueClient {
       })
     } catch (error) {
       await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-      await this._notifyAllSubscribers('STORAGE_UPDATED', session)
       if (isAuthError(error)) {
         return { data: { user: null }, error }
       }
@@ -1733,7 +1727,6 @@ export default class GoTrueClient {
       })
     } catch (error) {
       await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-      await this._notifyAllSubscribers('STORAGE_UPDATED', null)
       if (isAuthError(error)) {
         return { data: null, error }
       }
@@ -1798,7 +1791,6 @@ export default class GoTrueClient {
       return { data: { provider: credentials.provider, url: data?.url }, error: null }
     } catch (error) {
       await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
-      await this._notifyAllSubscribers('STORAGE_UPDATED', session)
       if (isAuthError(error)) {
         return { data: { provider: credentials.provider, url: null }, error }
       }
