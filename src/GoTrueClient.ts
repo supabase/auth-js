@@ -1,5 +1,12 @@
 import GoTrueAdminApi from './GoTrueAdminApi'
-import { DEFAULT_HEADERS, EXPIRY_MARGIN, GOTRUE_URL, STORAGE_KEY } from './lib/constants'
+import {
+  DEFAULT_HEADERS,
+  EXPIRY_MARGIN_MS,
+  AUTO_REFRESH_TICK_DURATION_MS,
+  AUTO_REFRESH_TICK_THRESHOLD,
+  GOTRUE_URL,
+  STORAGE_KEY,
+} from './lib/constants'
 import {
   AuthError,
   AuthImplicitGrantRedirectError,
@@ -13,6 +20,7 @@ import {
   isAuthRetryableFetchError,
   isAuthSessionMissingError,
   isAuthImplicitGrantRedirectError,
+  AuthInvalidJwtError,
 } from './lib/errors'
 import {
   Fetch,
@@ -23,7 +31,6 @@ import {
   _ssoResponse,
 } from './lib/fetch'
 import {
-  decodeJWTPayload,
   Deferred,
   getItemAsync,
   isBrowser,
@@ -36,6 +43,9 @@ import {
   supportsLocalStorage,
   parseParametersFromURL,
   getCodeChallengeAndMethod,
+  getAlgorithm,
+  validateExp,
+  decodeJWT,
 } from './lib/helpers'
 import { localStorageAdapter, memoryLocalStorageAdapter } from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
@@ -79,7 +89,6 @@ import type {
   MFAVerifyParams,
   AuthMFAVerifyResponse,
   AuthMFAListFactorsResponse,
-  AMREntry,
   AuthMFAGetAuthenticatorAssuranceLevelResponse,
   AuthenticatorAssuranceLevels,
   Factor,
@@ -93,7 +102,11 @@ import type {
   MFAEnrollPhoneParams,
   AuthMFAEnrollTOTPResponse,
   AuthMFAEnrollPhoneResponse,
+  JWK,
+  JwtPayload,
+  JwtHeader,
 } from './lib/types'
+import { stringToUint8Array } from './lib/base64url'
 
 polyfillGlobalThis() // Make "globalThis" available
 
@@ -108,13 +121,6 @@ const DEFAULT_OPTIONS: Omit<Required<GoTrueClientOptions>, 'fetch' | 'storage' |
   debug: false,
   hasCustomAuthorizationHeader: false,
 }
-
-/** Current session will be checked for refresh at this interval. */
-const AUTO_REFRESH_TICK_DURATION = 30 * 1000
-
-/**
- * A token refresh will be attempted this many ticks before the current session expires. */
-const AUTO_REFRESH_TICK_THRESHOLD = 3
 
 async function lockNoOp<R>(name: string, acquireTimeout: number, fn: () => Promise<R>): Promise<R> {
   return await fn()
@@ -140,7 +146,10 @@ export default class GoTrueClient {
   protected storageKey: string
 
   protected flowType: AuthFlowType
-
+  /**
+   * The JWKS used for verifying asymmetric JWTs
+   */
+  protected jwks: { keys: JWK[] }
   protected autoRefreshToken: boolean
   protected persistSession: boolean
   protected storage: SupportedStorage
@@ -220,7 +229,7 @@ export default class GoTrueClient {
     } else {
       this.lock = lockNoOp
     }
-
+    this.jwks = { keys: [] }
     this.mfa = {
       verify: this._verify.bind(this),
       enroll: this._enroll.bind(this),
@@ -1117,8 +1126,13 @@ export default class GoTrueClient {
         return { data: { session: null }, error: null }
       }
 
+      // A session is considered expired before the access token _actually_
+      // expires. When the autoRefreshToken option is off (or when the tab is
+      // in the background), very eager users of getSession() -- like
+      // realtime-js -- might send a valid JWT which will expire by the time it
+      // reaches the server.
       const hasExpired = currentSession.expires_at
-        ? currentSession.expires_at <= Date.now() / 1000
+        ? currentSession.expires_at * 1000 - Date.now() < EXPIRY_MARGIN_MS
         : false
 
       this._debug(
@@ -1297,17 +1311,6 @@ export default class GoTrueClient {
   }
 
   /**
-   * Decodes a JWT (without performing any validation).
-   */
-  private _decodeJWT(jwt: string): {
-    exp?: number
-    aal?: AuthenticatorAssuranceLevels | null
-    amr?: AMREntry[] | null
-  } {
-    return decodeJWTPayload(jwt)
-  }
-
-  /**
    * Sets the session data from the current session. If the current session is expired, setSession will take care of refreshing it to obtain a new session.
    * If the refresh token or access token in the current session is invalid, an error will be thrown.
    * @param currentSession The current session that minimally contains an access token and refresh token.
@@ -1336,7 +1339,7 @@ export default class GoTrueClient {
       let expiresAt = timeNow
       let hasExpired = true
       let session: Session | null = null
-      const payload = decodeJWTPayload(currentSession.access_token)
+      const { payload } = decodeJWT(currentSession.access_token)
       if (payload.exp) {
         expiresAt = payload.exp
         hasExpired = expiresAt <= timeNow
@@ -1516,7 +1519,7 @@ export default class GoTrueClient {
       }
 
       const actuallyExpiresIn = expiresAt - timeNow
-      if (actuallyExpiresIn * 1000 <= AUTO_REFRESH_TICK_DURATION) {
+      if (actuallyExpiresIn * 1000 <= AUTO_REFRESH_TICK_DURATION_MS) {
         console.warn(
           `@supabase/gotrue-js: Session as retrieved from URL expires in ${actuallyExpiresIn}s, should have been closer to ${expiresIn}s`
         )
@@ -1869,7 +1872,7 @@ export default class GoTrueClient {
             error &&
             isAuthRetryableFetchError(error) &&
             // retryable only if the request can be sent before the backoff overflows the tick duration
-            Date.now() + nextBackOffInterval - startedAt < AUTO_REFRESH_TICK_DURATION
+            Date.now() + nextBackOffInterval - startedAt < AUTO_REFRESH_TICK_DURATION_MS
           )
         }
       )
@@ -1942,12 +1945,12 @@ export default class GoTrueClient {
         return
       }
 
-      const timeNow = Math.round(Date.now() / 1000)
-      const expiresWithMargin = (currentSession.expires_at ?? Infinity) < timeNow + EXPIRY_MARGIN
+      const expiresWithMargin =
+        (currentSession.expires_at ?? Infinity) * 1000 - Date.now() < EXPIRY_MARGIN_MS
 
       this._debug(
         debugName,
-        `session has${expiresWithMargin ? '' : ' not'} expired with margin of ${EXPIRY_MARGIN}s`
+        `session has${expiresWithMargin ? '' : ' not'} expired with margin of ${EXPIRY_MARGIN_MS}s`
       )
 
       if (expiresWithMargin) {
@@ -2123,7 +2126,7 @@ export default class GoTrueClient {
 
     this._debug('#_startAutoRefresh()')
 
-    const ticker = setInterval(() => this._autoRefreshTokenTick(), AUTO_REFRESH_TICK_DURATION)
+    const ticker = setInterval(() => this._autoRefreshTokenTick(), AUTO_REFRESH_TICK_DURATION_MS)
     this.autoRefreshTicker = ticker
 
     if (ticker && typeof ticker === 'object' && typeof ticker.unref === 'function') {
@@ -2230,12 +2233,12 @@ export default class GoTrueClient {
 
               // session will expire in this many ticks (or has already expired if <= 0)
               const expiresInTicks = Math.floor(
-                (session.expires_at * 1000 - now) / AUTO_REFRESH_TICK_DURATION
+                (session.expires_at * 1000 - now) / AUTO_REFRESH_TICK_DURATION_MS
               )
 
               this._debug(
                 '#_autoRefreshTokenTick()',
-                `access token expires in ${expiresInTicks} ticks, a tick lasts ${AUTO_REFRESH_TICK_DURATION}ms, refresh threshold is ${AUTO_REFRESH_TICK_THRESHOLD} ticks`
+                `access token expires in ${expiresInTicks} ticks, a tick lasts ${AUTO_REFRESH_TICK_DURATION_MS}ms, refresh threshold is ${AUTO_REFRESH_TICK_THRESHOLD} ticks`
               )
 
               if (expiresInTicks <= AUTO_REFRESH_TICK_THRESHOLD) {
@@ -2593,7 +2596,7 @@ export default class GoTrueClient {
           }
         }
 
-        const payload = this._decodeJWT(session.access_token)
+        const { payload } = decodeJWT(session.access_token)
 
         let currentLevel: AuthenticatorAssuranceLevels | null = null
 
@@ -2615,5 +2618,129 @@ export default class GoTrueClient {
         return { data: { currentLevel, nextLevel, currentAuthenticationMethods }, error: null }
       })
     })
+  }
+
+  private async fetchJwk(kid: string, jwks: { keys: JWK[] } = { keys: [] }): Promise<JWK> {
+    // try fetching from the supplied jwks
+    let jwk = jwks.keys.find((key) => key.kid === kid)
+    if (jwk) {
+      return jwk
+    }
+
+    // try fetching from cache
+    jwk = this.jwks.keys.find((key) => key.kid === kid)
+    if (jwk) {
+      return jwk
+    }
+    // jwk isn't cached in memory so we need to fetch it from the well-known endpoint
+    const { data, error } = await _request(this.fetch, 'GET', `${this.url}/.well-known/jwks.json`, {
+      headers: this.headers,
+    })
+    if (error) {
+      throw error
+    }
+    if (!data.keys || data.keys.length === 0) {
+      throw new AuthInvalidJwtError('JWKS is empty')
+    }
+    this.jwks = data
+    // Find the signing key
+    jwk = data.keys.find((key: any) => key.kid === kid)
+    if (!jwk) {
+      throw new AuthInvalidJwtError('No matching signing key found in JWKS')
+    }
+    return jwk
+  }
+
+  /**
+   * @experimental This method may change in future versions.
+   * @description Gets the claims from a JWT. If the JWT is symmetric JWTs, it will call getUser() to verify against the server. If the JWT is asymmetric, it will be verified against the JWKS using the WebCrypto API.
+   */
+  async getClaims(
+    jwt?: string,
+    jwks: { keys: JWK[] } = { keys: [] }
+  ): Promise<
+    | {
+        data: { claims: JwtPayload; header: JwtHeader; signature: Uint8Array }
+        error: null
+      }
+    | { data: null; error: AuthError }
+    | { data: null; error: null }
+  > {
+    try {
+      let token = jwt
+      if (!token) {
+        const { data, error } = await this.getSession()
+        if (error || !data.session) {
+          return { data: null, error }
+        }
+        token = data.session.access_token
+      }
+
+      const {
+        header,
+        payload,
+        signature,
+        raw: { header: rawHeader, payload: rawPayload },
+      } = decodeJWT(token)
+
+      // Reject expired JWTs
+      validateExp(payload.exp)
+
+      // If symmetric algorithm or WebCrypto API is unavailable, fallback to getUser()
+      if (
+        !header.kid ||
+        header.alg === 'HS256' ||
+        !('crypto' in globalThis && 'subtle' in globalThis.crypto)
+      ) {
+        const { error } = await this.getUser(token)
+        if (error) {
+          throw error
+        }
+        // getUser succeeds so the claims in the JWT can be trusted
+        return {
+          data: {
+            claims: payload,
+            header,
+            signature,
+          },
+          error: null,
+        }
+      }
+
+      const algorithm = getAlgorithm(header.alg)
+      const signingKey = await this.fetchJwk(header.kid, jwks)
+
+      // Convert JWK to CryptoKey
+      const publicKey = await crypto.subtle.importKey('jwk', signingKey, algorithm, true, [
+        'verify',
+      ])
+
+      // Verify the signature
+      const isValid = await crypto.subtle.verify(
+        algorithm,
+        publicKey,
+        signature,
+        stringToUint8Array(`${rawHeader}.${rawPayload}`)
+      )
+
+      if (!isValid) {
+        throw new AuthInvalidJwtError('Invalid JWT signature')
+      }
+
+      // If verification succeeds, decode and return claims
+      return {
+        data: {
+          claims: payload,
+          header,
+          signature,
+        },
+        error: null,
+      }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: null, error }
+      }
+      throw error
+    }
   }
 }
