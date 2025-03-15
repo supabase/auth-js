@@ -1257,7 +1257,6 @@ export default class GoTrueClient {
       emailRedirectTo?: string | undefined
     } = {}
   ): Promise<UserResponse> {
-    let session: Session | null = null
     try {
       return await this._useSession(async (result) => {
         const { data: sessionData, error: sessionError } = result
@@ -1267,7 +1266,7 @@ export default class GoTrueClient {
         if (!sessionData.session) {
           throw new AuthSessionMissingError()
         }
-        session = sessionData.session
+        const session: Session = sessionData.session
         let codeChallenge: string | null = null
         let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce' && attributes.email != null) {
@@ -1763,11 +1762,9 @@ export default class GoTrueClient {
    * This method supports the PKCE flow.
    */
   async linkIdentity(credentials: SignInWithOAuthCredentials): Promise<OAuthResponse> {
-    let session: Session | null = null
     try {
       const { data, error } = await this._useSession(async (result) => {
         const { data, error } = result
-        session = data.session
         if (error) throw error
         const url: string = await this._getUrlForProvider(
           `${this.url}/user/identities/authorize`,
@@ -2076,8 +2073,6 @@ export default class GoTrueClient {
     // so we can safely suppress the warning returned by future getSession calls
     this.suppressGetSessionWarning = true
     await setItemAsync(this.storage, this.storageKey, session)
-    
-    // cleanup potentially unused code verifier
     await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
   }
 
