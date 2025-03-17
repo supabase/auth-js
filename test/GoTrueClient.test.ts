@@ -676,7 +676,6 @@ describe('GoTrueClient', () => {
           sessionId: 'test-session-id',
           codeChallenge: 'test-code-challenge',
         })
-        // Access private method using indexer notation
         client['createPKCESession'] = mockCreatePKCESession
 
         // Mock the fetch response
@@ -735,7 +734,6 @@ describe('GoTrueClient', () => {
 
         // Mock the retrievePKCESession method
         const mockRetrievePKCESession = jest.fn().mockResolvedValue('test-code-verifier')
-        // Access private method using indexer notation
         client['retrievePKCESession'] = mockRetrievePKCESession
 
         // Mock the fetch response for verification
@@ -771,7 +769,6 @@ describe('GoTrueClient', () => {
         // Mock _saveSession and _notifyAllSubscribers
         const mockSaveSession = jest.fn().mockResolvedValue(null)
         const mockNotifySubscribers = jest.fn().mockResolvedValue(null)
-        // Access private methods using indexer notation
         client['_saveSession'] = mockSaveSession
         client['_notifyAllSubscribers'] = mockNotifySubscribers
 
@@ -826,12 +823,10 @@ describe('GoTrueClient', () => {
           sessionId: 'test-session-id',
           redirectTo: 'http://localhost:3000',
         })
-        // Access private method using indexer notation
         client['_parseState'] = mockParseState
 
         // Mock the retrievePKCESession method
         const mockRetrievePKCESession = jest.fn().mockResolvedValue('test-code-verifier')
-        // Access private method using indexer notation
         client['retrievePKCESession'] = mockRetrievePKCESession
 
         // Mock the fetch response for token exchange
@@ -867,7 +862,6 @@ describe('GoTrueClient', () => {
         // Mock _saveSession and _notifyAllSubscribers
         const mockSaveSession = jest.fn().mockResolvedValue(null)
         const mockNotifySubscribers = jest.fn().mockResolvedValue(null)
-        // Access private methods using indexer notation
         client['_saveSession'] = mockSaveSession
         client['_notifyAllSubscribers'] = mockNotifySubscribers
 
@@ -1113,6 +1107,252 @@ describe('GoTrueClient', () => {
           expect(messageId).toEqual('test-message-id')
         } finally {
           client['fetch'] = originalFetch
+        }
+      })
+    })
+
+    describe('Magic Link Cross-Device Flow', () => {
+      test('signInWithMagicLinkCrossDevice() fails when cross-device flow is disabled', async () => {
+        const client = createCrossDeviceClient(false)
+        const { email } = mockUserCredentials()
+
+        const { error } = await client.signInWithMagicLinkCrossDevice({ email })
+
+        expect(error).not.toBeNull()
+        if (error) {
+          expect(error.message).toEqual(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          )
+        }
+      })
+
+      test('signInWithMagicLinkCrossDevice() succeeds when enabled', async () => {
+        const client = createCrossDeviceClient(true)
+        const { email } = mockUserCredentials()
+
+        // Mock the createPKCESession method
+        const mockCreatePKCESession = jest.fn().mockResolvedValue({
+          sessionId: 'test-session-id',
+          codeChallenge: 'test-code-challenge',
+        })
+        client['createPKCESession'] = mockCreatePKCESession
+
+        // Mock the fetch response
+        const originalFetch = client['fetch']
+        client['fetch'] = jest.fn().mockImplementation((url, options) => {
+          if (url.includes('/otp')) {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  data: { message_id: 'test-message-id' },
+                  error: null,
+                }),
+            })
+          }
+          return originalFetch(url, options)
+        })
+
+        try {
+          const { sessionId, destination, messageId, error } =
+            await client.signInWithMagicLinkCrossDevice({
+              email,
+              options: {
+                redirectTo: 'http://localhost:3000',
+              },
+            })
+
+          expect(error).toBeNull()
+          expect(sessionId).toEqual('test-session-id')
+          expect(destination).toEqual(email)
+          expect(messageId).toEqual('test-message-id')
+          expect(mockCreatePKCESession).toHaveBeenCalled()
+        } finally {
+          client['fetch'] = originalFetch
+        }
+      })
+
+      test('completeSignInWithMagicLinkCrossDevice() fails when cross-device flow is disabled', async () => {
+        const client = createCrossDeviceClient(false)
+
+        const { data, error } = await client.completeSignInWithMagicLinkCrossDevice({
+          sessionId: 'test-session-id',
+          token: 'test-token',
+        })
+
+        expect(error).not.toBeNull()
+        if (error) {
+          expect(error.message).toEqual(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          )
+        }
+        expect(data.session).toBeNull()
+        expect(data.user).toBeNull()
+      })
+
+      test('completeSignInWithMagicLinkCrossDevice() verifies token when enabled', async () => {
+        const client = createCrossDeviceClient(true)
+
+        // Mock the retrievePKCESession method
+        const mockRetrievePKCESession = jest.fn().mockResolvedValue('test-code-verifier')
+        client['retrievePKCESession'] = mockRetrievePKCESession
+
+        // Mock the fetch response for verification
+        const originalFetch = client['fetch']
+        client['fetch'] = jest.fn().mockImplementation((url, options) => {
+          if (url.includes('/verify')) {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  data: {
+                    session: {
+                      access_token: 'test-access-token',
+                      refresh_token: 'test-refresh-token',
+                      expires_in: 3600,
+                      user: {
+                        id: 'test-user-id',
+                        email: 'test@example.com',
+                      },
+                    },
+                    user: {
+                      id: 'test-user-id',
+                      email: 'test@example.com',
+                    },
+                  },
+                  error: null,
+                }),
+            })
+          }
+          return originalFetch(url, options)
+        })
+
+        // Mock _saveSession and _notifyAllSubscribers
+        const mockSaveSession = jest.fn().mockResolvedValue(null)
+        const mockNotifySubscribers = jest.fn().mockResolvedValue(null)
+        client['_saveSession'] = mockSaveSession
+        client['_notifyAllSubscribers'] = mockNotifySubscribers
+
+        try {
+          const { data, error } = await client.completeSignInWithMagicLinkCrossDevice({
+            sessionId: 'test-session-id',
+            token: 'test-token',
+          })
+
+          expect(error).toBeNull()
+          expect(data.session).not.toBeNull()
+          expect(data.user).not.toBeNull()
+
+          if (data.user) {
+            expect(data.user.id).toEqual('test-user-id')
+            expect(data.user.email).toEqual('test@example.com')
+          }
+          expect(mockRetrievePKCESession).toHaveBeenCalledWith('test-session-id')
+          expect(mockSaveSession).toHaveBeenCalled()
+          expect(mockNotifySubscribers).toHaveBeenCalledWith('SIGNED_IN', expect.anything())
+        } finally {
+          client['fetch'] = originalFetch
+        }
+      })
+
+      test('resendMagicLinkCrossDevice() fails when cross-device flow is disabled', async () => {
+        const client = createCrossDeviceClient(false)
+        const { email } = mockUserCredentials()
+
+        const { error } = await client.resendMagicLinkCrossDevice('test-session-id', {
+          email,
+        })
+
+        expect(error).not.toBeNull()
+        if (error) {
+          expect(error.message).toEqual(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          )
+        }
+      })
+
+      test('resendMagicLinkCrossDevice() succeeds when enabled', async () => {
+        const client = createCrossDeviceClient(true)
+        const { email } = mockUserCredentials()
+
+        // Mock the fetch responses
+        const originalFetch = client['fetch']
+        client['fetch'] = jest.fn().mockImplementation((url, options) => {
+          if (url.includes('/pkce-sessions/')) {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  data: { code_challenge: 'test-code-challenge' },
+                  error: null,
+                }),
+            })
+          } else if (url.includes('/otp')) {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  data: { message_id: 'test-message-id' },
+                  error: null,
+                }),
+            })
+          }
+          return originalFetch(url, options)
+        })
+
+        try {
+          const { sessionId, destination, messageId, error } =
+            await client.resendMagicLinkCrossDevice('test-session-id', {
+              email,
+              options: {
+                redirectTo: 'http://localhost:3000',
+              },
+            })
+
+          expect(error).toBeNull()
+          expect(sessionId).toEqual('test-session-id')
+          expect(destination).toEqual(email)
+          expect(messageId).toEqual('test-message-id')
+        } finally {
+          client['fetch'] = originalFetch
+        }
+      })
+
+      test('handleOAuthCallback() routes to magic link cross-device flow when state contains sessionId and flowType=magiclink', async () => {
+        const client = createCrossDeviceClient(true)
+
+        // Mock window.location.href
+        const originalLocation = window.location
+        const windowAny = window as any
+        windowAny.location = {
+          ...originalLocation,
+          href: 'http://localhost:3000/#code=test-token&state=test-state',
+        } as Location
+
+        // Mock the _parseState method
+        const mockParseState = jest.fn().mockReturnValue({
+          sessionId: 'test-session-id',
+          flowType: 'magiclink',
+        })
+        client['_parseState'] = mockParseState
+
+        // Mock the completeSignInWithMagicLinkCrossDevice method
+        const mockCompleteSignInWithMagicLinkCrossDevice = jest.fn().mockResolvedValue({
+          data: { user: { id: 'test-user-id' }, session: { access_token: 'test-token' } },
+          error: null,
+        })
+        client.completeSignInWithMagicLinkCrossDevice = mockCompleteSignInWithMagicLinkCrossDevice
+
+        try {
+          await client.handleOAuthCallback()
+
+          expect(mockParseState).toHaveBeenCalledWith('test-state')
+          expect(mockCompleteSignInWithMagicLinkCrossDevice).toHaveBeenCalledWith({
+            sessionId: 'test-session-id',
+            token: 'test-token',
+          })
+        } finally {
+          window.location = originalLocation
         }
       })
     })

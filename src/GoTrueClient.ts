@@ -112,6 +112,9 @@ import type {
   CompleteOtpCrossDeviceParams,
   EmailOtpType,
   MobileOtpType,
+  SignInWithMagicLinkCrossDeviceCredentials,
+  CrossDeviceMagicLinkResponse,
+  CompleteMagicLinkCrossDeviceParams,
 } from './lib/types'
 import { stringToUint8Array } from './lib/base64url'
 
@@ -3168,6 +3171,186 @@ export default class GoTrueClient {
     } catch (error) {
       if (isAuthError(error)) {
         return { sessionId, error }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Initiates a sign-in with magic link that can be completed on another device
+   */
+  async signInWithMagicLinkCrossDevice(
+    credentials: SignInWithMagicLinkCrossDeviceCredentials
+  ): Promise<CrossDeviceMagicLinkResponse> {
+    try {
+      if (!this.enableCrossDeviceFlow) {
+        throw new AuthError(
+          'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+        )
+      }
+
+      // Create a new PKCE session
+      const { codeChallenge, sessionId } = await this.createPKCESession()
+
+      // Construct the credentials to pass to the server
+      const { email, options } = credentials
+
+      if (!email) {
+        throw new AuthError('Email is required for magic link authentication')
+      }
+
+      // Send the magic link
+      const { error, data } = await _request(this.fetch, 'POST', `${this.url}/otp`, {
+        headers: this.headers,
+        body: {
+          email,
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256',
+          session_id: sessionId,
+          should_create_user: options?.shouldCreateUser ?? true,
+          gotrue_meta_security: { captcha_token: options?.captchaToken },
+          ...(options?.data ? { data: options.data } : {}),
+          state: this._generateState({
+            sessionId,
+            flowType: 'magiclink',
+          }),
+        },
+        redirectTo: options?.redirectTo,
+      })
+
+      if (error) throw error
+
+      return {
+        sessionId,
+        destination: email,
+        messageId: data?.message_id,
+        error: null,
+      }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { sessionId: '', destination: '', error }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Completes the cross-device magic link sign-in flow
+   */
+  async completeSignInWithMagicLinkCrossDevice(
+    params: CompleteMagicLinkCrossDeviceParams
+  ): Promise<AuthResponse> {
+    try {
+      if (!this.enableCrossDeviceFlow) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthError(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          ),
+        }
+      }
+
+      const { sessionId, token } = params
+
+      // Retrieve the code verifier using the session ID
+      const codeVerifier = await this.retrievePKCESession(sessionId)
+
+      // Use the verifier to complete the authentication
+      const { data, error } = await _request(this.fetch, 'POST', `${this.url}/verify`, {
+        headers: this.headers,
+        body: {
+          session_id: sessionId,
+          code_verifier: codeVerifier,
+          token,
+          type: 'magiclink',
+        },
+      })
+
+      if (error) throw error
+
+      if (!data?.session || !data?.user) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthInvalidTokenResponseError(),
+        }
+      }
+
+      // Save session and notify subscribers
+      if (data.session) {
+        await this._saveSession(data.session)
+        await this._notifyAllSubscribers('SIGNED_IN', data.session)
+      }
+
+      return { data, error: null }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Resends the magic link to the user's email in a cross-device flow
+   */
+  async resendMagicLinkCrossDevice(
+    sessionId: string,
+    params: {
+      email: string
+      options?: {
+        captchaToken?: string
+        redirectTo?: string
+      }
+    }
+  ): Promise<CrossDeviceMagicLinkResponse> {
+    try {
+      if (!this.enableCrossDeviceFlow) {
+        return {
+          sessionId,
+          destination: '',
+          error: new AuthError(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          ),
+        }
+      }
+
+      const { email, options } = params
+
+      // Retrieve the code challenge for this session
+      const { error: sessionError } = await _request(
+        this.fetch,
+        'GET',
+        `${this.url}/pkce-sessions/${sessionId}`,
+        {
+          headers: this.headers,
+        }
+      )
+
+      if (sessionError) throw sessionError
+
+      // Resend the magic link
+      const { error, data } = await _request(this.fetch, 'POST', `${this.url}/otp`, {
+        headers: this.headers,
+        body: {
+          email,
+          type: 'magiclink',
+          session_id: sessionId,
+          gotrue_meta_security: { captcha_token: options?.captchaToken },
+        },
+        redirectTo: options?.redirectTo,
+      })
+
+      if (error) throw error
+
+      return {
+        sessionId,
+        destination: email,
+        messageId: data?.message_id,
+        error: null,
+      }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { sessionId, destination: '', error }
       }
       throw error
     }

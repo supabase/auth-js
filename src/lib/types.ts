@@ -1332,3 +1332,46 @@ export interface CrossDeviceOtpResponse {
   messageId?: string | null
   error: AuthError | null
 }
+
+/**
+ * Parameters for initiating cross-device magic link sign in
+ */
+export interface SignInWithMagicLinkCrossDeviceCredentials {
+  /** The user's email address */
+  email: string
+  options?: {
+    /** If set to false, this method will not create a new user. Defaults to true. */
+    shouldCreateUser?: boolean
+    /**
+     * A custom data object to store the user's metadata.
+     */
+    data?: object
+    /** Verification token received when the user completes the captcha on the site. */
+    captchaToken?: string
+    /** The URL to redirect to after successful sign in */
+    redirectTo?: string
+  }
+}
+
+/**
+ * Parameters for completing cross-device magic link sign in
+ */
+export interface CompleteMagicLinkCrossDeviceParams {
+  /** The unique session ID from the cross-device flow */
+  sessionId: string
+  /** The token from the magic link */
+  token: string
+}
+
+/**
+ * Response from initiating a cross-device magic link sign in
+ */
+export interface CrossDeviceMagicLinkResponse {
+  /** Unique session ID for the cross-device flow */
+  sessionId: string
+  /** Email where the magic link was sent */
+  destination: string
+  /** True if the message was successfully sent */
+  messageId?: string | null
+  error: AuthError | null
+}
