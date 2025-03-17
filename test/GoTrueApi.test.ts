@@ -425,4 +425,50 @@ describe('GoTrueAdminApi', () => {
       })
     })
   })
+
+  describe('PKCE Session Management', () => {
+    test('listPKCESessions() should return active PKCE sessions', async () => {
+      const { error, data } = await serviceRoleApiClient.listPKCESessions()
+
+      expect(error).toBeNull()
+      expect(data).not.toBeNull()
+      if (data) {
+        expect(data).toHaveProperty('sessions')
+        expect(Array.isArray(data.sessions)).toBe(true)
+      }
+    })
+
+    test('deletePKCESession() should delete a specific PKCE session', async () => {
+      // First get a list of sessions to find one to delete
+      const { data: sessionsData, error: listError } = await serviceRoleApiClient.listPKCESessions()
+
+      expect(listError).toBeNull()
+      expect(sessionsData).not.toBeNull()
+      if (sessionsData && sessionsData.sessions.length > 0) {
+        // Get the first session to delete
+        const session = sessionsData.sessions[0]
+        expect(session).toHaveProperty('session_id')
+
+        // Delete the session
+        const { data: deleteData, error: deleteError } =
+          await serviceRoleApiClient.deletePKCESession(session.session_id)
+
+        expect(deleteError).toBeNull()
+        expect(deleteData).not.toBeNull()
+        if (deleteData) {
+          expect(deleteData).toHaveProperty('success')
+          expect(deleteData.success).toBe(true)
+        }
+      }
+    })
+
+    test('deletePKCESession() should handle non-existent session ID', async () => {
+      const nonExistentSessionId = 'non-existent-session-id'
+      const { data, error } = await serviceRoleApiClient.deletePKCESession(nonExistentSessionId)
+
+      expect(data).toBeNull()
+      expect(error).not.toBeNull()
+      expect(error?.status).toBe(404)
+    })
+  })
 })

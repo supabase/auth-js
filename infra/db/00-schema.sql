@@ -84,3 +84,22 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA auth TO postgres;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA auth TO postgres;
 ALTER USER postgres SET search_path = "auth";
 
+-- auth.pkce_sessions definition
+CREATE TABLE auth.pkce_sessions (
+    id uuid NOT NULL,
+    session_id varchar(255) NOT NULL,
+    code_verifier varchar(255) NOT NULL,
+    instance_id uuid NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL,
+    CONSTRAINT pkce_sessions_pkey PRIMARY KEY (id),
+    CONSTRAINT pkce_sessions_session_id_key UNIQUE (session_id)
+);
+
+CREATE INDEX pkce_sessions_instance_id_idx ON auth.pkce_sessions USING btree (instance_id);
+CREATE INDEX pkce_sessions_session_id_idx ON auth.pkce_sessions USING btree (session_id);
+CREATE INDEX pkce_sessions_expires_at_idx ON auth.pkce_sessions USING btree (expires_at);
+
+-- Add permissions for the new table
+GRANT ALL PRIVILEGES ON TABLE auth.pkce_sessions TO postgres;
+

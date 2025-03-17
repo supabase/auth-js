@@ -13,7 +13,6 @@ import {
   authAdminApiAutoConfirmEnabledClient,
   GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
   authClient,
-  authClientWithAsymmetricSession,
   GOTRUE_URL_SIGNUP_ENABLED_ASYMMETRIC_AUTO_CONFIRM_ON,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
@@ -54,12 +53,17 @@ describe('GoTrueClient', () => {
       })
       expect(refreshSessionError).toBeNull()
       expect(session).not.toBeNull()
-      expect(session!.user).not.toBeNull()
-      expect(session!.expires_in).not.toBeNull()
-      expect(session!.expires_at).not.toBeNull()
-      expect(session!.access_token).not.toBeNull()
-      expect(session!.refresh_token).not.toBeNull()
-      expect(session!.token_type).toStrictEqual('bearer')
+
+      // Use null checking instead of non-null assertions
+      if (session) {
+        expect(session.user).not.toBeNull()
+        expect(session.expires_in).not.toBeNull()
+        expect(session.expires_at).not.toBeNull()
+        expect(session.access_token).not.toBeNull()
+        expect(session.refresh_token).not.toBeNull()
+        expect(session.token_type).toStrictEqual('bearer')
+      }
+
       expect(refreshAccessTokenSpy).toBeCalledTimes(1)
       // @ts-expect-error 'data.session and session should not be null because of the assertion above'
       expect(data.session.refresh_token).not.toEqual(session.refresh_token)
@@ -86,12 +90,17 @@ describe('GoTrueClient', () => {
       } = await authWithSession.refreshSession()
       expect(refreshSessionError).toBeNull()
       expect(session).not.toBeNull()
-      expect(session!.user).not.toBeNull()
-      expect(session!.expires_in).not.toBeNull()
-      expect(session!.expires_at).not.toBeNull()
-      expect(session!.access_token).not.toBeNull()
-      expect(session!.refresh_token).not.toBeNull()
-      expect(session!.token_type).toStrictEqual('bearer')
+
+      // Use null checking instead of non-null assertions
+      if (session) {
+        expect(session.user).not.toBeNull()
+        expect(session.expires_in).not.toBeNull()
+        expect(session.expires_at).not.toBeNull()
+        expect(session.access_token).not.toBeNull()
+        expect(session.refresh_token).not.toBeNull()
+        expect(session.token_type).toStrictEqual('bearer')
+      }
+
       expect(refreshAccessTokenSpy).toBeCalledTimes(1)
       // @ts-expect-error 'data.session and session should not be null because of the assertion above'
       expect(data.session.refresh_token).not.toEqual(session.refresh_token)
@@ -118,12 +127,15 @@ describe('GoTrueClient', () => {
       })
       expect(setSessionError).toBeNull()
       expect(session).not.toBeNull()
-      expect(session!.user).not.toBeNull()
-      expect(session!.expires_in).not.toBeNull()
-      expect(session!.expires_at).not.toBeNull()
-      expect(session!.access_token).not.toBeNull()
-      expect(session!.refresh_token).not.toBeNull()
-      expect(session!.token_type).toStrictEqual('bearer')
+      // Use null checking instead of non-null assertions
+      if (session) {
+        expect(session.user).not.toBeNull()
+        expect(session.expires_in).not.toBeNull()
+        expect(session.expires_at).not.toBeNull()
+        expect(session.access_token).not.toBeNull()
+        expect(session.refresh_token).not.toBeNull()
+        expect(session.token_type).toStrictEqual('bearer')
+      }
 
       /**
        * getSession has been added to verify setSession is also saving
@@ -269,7 +281,7 @@ describe('GoTrueClient', () => {
       // verify the deferred has been reset and successive calls can be made
       // @ts-expect-error 'Allow access to private _callRefreshToken()'
       const { session: session3, error: error3 } = await authWithSession._callRefreshToken(
-        data.session!.refresh_token
+        data.session?.refresh_token || ''
       )
 
       expect(error3).toBeNull()
@@ -311,7 +323,7 @@ describe('GoTrueClient', () => {
       // vreify the deferred has been reset and successive calls can be made
       // @ts-expect-error 'Allow access to private _callRefreshToken()'
       const { session: session3, error: error3 } = await authWithSession._callRefreshToken(
-        data.session!.refresh_token
+        data.session?.refresh_token || ''
       )
 
       expect(error3).toBeNull()
@@ -553,6 +565,557 @@ describe('GoTrueClient', () => {
 
     expect(userSession.session?.user).not.toBeNull()
     expect(userSession.session?.user?.email).toBe(email)
+  })
+
+  describe('Cross-Device Authentication', () => {
+    // Create a client with cross-device flow enabled
+    const createCrossDeviceClient = (enableCrossDeviceFlow = true) => {
+      return new GoTrueClient({
+        url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+        autoRefreshToken: false,
+        persistSession: true,
+        storage: memoryLocalStorageAdapter(),
+        enableCrossDeviceFlow,
+      })
+    }
+
+    describe('Configuration', () => {
+      test('client is created with enableCrossDeviceFlow set to false by default', () => {
+        const client = new GoTrueClient({
+          url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+        })
+
+        // Access private property using indexer notation
+        expect(client['enableCrossDeviceFlow']).toBe(false)
+      })
+
+      test('client can be created with enableCrossDeviceFlow set to true', () => {
+        const client = createCrossDeviceClient(true)
+
+        // Access private property using indexer notation
+        expect(client['enableCrossDeviceFlow']).toBe(true)
+      })
+    })
+
+    describe('PKCE Session Management', () => {
+      test('createPKCESession() fails when cross-device flow is disabled', async () => {
+        const client = createCrossDeviceClient(false)
+
+        try {
+          // Access private method using indexer notation
+          await client['createPKCESession']()
+          fail('Should have thrown an error')
+        } catch (error) {
+          expect(error).toBeInstanceOf(AuthError)
+          expect((error as AuthError).message).toEqual(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          )
+        }
+      })
+
+      test('retrievePKCESession() fails when cross-device flow is disabled', async () => {
+        const client = createCrossDeviceClient(false)
+
+        try {
+          // Access private method using indexer notation
+          await client['retrievePKCESession']('test-session-id')
+          fail('Should have thrown an error')
+        } catch (error) {
+          expect(error).toBeInstanceOf(AuthError)
+          expect((error as AuthError).message).toEqual(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          )
+        }
+      })
+
+      test('createPKCESession() returns session data when enabled', async () => {
+        const client = createCrossDeviceClient(true)
+
+        // Mock the fetch response
+        const originalFetch = client['fetch']
+        client['fetch'] = jest.fn().mockImplementation(() => {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ data: { session_id: 'test-session-id' } }),
+          })
+        })
+
+        try {
+          // Access private method using indexer notation
+          const result = await client['createPKCESession']()
+          expect(result).toHaveProperty('sessionId', 'test-session-id')
+          expect(result).toHaveProperty('codeChallenge')
+          expect(result.codeChallenge).toMatch(/^[A-Za-z0-9_-]+$/) // base64url format
+        } finally {
+          client['fetch'] = originalFetch
+        }
+      })
+    })
+
+    describe('OTP Cross-Device Flow', () => {
+      test('signInWithOtpCrossDevice() fails when cross-device flow is disabled', async () => {
+        const client = createCrossDeviceClient(false)
+        const { email } = mockUserCredentials()
+
+        const { error } = await client.signInWithOtpCrossDevice({ email })
+
+        expect(error).not.toBeNull()
+        if (error) {
+          expect(error.message).toEqual(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          )
+        }
+      })
+
+      test('signInWithOtpCrossDevice() succeeds when enabled', async () => {
+        const client = createCrossDeviceClient(true)
+        const { email } = mockUserCredentials()
+
+        // Mock the createPKCESession method
+        const mockCreatePKCESession = jest.fn().mockResolvedValue({
+          sessionId: 'test-session-id',
+          codeChallenge: 'test-code-challenge',
+        })
+        // Access private method using indexer notation
+        client['createPKCESession'] = mockCreatePKCESession
+
+        // Mock the fetch response
+        const originalFetch = client['fetch']
+        client['fetch'] = jest.fn().mockImplementation((url, options) => {
+          if (url.includes('/otp')) {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  data: { message_id: 'test-message-id' },
+                  error: null,
+                }),
+            })
+          }
+          return originalFetch(url, options)
+        })
+
+        try {
+          const { sessionId, destination, messageId, error } =
+            await client.signInWithOtpCrossDevice({
+              email,
+            })
+
+          expect(error).toBeNull()
+          expect(sessionId).toEqual('test-session-id')
+          expect(destination).toEqual(email)
+          expect(messageId).toEqual('test-message-id')
+          expect(mockCreatePKCESession).toHaveBeenCalled()
+        } finally {
+          client['fetch'] = originalFetch
+        }
+      })
+
+      test('completeSignInWithOtpCrossDevice() fails when cross-device flow is disabled', async () => {
+        const client = createCrossDeviceClient(false)
+
+        const { data, error } = await client.completeSignInWithOtpCrossDevice({
+          sessionId: 'test-session-id',
+          token: '123456',
+          type: 'email',
+        })
+
+        expect(error).not.toBeNull()
+        if (error) {
+          expect(error.message).toEqual(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          )
+        }
+        expect(data.session).toBeNull()
+        expect(data.user).toBeNull()
+      })
+
+      test('completeSignInWithOtpCrossDevice() verifies token when enabled', async () => {
+        const client = createCrossDeviceClient(true)
+
+        // Mock the retrievePKCESession method
+        const mockRetrievePKCESession = jest.fn().mockResolvedValue('test-code-verifier')
+        // Access private method using indexer notation
+        client['retrievePKCESession'] = mockRetrievePKCESession
+
+        // Mock the fetch response for verification
+        const originalFetch = client['fetch']
+        client['fetch'] = jest.fn().mockImplementation((url, options) => {
+          if (url.includes('/verify')) {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  data: {
+                    session: {
+                      access_token: 'test-access-token',
+                      refresh_token: 'test-refresh-token',
+                      expires_in: 3600,
+                      user: {
+                        id: 'test-user-id',
+                        email: 'test@example.com',
+                      },
+                    },
+                    user: {
+                      id: 'test-user-id',
+                      email: 'test@example.com',
+                    },
+                  },
+                  error: null,
+                }),
+            })
+          }
+          return originalFetch(url, options)
+        })
+
+        // Mock _saveSession and _notifyAllSubscribers
+        const mockSaveSession = jest.fn().mockResolvedValue(null)
+        const mockNotifySubscribers = jest.fn().mockResolvedValue(null)
+        // Access private methods using indexer notation
+        client['_saveSession'] = mockSaveSession
+        client['_notifyAllSubscribers'] = mockNotifySubscribers
+
+        try {
+          const { data, error } = await client.completeSignInWithOtpCrossDevice({
+            sessionId: 'test-session-id',
+            token: '123456',
+            type: 'email',
+          })
+
+          expect(error).toBeNull()
+          expect(data.session).not.toBeNull()
+          expect(data.user).not.toBeNull()
+
+          if (data.user) {
+            expect(data.user.id).toEqual('test-user-id')
+            expect(data.user.email).toEqual('test@example.com')
+          }
+          expect(mockRetrievePKCESession).toHaveBeenCalledWith('test-session-id')
+          expect(mockSaveSession).toHaveBeenCalled()
+          expect(mockNotifySubscribers).toHaveBeenCalledWith('SIGNED_IN', expect.anything())
+        } finally {
+          client['fetch'] = originalFetch
+        }
+      })
+    })
+
+    describe('OAuth Cross-Device Flow', () => {
+      test('completeSignInWithCrossDeviceOAuth() fails when cross-device flow is disabled', async () => {
+        const client = createCrossDeviceClient(false)
+
+        const { data, error } = await client.completeSignInWithCrossDeviceOAuth({
+          code: 'test-code',
+          state: JSON.stringify({ sessionId: 'test-session-id' }),
+        })
+
+        expect(error).not.toBeNull()
+        if (error) {
+          expect(error.message).toEqual(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          )
+        }
+        expect(data.session).toBeNull()
+        expect(data.user).toBeNull()
+      })
+
+      test('completeSignInWithCrossDeviceOAuth() exchanges code when enabled', async () => {
+        const client = createCrossDeviceClient(true)
+
+        // Mock the _parseState method
+        const mockParseState = jest.fn().mockReturnValue({
+          sessionId: 'test-session-id',
+          redirectTo: 'http://localhost:3000',
+        })
+        // Access private method using indexer notation
+        client['_parseState'] = mockParseState
+
+        // Mock the retrievePKCESession method
+        const mockRetrievePKCESession = jest.fn().mockResolvedValue('test-code-verifier')
+        // Access private method using indexer notation
+        client['retrievePKCESession'] = mockRetrievePKCESession
+
+        // Mock the fetch response for token exchange
+        const originalFetch = client['fetch']
+        client['fetch'] = jest.fn().mockImplementation((url, options) => {
+          if (url.includes('/token')) {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  data: {
+                    session: {
+                      access_token: 'test-access-token',
+                      refresh_token: 'test-refresh-token',
+                      expires_in: 3600,
+                      user: {
+                        id: 'test-user-id',
+                        email: 'test@example.com',
+                      },
+                    },
+                    user: {
+                      id: 'test-user-id',
+                      email: 'test@example.com',
+                    },
+                  },
+                  error: null,
+                }),
+            })
+          }
+          return originalFetch(url, options)
+        })
+
+        // Mock _saveSession and _notifyAllSubscribers
+        const mockSaveSession = jest.fn().mockResolvedValue(null)
+        const mockNotifySubscribers = jest.fn().mockResolvedValue(null)
+        // Access private methods using indexer notation
+        client['_saveSession'] = mockSaveSession
+        client['_notifyAllSubscribers'] = mockNotifySubscribers
+
+        try {
+          const { data, error } = await client.completeSignInWithCrossDeviceOAuth({
+            code: 'test-code',
+            state: 'test-state',
+          })
+
+          expect(error).toBeNull()
+          expect(data.session).not.toBeNull()
+          expect(data.user).not.toBeNull()
+          if (data.user) {
+            expect(data.user.id).toEqual('test-user-id')
+            expect(data.user.email).toEqual('test@example.com')
+          }
+          expect(mockParseState).toHaveBeenCalledWith('test-state')
+          expect(mockRetrievePKCESession).toHaveBeenCalledWith('test-session-id')
+          expect(mockSaveSession).toHaveBeenCalled()
+          expect(mockNotifySubscribers).toHaveBeenCalledWith('SIGNED_IN', expect.anything())
+        } finally {
+          client['fetch'] = originalFetch
+        }
+      })
+    })
+
+    describe('OAuth Callback Handling', () => {
+      test('handleOAuthCallback() routes to cross-device OTP flow when state contains sessionId and flowType=otp', async () => {
+        const client = createCrossDeviceClient(true)
+
+        // Mock window.location.href
+        const originalLocation = window.location
+        const windowAny = window as any
+        windowAny.location = {
+          ...originalLocation,
+          href: 'http://localhost:3000/#code=123456&state=test-state',
+        } as Location
+
+        // Mock the _parseState method
+        const mockParseState = jest.fn().mockReturnValue({
+          sessionId: 'test-session-id',
+          flowType: 'otp',
+          type: 'email',
+        })
+        client['_parseState'] = mockParseState
+
+        // Mock the completeSignInWithOtpCrossDevice method
+        const mockCompleteSignInWithOtpCrossDevice = jest.fn().mockResolvedValue({
+          data: { user: { id: 'test-user-id' }, session: { access_token: 'test-token' } },
+          error: null,
+        })
+        client.completeSignInWithOtpCrossDevice = mockCompleteSignInWithOtpCrossDevice
+
+        try {
+          await client.handleOAuthCallback()
+
+          expect(mockParseState).toHaveBeenCalledWith('test-state')
+          expect(mockCompleteSignInWithOtpCrossDevice).toHaveBeenCalledWith({
+            sessionId: 'test-session-id',
+            token: '123456',
+            type: 'email',
+          })
+        } finally {
+          window.location = originalLocation
+        }
+      })
+
+      test('handleOAuthCallback() routes to cross-device OAuth flow when state contains sessionId', async () => {
+        const client = createCrossDeviceClient(true)
+
+        // Mock window.location.href
+        const originalLocation = window.location
+        const windowAny = window as any
+        windowAny.location = {
+          ...originalLocation,
+          href: 'http://localhost:3000/#code=test-code&state=test-state',
+        } as Location
+
+        // Mock the _parseState method
+        const mockParseState = jest.fn().mockReturnValue({
+          sessionId: 'test-session-id',
+          provider: 'google',
+        })
+        client['_parseState'] = mockParseState
+
+        // Mock the completeSignInWithCrossDeviceOAuth method
+        const mockCompleteSignInWithCrossDeviceOAuth = jest.fn().mockResolvedValue({
+          data: { user: { id: 'test-user-id' }, session: { access_token: 'test-token' } },
+          error: null,
+        })
+        client.completeSignInWithCrossDeviceOAuth = mockCompleteSignInWithCrossDeviceOAuth
+
+        try {
+          await client.handleOAuthCallback()
+
+          expect(mockParseState).toHaveBeenCalledWith('test-state')
+          expect(mockCompleteSignInWithCrossDeviceOAuth).toHaveBeenCalledWith({
+            provider: 'google',
+            code: 'test-code',
+            state: 'test-state',
+          })
+        } finally {
+          window.location = originalLocation
+        }
+      })
+
+      test('handleOAuthCallback() routes to standard flow when no sessionId in state', async () => {
+        const client = createCrossDeviceClient(true)
+
+        // Mock window.location.href
+        const originalLocation = window.location
+        const windowAny = window as any
+        windowAny.location = {
+          ...originalLocation,
+          href: 'http://localhost:3000/#code=test-code&state=test-state',
+        } as Location
+
+        // Mock the _parseState method
+        const mockParseState = jest.fn().mockReturnValue({
+          // No sessionId here, should go to standard flow
+          redirectTo: 'http://localhost:3000',
+        })
+        client['_parseState'] = mockParseState
+
+        // Mock the exchangeCodeForSession method
+        const mockExchangeCodeForSession = jest.fn().mockResolvedValue({
+          data: { user: { id: 'test-user-id' }, session: { access_token: 'test-token' } },
+          error: null,
+        })
+        client['exchangeCodeForSession'] = mockExchangeCodeForSession
+
+        try {
+          await client.handleOAuthCallback()
+
+          expect(mockParseState).toHaveBeenCalledWith('test-state')
+          expect(mockExchangeCodeForSession).toHaveBeenCalledWith('test-code')
+        } finally {
+          window.location = originalLocation
+        }
+      })
+    })
+
+    describe('State Management', () => {
+      test('_generateState() includes flowType in state data', () => {
+        const client = createCrossDeviceClient(true)
+
+        // Access private method using indexer notation
+        const state = client['_generateState']({
+          sessionId: 'test-session-id',
+          flowType: 'otp',
+          type: 'email',
+        })
+
+        // Parse the state to check it contains the expected data
+        const parsedState = JSON.parse(atob(state))
+        expect(parsedState).toHaveProperty('csrfToken')
+        expect(parsedState).toHaveProperty('sessionId', 'test-session-id')
+        expect(parsedState).toHaveProperty('flowType', 'otp')
+        expect(parsedState).toHaveProperty('type', 'email')
+      })
+
+      test('_parseState() correctly extracts sessionId and flowType', () => {
+        const client = createCrossDeviceClient(true)
+
+        // Create a state string with the expected data
+        const stateData = {
+          csrfToken: 'test-csrf-token',
+          sessionId: 'test-session-id',
+          flowType: 'otp',
+          type: 'email',
+        }
+        const state = btoa(JSON.stringify(stateData))
+
+        // Access private method using indexer notation
+        const parsedState = client['_parseState'](state)
+
+        expect(parsedState).toHaveProperty('csrfToken', 'test-csrf-token')
+        expect(parsedState).toHaveProperty('sessionId', 'test-session-id')
+        expect(parsedState).toHaveProperty('flowType', 'otp')
+        expect(parsedState).toHaveProperty('type', 'email')
+      })
+    })
+
+    describe('Resend OTP', () => {
+      test('resendOtpCrossDevice() fails when cross-device flow is disabled', async () => {
+        const client = createCrossDeviceClient(false)
+        const { email } = mockUserCredentials()
+
+        const { error } = await client.resendOtpCrossDevice('test-session-id', {
+          type: 'email',
+          email,
+        })
+
+        expect(error).not.toBeNull()
+        if (error) {
+          expect(error.message).toEqual(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          )
+        }
+      })
+
+      test('resendOtpCrossDevice() succeeds when enabled', async () => {
+        const client = createCrossDeviceClient(true)
+        const { email } = mockUserCredentials()
+
+        // Mock the fetch responses
+        const originalFetch = client['fetch']
+        client['fetch'] = jest.fn().mockImplementation((url, options) => {
+          if (url.includes('/pkce-sessions/')) {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  data: { code_challenge: 'test-code-challenge' },
+                  error: null,
+                }),
+            })
+          } else if (url.includes('/otp')) {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  data: { message_id: 'test-message-id' },
+                  error: null,
+                }),
+            })
+          }
+          return originalFetch(url, options)
+        })
+
+        try {
+          const { sessionId, destination, messageId, error } = await client.resendOtpCrossDevice(
+            'test-session-id',
+            {
+              type: 'email',
+              email,
+            }
+          )
+
+          expect(error).toBeNull()
+          expect(sessionId).toEqual('test-session-id')
+          expect(destination).toEqual(email)
+          expect(messageId).toEqual('test-message-id')
+        } finally {
+          client['fetch'] = originalFetch
+        }
+      })
+    })
   })
 })
 
@@ -1126,7 +1689,7 @@ describe('GoTrueClient with storageisServer = true', () => {
       },
     }
 
-    // @ts-ignore 'Allow access to private _saveSession'
+    // @ts-expect-error 'Allow access to private _saveSession'
     await client._saveSession(initialSession)
     expect(store.getItem('test-storage-key')).toEqual(JSON.stringify(initialSession))
 
@@ -1144,7 +1707,7 @@ describe('GoTrueClient with storageisServer = true', () => {
       },
     }
 
-    // @ts-ignore 'Allow access to private _saveSession'
+    // @ts-expect-error 'Allow access to private _saveSession'
     await client._saveSession(newSession)
     expect(store.getItem('test-storage-key')).toEqual(JSON.stringify(newSession))
   })

@@ -357,3 +357,57 @@ export function getAlgorithm(alg: 'RS256' | 'ES256'): RsaHashedImportParams | Ec
       throw new Error('Invalid alg claim')
   }
 }
+
+/**
+ * Generate a random string for code verifier
+ */
+export function generateRandomString(minLength = 43, maxLength = 128): string {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
+  const length = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength
+  let result = ''
+
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const randomValues = new Uint8Array(length)
+    crypto.getRandomValues(randomValues)
+
+    for (let i = 0; i < length; i++) {
+      result += charset[randomValues[i] % charset.length]
+    }
+  } else {
+    // Fallback for environments without crypto.getRandomValues
+    for (let i = 0; i < length; i++) {
+      result += charset[Math.floor(Math.random() * charset.length)]
+    }
+  }
+
+  return result
+}
+
+/**
+ * Encodes a buffer as a base64url string
+ */
+export function base64URLEncode(buffer: Uint8Array): string {
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/**
+ * Generates PKCE parameters (code verifier and challenge)
+ */
+export async function generatePKCEParameters(): Promise<{
+  codeVerifier: string
+  codeChallenge: string
+}> {
+  // Generate random string for code verifier
+  const verifier = generateRandomString(43, 128)
+
+  // Create code challenge using SHA-256
+  const encoder = new TextEncoder()
+  const data = encoder.encode(verifier)
+  const digest = await crypto.subtle.digest('SHA-256', data)
+
+  // Base64-URL encode the digest
+  const challenge = base64URLEncode(new Uint8Array(digest))
+
+  return { codeVerifier: verifier, codeChallenge: challenge }
+}

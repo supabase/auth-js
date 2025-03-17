@@ -86,6 +86,17 @@ export type GoTrueClientOptions = {
    * @experimental
    */
   hasCustomAuthorizationHeader?: boolean
+  /**
+   * Enable cross-browser/device authentication flow
+   * @default false
+   */
+  enableCrossDeviceFlow?: boolean
+
+  /**
+   * Duration in seconds for cross-device PKCE sessions
+   * @default 300 (5 minutes)
+   */
+  crossDeviceSessionDuration?: number
 }
 
 export type WeakPasswordReasons = 'length' | 'characters' | 'pwned' | (string & {})
@@ -1227,4 +1238,97 @@ export interface JWK {
   alg?: string
   kid?: string
   [key: string]: any
+}
+
+/**
+ * Parameters for initiating cross-device OAuth sign in
+ */
+export interface SignInWithCrossDeviceOAuthCredentials {
+  /** The Provider to use for the authentication. */
+  provider: Provider
+  /** A URL to send the user to after they are confirmed. */
+  redirectTo?: string
+  /** A space-separated list of scopes granted to the OAuth application. */
+  scopes?: string
+}
+
+/**
+ * Parameters for completing cross-device OAuth sign in
+ */
+export interface CompleteCrossDeviceOAuthParams {
+  /** The OAuth provider used for the sign in */
+  provider: Provider
+  /** The authorization code from the OAuth provider */
+  code: string
+  /** The state parameter from the OAuth provider */
+  state: string
+}
+
+/**
+ * Response from initiating a cross-device OAuth sign in
+ */
+export interface CrossDeviceOAuthResponse {
+  /** URL to redirect the secondary device to */
+  url: string
+  /** Unique session ID for the cross-device flow */
+  sessionId: string
+}
+
+/**
+ * PKCE session as stored in the database
+ */
+export interface PKCESession {
+  /** Unique session identifier */
+  session_id: string
+  /** When the session expires */
+  expires_at: string
+  /** Code verifier (only returned to admin API) */
+  code_verifier?: string
+}
+
+/**
+ * Parameters for initiating cross-device OTP sign in
+ */
+export interface SignInWithOtpCrossDeviceCredentials {
+  /** The user's email address */
+  email?: string
+  /** The user's phone number */
+  phone?: string
+  options?: {
+    /** If set to false, this method will not create a new user. Defaults to true. */
+    shouldCreateUser?: boolean
+    /**
+     * A custom data object to store the user's metadata.
+     */
+    data?: object
+    /** Verification token received when the user completes the captcha on the site. */
+    captchaToken?: string
+    /** Messaging channel to use (e.g. whatsapp or sms) */
+    channel?: 'sms' | 'whatsapp'
+  }
+}
+
+/**
+ * Parameters for completing cross-device OTP sign in
+ */
+export interface CompleteOtpCrossDeviceParams {
+  /** The unique session ID from the cross-device flow */
+  sessionId: string
+  /** The OTP code sent to the user */
+  token: string
+  /** The type of OTP verification */
+  type: MobileOtpType | EmailOtpType
+}
+
+/**
+ * Response from initiating a cross-device OTP sign in
+ */
+export interface CrossDeviceOtpResponse {
+  /** Unique session ID for the cross-device flow */
+  sessionId: string
+  /** Email or phone where the OTP was sent */
+  destination?: string
+  /** True if the message was successfully sent */
+  messageId?: string | null
+  error: AuthError | null
 }

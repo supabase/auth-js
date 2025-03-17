@@ -4,6 +4,10 @@ import {
   getAlgorithm,
   parseParametersFromURL,
   parseResponseAPIVersion,
+  generateRandomString,
+  base64URLEncode,
+  generatePKCEParameters,
+  generatePKCEChallenge,
 } from '../src/lib/helpers'
 
 describe('parseParametersFromURL', () => {
@@ -223,5 +227,97 @@ describe('getAlgorithm', () => {
   })
   it('should throw if invalid alg claim', () => {
     expect(() => getAlgorithm('EdDSA' as any)).toThrowError(new Error('Invalid alg claim'))
+  })
+})
+
+describe('generateRandomString', () => {
+  it('should generate string within length constraints', () => {
+    const minLength = 43
+    const maxLength = 128
+    const result = generateRandomString(minLength, maxLength)
+
+    expect(result.length).toBeGreaterThanOrEqual(minLength)
+    expect(result.length).toBeLessThanOrEqual(maxLength)
+  })
+
+  it('should only contain valid characters', () => {
+    const validChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
+    const result = generateRandomString()
+
+    for (const char of result) {
+      expect(validChars).toContain(char)
+    }
+  })
+
+  it('should generate different strings on each call', () => {
+    const result1 = generateRandomString()
+    const result2 = generateRandomString()
+
+    expect(result1).not.toBe(result2)
+  })
+})
+
+describe('base64URLEncode', () => {
+  it('should correctly encode Uint8Array to base64url', () => {
+    const input = new Uint8Array([72, 101, 108, 108, 111]) // "Hello"
+    const result = base64URLEncode(input)
+
+    expect(result).toBe('SGVsbG8')
+  })
+
+  it('should handle empty input', () => {
+    const input = new Uint8Array([])
+    const result = base64URLEncode(input)
+
+    expect(result).toBe('')
+  })
+
+  it('should properly replace + and / characters', () => {
+    const input = new Uint8Array([255, 255, 255]) // Will produce + and / in base64
+    const result = base64URLEncode(input)
+
+    expect(result).not.toContain('+')
+    expect(result).not.toContain('/')
+    expect(result).toContain('-')
+    expect(result).toContain('_')
+  })
+})
+
+describe('generatePKCEParameters', () => {
+  it('should generate valid code verifier and challenge', async () => {
+    const { codeVerifier, codeChallenge } = await generatePKCEParameters()
+
+    // Check code verifier
+    expect(codeVerifier.length).toBeGreaterThanOrEqual(43)
+    expect(codeVerifier.length).toBeLessThanOrEqual(128)
+    expect(/^[A-Za-z0-9-._~]+$/.test(codeVerifier)).toBe(true)
+
+    // Check code challenge
+    expect(codeChallenge.length).toBeGreaterThan(0)
+    expect(/^[A-Za-z0-9-._~]+$/.test(codeChallenge)).toBe(true)
+  })
+
+  it('should generate different parameters on each call', async () => {
+    const params1 = await generatePKCEParameters()
+    const params2 = await generatePKCEParameters()
+
+    expect(params1.codeVerifier).not.toBe(params2.codeVerifier)
+    expect(params1.codeChallenge).not.toBe(params2.codeChallenge)
+  })
+
+  it('should generate consistent challenge for same verifier', async () => {
+    const verifier = generateRandomString()
+    const encoder = new TextEncoder()
+    const data = encoder.encode(verifier)
+    const digest = await crypto.subtle.digest('SHA-256', data)
+    const expectedChallenge = base64URLEncode(new Uint8Array(digest))
+
+    // Generate multiple challenges for same verifier
+    const challenge1 = await generatePKCEChallenge(verifier)
+    const challenge2 = await generatePKCEChallenge(verifier)
+
+    expect(challenge1).toBe(expectedChallenge)
+    expect(challenge2).toBe(expectedChallenge)
+    expect(challenge1).toBe(challenge2)
   })
 })

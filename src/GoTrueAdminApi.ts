@@ -19,6 +19,7 @@ import {
   AuthMFAAdminListFactorsParams,
   AuthMFAAdminListFactorsResponse,
   PageParams,
+  PKCESession,
 } from './lib/types'
 import { AuthError, isAuthError } from './lib/errors'
 
@@ -327,6 +328,55 @@ export default class GoTrueAdminApi {
         return { data: null, error }
       }
 
+      throw error
+    }
+  }
+
+  /**
+   * Lists all active PKCE sessions.
+   * This function should only be called on a server. Never expose your `service_role` key in the browser.
+   */
+  async listPKCESessions(): Promise<
+    { data: { sessions: PKCESession[] }; error: null } | { data: null; error: AuthError }
+  > {
+    try {
+      const { data, error } = await _request(this.fetch, 'GET', `${this.url}/admin/pkce-sessions`, {
+        headers: this.headers,
+      })
+
+      if (error) throw error
+      return { data, error: null }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: null, error }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Deletes a PKCE session.
+   * This function should only be called on a server. Never expose your `service_role` key in the browser.
+   */
+  async deletePKCESession(
+    sessionId: string
+  ): Promise<{ data: { success: boolean }; error: null } | { data: null; error: AuthError }> {
+    try {
+      const { data, error } = await _request(
+        this.fetch,
+        'DELETE',
+        `${this.url}/admin/pkce-sessions/${sessionId}`,
+        {
+          headers: this.headers,
+        }
+      )
+
+      if (error) throw error
+      return { data, error: null }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: null, error }
+      }
       throw error
     }
   }

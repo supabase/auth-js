@@ -46,6 +46,8 @@ import {
   getAlgorithm,
   validateExp,
   decodeJWT,
+  generateRandomString,
+  generatePKCEParameters,
 } from './lib/helpers'
 import { localStorageAdapter, memoryLocalStorageAdapter } from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
@@ -105,6 +107,11 @@ import type {
   JWK,
   JwtPayload,
   JwtHeader,
+  SignInWithOtpCrossDeviceCredentials,
+  CrossDeviceOtpResponse,
+  CompleteOtpCrossDeviceParams,
+  EmailOtpType,
+  MobileOtpType,
 } from './lib/types'
 import { stringToUint8Array } from './lib/base64url'
 
@@ -120,6 +127,8 @@ const DEFAULT_OPTIONS: Omit<Required<GoTrueClientOptions>, 'fetch' | 'storage' |
   flowType: 'implicit',
   debug: false,
   hasCustomAuthorizationHeader: false,
+  enableCrossDeviceFlow: false,
+  crossDeviceSessionDuration: 300,
 }
 
 async function lockNoOp<R>(name: string, acquireTimeout: number, fn: () => Promise<R>): Promise<R> {
@@ -184,6 +193,9 @@ export default class GoTrueClient {
 
   protected logDebugMessages: boolean
   protected logger: (message: string, ...args: any[]) => void = console.log
+
+  protected enableCrossDeviceFlow: boolean
+  protected crossDeviceSessionDuration: number
 
   /**
    * Create a new client for use in the browser.
@@ -272,6 +284,9 @@ export default class GoTrueClient {
         await this._notifyAllSubscribers(event.data.event, event.data.session, false) // broadcast = false so we don't get an endless loop of messages
       })
     }
+
+    this.enableCrossDeviceFlow = settings.enableCrossDeviceFlow
+    this.crossDeviceSessionDuration = settings.crossDeviceSessionDuration
 
     this.initialize()
   }
@@ -2717,6 +2732,442 @@ export default class GoTrueClient {
     } catch (error) {
       if (isAuthError(error)) {
         return { data: null, error }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Initiates sign in with a provider using cross-device PKCE flow
+   * Returns a URL and session ID that can be used on another device
+   */
+  async signInWithOAuthCrossDevice(options: {
+    provider: Provider
+    redirectTo?: string
+    scopes?: string
+  }): Promise<{ url: string; sessionId: string }> {
+    try {
+      if (!this.enableCrossDeviceFlow) {
+        throw new Error(
+          'Cross-device flow is not enabled. Set enableCrossDeviceFlow to true in the client options.'
+        )
+      }
+
+      const { codeChallenge, sessionId } = await this.createPKCESession()
+
+      // Include the session ID in the state parameter
+      const customState = {
+        sessionId,
+        redirectTo: options.redirectTo || window.location.origin,
+      }
+
+      // Combine with any existing state logic
+      const state = this._generateState(customState)
+
+      const url = await this._getUrlForProvider(`${this.url}/authorize`, options.provider, {
+        redirectTo: options.redirectTo,
+        scopes: options.scopes,
+        queryParams: {
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256',
+          state,
+        },
+        skipBrowserRedirect: true,
+      })
+
+      return { url, sessionId }
+    } catch (error) {
+      if (isAuthError(error)) {
+        throw error
+      }
+      throw new AuthError('Something went wrong while initiating cross-device sign-in.', 500)
+    }
+  }
+
+  /**
+   * Completes the OAuth sign-in process for a cross-device flow
+   */
+  async completeSignInWithCrossDeviceOAuth({
+    code,
+    state,
+  }: {
+    code: string
+    state: string
+  }): Promise<AuthResponse> {
+    try {
+      if (!this.enableCrossDeviceFlow) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthError(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          ),
+        }
+      }
+
+      // Parse state to extract sessionId
+      const parsedState = this._parseState(state)
+      const { sessionId } = parsedState
+
+      if (!sessionId) {
+        throw new Error('No session ID found in state parameter')
+      }
+
+      // Retrieve the code verifier using the session ID
+      const codeVerifier = await this.retrievePKCESession(sessionId)
+
+      // Exchange the code using the retrieved verifier
+      const response = await _request(
+        this.fetch,
+        'POST',
+        `${this.url}/token?grant_type=authorization_code`,
+        {
+          headers: this.headers,
+          body: {
+            client_id: '',
+            code_verifier: codeVerifier,
+            code,
+            redirect_uri: parsedState.redirectTo || window.location.origin,
+          },
+        }
+      )
+
+      if (response.error) throw response.error
+
+      // Process tokens and return auth response
+      if (response.data?.session) {
+        const session = response.data.session
+        // Save the session and notify subscribers
+        await this._saveSession(session)
+        await this._notifyAllSubscribers('SIGNED_IN', session)
+        return { data: { user: response.data.user, session }, error: null }
+      } else {
+        return { data: { user: null, session: null }, error: null }
+      }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { session: null, user: null }, error }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Creates and stores PKCE parameters for cross-device flows
+   * @returns Promise with code challenge and session ID
+   */
+  public async createPKCESession(): Promise<{ codeChallenge: string; sessionId: string }> {
+    if (!this.enableCrossDeviceFlow) {
+      throw new AuthError(
+        'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+      )
+    }
+
+    // Generate PKCE parameters
+    const { codeVerifier, codeChallenge } = await generatePKCEParameters()
+
+    // Generate a unique session ID
+    const sessionId = crypto.randomUUID ? crypto.randomUUID() : generateRandomString(32)
+
+    // Store on server temporarily
+    const sessionDuration = this.crossDeviceSessionDuration || 300
+    const expiresAt = Math.floor(Date.now() / 1000) + sessionDuration
+
+    const response = await fetch(`${this.url}/pkce-sessions`, {
+      method: 'POST',
+      headers: this.headers,
+      body: JSON.stringify({
+        session_id: sessionId,
+        code_verifier: codeVerifier,
+        expires_at: expiresAt,
+      }),
+    })
+
+    const { error } = await response.json()
+    if (error) {
+      throw error
+    }
+
+    return { codeChallenge, sessionId }
+  }
+
+  /**
+   * Retrieves stored code verifier using session ID for cross-device flow
+   * @param sessionId The session ID from the cross-device flow
+   * @returns Promise with the code verifier
+   */
+  public async retrievePKCESession(sessionId: string): Promise<string> {
+    if (!this.enableCrossDeviceFlow) {
+      throw new AuthError(
+        'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+      )
+    }
+
+    const response = await fetch(`${this.url}/pkce-sessions/${sessionId}`, {
+      method: 'GET',
+      headers: this.headers,
+    })
+
+    const { data, error } = await response.json()
+    if (error) throw error
+    return data.code_verifier
+  }
+
+  /**
+   * Generate a state parameter with custom data for OAuth
+   */
+  _generateState(customData = {}): string {
+    const state = {
+      ...customData,
+      redirectTo: window.location.origin || '',
+      timestamp: Date.now(),
+    }
+    return encodeURIComponent(JSON.stringify(state))
+  }
+
+  /**
+   * Parse the state parameter from OAuth
+   */
+  _parseState(state: string): any {
+    try {
+      return JSON.parse(decodeURIComponent(state))
+    } catch (e) {
+      throw new Error('Failed to parse state')
+    }
+  }
+
+  // Update the OAuth callback handler
+  async handleOAuthCallback(url?: string): Promise<AuthResponse> {
+    try {
+      const urlToProcess = url || window.location.href
+      const params = new URLSearchParams(new URL(urlToProcess).hash.substring(1))
+
+      // Process error responses
+      const error = params.get('error')
+      const errorDescription = params.get('error_description')
+      if (error) {
+        throw new AuthError(errorDescription || 'OAuth error', undefined, error)
+      }
+
+      const code = params.get('code')
+      const state = params.get('state')
+
+      if (!code || !state) {
+        throw new Error('No code or state found in redirect')
+      }
+
+      // Parse state to see if this is a cross-device flow
+      const parsedState = this._parseState(state)
+      const isSessionFlow = !!parsedState.sessionId
+
+      if (isSessionFlow && this.enableCrossDeviceFlow) {
+        if (parsedState.flowType === 'otp') {
+          // Handle OTP cross-device flow
+          return this.completeSignInWithOtpCrossDevice({
+            sessionId: parsedState.sessionId,
+            token: code,
+            type: parsedState.type || 'email',
+          })
+        } else {
+          // Handle OAuth cross-device flow
+          return this.completeSignInWithCrossDeviceOAuth({
+            code,
+            state,
+          })
+        }
+      } else {
+        // Handle standard flow
+        return this.exchangeCodeForSession(code)
+      }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { session: null, user: null }, error }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Initiates a sign-in with OTP that can be completed on another device
+   */
+  async signInWithOtpCrossDevice(
+    credentials: SignInWithOtpCrossDeviceCredentials
+  ): Promise<CrossDeviceOtpResponse> {
+    try {
+      if (!this.enableCrossDeviceFlow) {
+        throw new AuthError(
+          'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+        )
+      }
+
+      // Create a new PKCE session
+      const { codeChallenge, sessionId } = await this.createPKCESession()
+
+      // Determine the OTP type
+      const otpType = credentials.email ? 'email' : 'sms'
+
+      // Construct the credentials to pass to the server
+      const { email, phone, options } = credentials
+
+      if (!email && !phone) {
+        throw new AuthError('Email or phone is required for OTP authentication')
+      }
+
+      // Send the OTP
+      const { error, data } = await _request(this.fetch, 'POST', `${this.url}/otp`, {
+        headers: this.headers,
+        body: {
+          ...(email ? { email } : {}),
+          ...(phone ? { phone } : {}),
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256',
+          session_id: sessionId,
+          should_create_user: options?.shouldCreateUser ?? true,
+          gotrue_meta_security: { captcha_token: options?.captchaToken },
+          ...(phone && options?.channel ? { channel: options.channel } : {}),
+          ...(options?.data ? { data: options.data } : {}),
+          state: this._generateState({
+            sessionId,
+            flowType: 'otp',
+            type: otpType,
+          }),
+        },
+      })
+
+      if (error) throw error
+
+      return {
+        sessionId,
+        destination: email || phone,
+        messageId: data?.message_id,
+        error: null,
+      }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { sessionId: '', error }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Completes the cross-device OTP sign-in flow
+   */
+  async completeSignInWithOtpCrossDevice(
+    params: CompleteOtpCrossDeviceParams
+  ): Promise<AuthResponse> {
+    try {
+      if (!this.enableCrossDeviceFlow) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthError(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          ),
+        }
+      }
+
+      const { sessionId, token, type } = params
+
+      // Retrieve the code verifier using the session ID
+      const codeVerifier = await this.retrievePKCESession(sessionId)
+
+      // Use the verifier to complete the authentication
+      const { data, error } = await _request(this.fetch, 'POST', `${this.url}/verify`, {
+        headers: this.headers,
+        body: {
+          session_id: sessionId,
+          code_verifier: codeVerifier,
+          token,
+          type,
+        },
+      })
+
+      if (error) throw error
+
+      if (!data?.session || !data?.user) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthInvalidTokenResponseError(),
+        }
+      }
+
+      // Save session and notify subscribers
+      if (data.session) {
+        await this._saveSession(data.session)
+        await this._notifyAllSubscribers('SIGNED_IN', data.session)
+      }
+
+      return { data, error: null }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Resends the OTP to the user's email or phone in a cross-device flow
+   */
+  async resendOtpCrossDevice(
+    sessionId: string,
+    params: {
+      type: EmailOtpType | MobileOtpType
+      email?: string
+      phone?: string
+      options?: {
+        captchaToken?: string
+        channel?: 'sms' | 'whatsapp'
+      }
+    }
+  ): Promise<CrossDeviceOtpResponse> {
+    try {
+      if (!this.enableCrossDeviceFlow) {
+        return {
+          sessionId,
+          error: new AuthError(
+            'Cross-device flow is not enabled. Enable with enableCrossDeviceFlow option.'
+          ),
+        }
+      }
+
+      const { type, email, phone, options } = params
+
+      // Retrieve the code challenge for this session
+      const { error: sessionError } = await _request(
+        this.fetch,
+        'GET',
+        `${this.url}/pkce-sessions/${sessionId}`,
+        {
+          headers: this.headers,
+        }
+      )
+
+      if (sessionError) throw sessionError
+
+      // Resend the OTP
+      const { error, data } = await _request(this.fetch, 'POST', `${this.url}/otp`, {
+        headers: this.headers,
+        body: {
+          ...(email ? { email } : {}),
+          ...(phone ? { phone } : {}),
+          type,
+          session_id: sessionId,
+          gotrue_meta_security: { captcha_token: options?.captchaToken },
+          ...(phone && options?.channel ? { channel: options.channel } : {}),
+        },
+      })
+
+      if (error) throw error
+
+      return {
+        sessionId,
+        destination: email || phone,
+        messageId: data?.message_id,
+        error: null,
+      }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { sessionId, error }
       }
       throw error
     }
