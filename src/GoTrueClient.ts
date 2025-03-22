@@ -2612,7 +2612,7 @@ export default class GoTrueClient {
     jwk = this.jwks.keys.find((key) => key.kid === kid)
 
     // jwk exists and jwks isn't stale
-    if (jwk && Date.now() - JWKS_TTL < this.jwks_cached_at) {
+    if (jwk && this.jwks_cached_at + JWKS_TTL > Date.now()) {
       return jwk
     }
     // jwk isn't cached in memory so we need to fetch it from the well-known endpoint
