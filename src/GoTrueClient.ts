@@ -1825,6 +1825,75 @@ export default class GoTrueClient {
   }
 
   /**
+   * Retrieves all active sessions for the current user.
+   *
+   * This method calls the GET /sessions endpoint on the GoTrue server.
+   * It returns a promise that resolves with an object containing an array of Session objects
+   * or an error if the request fails.
+   *
+   * @returns {Promise<{ data: Session[] | null; error: AuthError | null }>} The active sessions and any error encountered.
+   */
+  async listSessions(): Promise<{ data: Session[] | null; error: AuthError | null }> {
+    await this.initializePromise;
+    return await this._acquireLock(-1, async () => {
+      return await this._useSession(async (result) => {
+        const { data: { session }, error } = result;
+        if (error) return { data: null, error };
+        if (!session) return { data: null, error: new AuthSessionMissingError() };
+        const { data: sessionsData, error: sessionsError } = await _request(
+          this.fetch,
+          'GET',
+          `${this.url}/sessions`,
+          {
+            headers: this.headers,
+            jwt: session.access_token,
+            xform: (r) => r,
+          }
+        );
+        if (sessionsError) return { data: null, error: sessionsError };
+        return { data: sessionsData as Session[], error: null };
+      });
+    });
+  }
+
+  /**
+   * Revokes a specific session for the current user.
+   *
+   * This method calls the DELETE /sessions/{sessionId} endpoint on the GoTrue server.
+   * It sends the request using the current session's access token. If the revoked session is the current one,
+   * the session is also removed from local storage.
+   *
+   * @param {string} sessionId - The unique identifier of the session to revoke.
+   * @returns {Promise<{ error: AuthError | null }>} An object containing an error if the revocation fails.
+   */
+  async revokeSession(sessionId: string): Promise<{ error: AuthError | null }> {
+    await this.initializePromise;
+    return await this._acquireLock(-1, async () => {
+      return await this._useSession(async (result) => {
+        const { data: { session }, error } = result;
+        if (error) return { error };
+        if (!session) return { error: new AuthSessionMissingError() };
+        const { error: revokeError } = await _request(
+          this.fetch,
+          'DELETE',
+          `${this.url}/sessions/${sessionId}`,
+          {
+            headers: this.headers,
+            jwt: session.access_token,
+          }
+        );
+        if (revokeError) return { error: revokeError };
+        // If the revoked session is the current one, remove it from storage.
+        const currentSession = session as Session & { id?: string };
+        if (currentSession.id && currentSession.id === sessionId) {
+          await this._removeSession();
+        }
+        return { error: null };
+      });
+    });
+  }
+
+  /**
    * Generates a new JWT.
    * @param refreshToken A valid refresh token that was returned on login.
    */
