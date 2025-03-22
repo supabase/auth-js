@@ -1834,12 +1834,15 @@ export default class GoTrueClient {
    * @returns {Promise<{ data: Session[] | null; error: AuthError | null }>} The active sessions and any error encountered.
    */
   async listSessions(): Promise<{ data: Session[] | null; error: AuthError | null }> {
-    await this.initializePromise;
+    await this.initializePromise
     return await this._acquireLock(-1, async () => {
       return await this._useSession(async (result) => {
-        const { data: { session }, error } = result;
-        if (error) return { data: null, error };
-        if (!session) return { data: null, error: new AuthSessionMissingError() };
+        const {
+          data: { session },
+          error,
+        } = result
+        if (error) return { data: null, error }
+        if (!session) return { data: null, error: new AuthSessionMissingError() }
         const { data: sessionsData, error: sessionsError } = await _request(
           this.fetch,
           'GET',
@@ -1849,11 +1852,11 @@ export default class GoTrueClient {
             jwt: session.access_token,
             xform: (r) => r,
           }
-        );
-        if (sessionsError) return { data: null, error: sessionsError };
-        return { data: sessionsData as Session[], error: null };
-      });
-    });
+        )
+        if (sessionsError) return { data: null, error: sessionsError }
+        return { data: sessionsData as Session[], error: null }
+      })
+    })
   }
 
   /**
@@ -1867,12 +1870,15 @@ export default class GoTrueClient {
    * @returns {Promise<{ error: AuthError | null }>} An object containing an error if the revocation fails.
    */
   async revokeSession(sessionId: string): Promise<{ error: AuthError | null }> {
-    await this.initializePromise;
+    await this.initializePromise
     return await this._acquireLock(-1, async () => {
       return await this._useSession(async (result) => {
-        const { data: { session }, error } = result;
-        if (error) return { error };
-        if (!session) return { error: new AuthSessionMissingError() };
+        const {
+          data: { session },
+          error,
+        } = result
+        if (error) return { error }
+        if (!session) return { error: new AuthSessionMissingError() }
         const { error: revokeError } = await _request(
           this.fetch,
           'DELETE',
@@ -1881,16 +1887,16 @@ export default class GoTrueClient {
             headers: this.headers,
             jwt: session.access_token,
           }
-        );
-        if (revokeError) return { error: revokeError };
+        )
+        if (revokeError) return { error: revokeError }
         // If the revoked session is the current one, remove it from storage.
-        const currentSession = session as Session & { id?: string };
+        const currentSession = session as Session & { id?: string }
         if (currentSession.id && currentSession.id === sessionId) {
-          await this._removeSession();
+          await this._removeSession()
         }
-        return { error: null };
-      });
-    });
+        return { error: null }
+      })
+    })
   }
 
   /**
