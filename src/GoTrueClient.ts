@@ -108,6 +108,7 @@ import type {
   JwtHeader,
 } from './lib/types'
 import { stringToUint8Array } from './lib/base64url'
+import { LockClient } from './lib/lock-client'
 
 polyfillGlobalThis() // Make "globalThis" available
 
@@ -175,9 +176,7 @@ export default class GoTrueClient {
   protected hasCustomAuthorizationHeader = false
   protected suppressGetSessionWarning = false
   protected fetch: Fetch
-  protected lock: LockFunc
-  protected lockAcquired = false
-  protected pendingInLock: Promise<any>[] = []
+  protected lock: LockClient
 
   /**
    * Used to broadcast state change events to other tabs listening.
@@ -219,17 +218,16 @@ export default class GoTrueClient {
     this.url = settings.url
     this.headers = settings.headers
     this.fetch = resolveFetch(settings.fetch)
-    this.lock = settings.lock || lockNoOp
     this.detectSessionInUrl = settings.detectSessionInUrl
     this.flowType = settings.flowType
     this.hasCustomAuthorizationHeader = settings.hasCustomAuthorizationHeader
 
     if (settings.lock) {
-      this.lock = settings.lock
+      this.lock = new LockClient(settings.lock, settings.storageKey, this._debug)
     } else if (isBrowser() && globalThis?.navigator?.locks) {
-      this.lock = navigatorLock
+      this.lock = new LockClient(navigatorLock, settings.storageKey, this._debug)
     } else {
-      this.lock = lockNoOp
+      this.lock = new LockClient(lockNoOp, settings.storageKey, this._debug)
     }
     this.jwks = { keys: [] }
     this.jwks_cached_at = Number.MIN_SAFE_INTEGER
@@ -301,7 +299,7 @@ export default class GoTrueClient {
     }
 
     this.initializePromise = (async () => {
-      return await this._acquireLock(-1, async () => {
+      return await this.lock.acquireLock(-1, async () => {
         return await this._initialize()
       })
     })()
@@ -596,7 +594,7 @@ export default class GoTrueClient {
   async exchangeCodeForSession(authCode: string): Promise<AuthTokenResponse> {
     await this.initializePromise
 
-    return this._acquireLock(-1, async () => {
+    return this.lock.acquireLock(-1, async () => {
       return this._exchangeCodeForSession(authCode)
     })
   }
@@ -863,7 +861,7 @@ export default class GoTrueClient {
   async reauthenticate(): Promise<AuthResponse> {
     await this.initializePromise
 
-    return await this._acquireLock(-1, async () => {
+    return await this.lock.acquireLock(-1, async () => {
       return await this._reauthenticate()
     })
   }
@@ -947,84 +945,13 @@ export default class GoTrueClient {
   async getSession() {
     await this.initializePromise
 
-    const result = await this._acquireLock(-1, async () => {
+    const result = await this.lock.acquireLock(-1, async () => {
       return this._useSession(async (result) => {
         return result
       })
     })
 
     return result
-  }
-
-  /**
-   * Acquires a global lock based on the storage key.
-   */
-  private async _acquireLock<R>(acquireTimeout: number, fn: () => Promise<R>): Promise<R> {
-    this._debug('#_acquireLock', 'begin', acquireTimeout)
-
-    try {
-      if (this.lockAcquired) {
-        const last = this.pendingInLock.length
-          ? this.pendingInLock[this.pendingInLock.length - 1]
-          : Promise.resolve()
-
-        const result = (async () => {
-          await last
-          return await fn()
-        })()
-
-        this.pendingInLock.push(
-          (async () => {
-            try {
-              await result
-            } catch (e: any) {
-              // we just care if it finished
-            }
-          })()
-        )
-
-        return result
-      }
-
-      return await this.lock(`lock:${this.storageKey}`, acquireTimeout, async () => {
-        this._debug('#_acquireLock', 'lock acquired for storage key', this.storageKey)
-
-        try {
-          this.lockAcquired = true
-
-          const result = fn()
-
-          this.pendingInLock.push(
-            (async () => {
-              try {
-                await result
-              } catch (e: any) {
-                // we just care if it finished
-              }
-            })()
-          )
-
-          await result
-
-          // keep draining the queue until there's nothing to wait on
-          while (this.pendingInLock.length) {
-            const waitOn = [...this.pendingInLock]
-
-            await Promise.all(waitOn)
-
-            this.pendingInLock.splice(0, waitOn.length)
-          }
-
-          return await result
-        } finally {
-          this._debug('#_acquireLock', 'lock released for storage key', this.storageKey)
-
-          this.lockAcquired = false
-        }
-      })
-    } finally {
-      this._debug('#_acquireLock', 'end')
-    }
   }
 
   /**
@@ -1095,7 +1022,7 @@ export default class GoTrueClient {
   > {
     this._debug('#__loadSession()', 'begin')
 
-    if (!this.lockAcquired) {
+    if (!this.lock.lockAcquired) {
       this._debug('#__loadSession()', 'used outside of an acquired lock!', new Error().stack)
     }
 
@@ -1182,7 +1109,7 @@ export default class GoTrueClient {
 
     await this.initializePromise
 
-    const result = await this._acquireLock(-1, async () => {
+    const result = await this.lock.acquireLock(-1, async () => {
       return await this._getUser()
     })
 
@@ -1244,7 +1171,7 @@ export default class GoTrueClient {
   ): Promise<UserResponse> {
     await this.initializePromise
 
-    return await this._acquireLock(-1, async () => {
+    return await this.lock.acquireLock(-1, async () => {
       return await this._updateUser(attributes, options)
     })
   }
@@ -1311,7 +1238,7 @@ export default class GoTrueClient {
   }): Promise<AuthResponse> {
     await this.initializePromise
 
-    return await this._acquireLock(-1, async () => {
+    return await this.lock.acquireLock(-1, async () => {
       return await this._setSession(currentSession)
     })
   }
@@ -1383,7 +1310,7 @@ export default class GoTrueClient {
   async refreshSession(currentSession?: { refresh_token: string }): Promise<AuthResponse> {
     await this.initializePromise
 
-    return await this._acquireLock(-1, async () => {
+    return await this.lock.acquireLock(-1, async () => {
       return await this._refreshSession(currentSession)
     })
   }
@@ -1590,7 +1517,7 @@ export default class GoTrueClient {
   async signOut(options: SignOut = { scope: 'global' }): Promise<{ error: AuthError | null }> {
     await this.initializePromise
 
-    return await this._acquireLock(-1, async () => {
+    return await this.lock.acquireLock(-1, async () => {
       return await this._signOut(options)
     })
   }
@@ -1653,7 +1580,7 @@ export default class GoTrueClient {
     ;(async () => {
       await this.initializePromise
 
-      await this._acquireLock(-1, async () => {
+      await this.lock.acquireLock(-1, async () => {
         this._emitInitialSession(id)
       })
     })()
@@ -2197,7 +2124,7 @@ export default class GoTrueClient {
     this._debug('#_autoRefreshTokenTick()', 'begin')
 
     try {
-      await this._acquireLock(0, async () => {
+      await this.lock.acquireLock(0, async () => {
         try {
           const now = Date.now()
 
@@ -2296,7 +2223,7 @@ export default class GoTrueClient {
         // the lock first asynchronously
         await this.initializePromise
 
-        await this._acquireLock(-1, async () => {
+        await this.lock.acquireLock(-1, async () => {
           if (document.visibilityState !== 'visible') {
             this._debug(
               methodName,
@@ -2432,7 +2359,7 @@ export default class GoTrueClient {
    * {@see GoTrueMFAApi#verify}
    */
   private async _verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse> {
-    return this._acquireLock(-1, async () => {
+    return this.lock.acquireLock(-1, async () => {
       try {
         return await this._useSession(async (result) => {
           const { data: sessionData, error: sessionError } = result
@@ -2475,7 +2402,7 @@ export default class GoTrueClient {
    * {@see GoTrueMFAApi#challenge}
    */
   private async _challenge(params: MFAChallengeParams): Promise<AuthMFAChallengeResponse> {
-    return this._acquireLock(-1, async () => {
+    return this.lock.acquireLock(-1, async () => {
       try {
         return await this._useSession(async (result) => {
           const { data: sessionData, error: sessionError } = result
@@ -2561,7 +2488,7 @@ export default class GoTrueClient {
    * {@see GoTrueMFAApi#getAuthenticatorAssuranceLevel}
    */
   private async _getAuthenticatorAssuranceLevel(): Promise<AuthMFAGetAuthenticatorAssuranceLevelResponse> {
-    return this._acquireLock(-1, async () => {
+    return this.lock.acquireLock(-1, async () => {
       return await this._useSession(async (result) => {
         const {
           data: { session },
