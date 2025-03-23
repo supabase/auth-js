@@ -28,8 +28,7 @@ export class LockClient {
   }
 
   private async _handleExistingLock<R>(fn: () => Promise<R>): Promise<R> {
-    const lastPending = this.pendingInLock[this.pendingInLock.length - 1] || Promise.resolve()
-    await lastPending
+    await this._drainPendingQueue()
     return await fn()
   }
 
