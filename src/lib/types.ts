@@ -1,5 +1,6 @@
 import { AuthError } from './errors'
 import { Fetch } from './fetch'
+import type { SolanaSignInInput, SolanaSignInOutput } from '@solana/wallet-standard-features'
 
 /** One of the providers supported by GoTrue. */
 export type Provider =
@@ -521,6 +522,7 @@ export type SignUpWithPasswordCredentials =
         channel?: 'sms' | 'whatsapp'
       }
     }
+
 export type SignInWithPasswordCredentials =
   | {
       /** The user's email address. */
@@ -611,6 +613,34 @@ export type SignInWithIdTokenCredentials = {
     captchaToken?: string
   }
 }
+
+export interface SolanaWallet {
+  isSolana: boolean
+  signIn: (...inputs: SolanaSignInInput[]) => Promise<SolanaSignInOutput[]>
+}
+
+export const SOLANA_CHAINS = ['solana:mainnet', 'solana:testnet', 'solana:localnet'] as const
+
+export interface SolanaWeb3Credentials {
+  chain: typeof SOLANA_CHAINS[number]
+
+  wallet?: SolanaWallet | 'phantom'
+
+  statement?: string
+
+  options?: {
+    url?: string
+
+    /** Verification token received when the user completes the captcha on the site. */
+    captchaToken?: string
+
+    signInWithSolana?: Partial<
+      Omit<SolanaSignInInput, 'version' | 'chain' | 'domain' | 'uri' | 'statement'>
+    >
+  }
+}
+
+export type Web3Credentials = SolanaWeb3Credentials
 
 export type VerifyOtpParams = VerifyMobileOtpParams | VerifyEmailOtpParams | VerifyTokenHashParams
 export interface VerifyMobileOtpParams {

@@ -357,3 +357,8 @@ export function getAlgorithm(alg: 'RS256' | 'ES256'): RsaHashedImportParams | Ec
       throw new Error('Invalid alg claim')
   }
 }
+
+export function generateNonce() {
+  // TODO(hf): Use crypto.getRandomValues() instead
+  return Math.random().toString().substring(2) + Math.random().toString().substring(2)
+}

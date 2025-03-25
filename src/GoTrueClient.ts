@@ -45,6 +45,7 @@ import {
   parseParametersFromURL,
   getCodeChallengeAndMethod,
   getAlgorithm,
+  generateNonce,
   validateExp,
   decodeJWT,
 } from './lib/helpers'
@@ -106,8 +107,12 @@ import type {
   JWK,
   JwtPayload,
   JwtHeader,
+  SolanaWeb3Credentials,
+  SolanaWallet,
+  Web3Credentials,
 } from './lib/types'
-import { stringToUint8Array } from './lib/base64url'
+import { SOLANA_CHAINS } from './lib/types'
+import { stringToUint8Array, bytesToBase64URL } from './lib/base64url'
 
 polyfillGlobalThis() // Make "globalThis" available
 
@@ -599,6 +604,128 @@ export default class GoTrueClient {
     return this._acquireLock(-1, async () => {
       return this._exchangeCodeForSession(authCode)
     })
+  }
+
+  /**
+   * TODO
+   */
+  async signInWithWeb3(credentials: Web3Credentials): Promise<
+    | {
+        data: { session: Session; user: User }
+        error: null
+      }
+    | { data: { session: null; user: null }; error: AuthError }
+  > {
+    const { chain } = credentials
+
+    if (SOLANA_CHAINS.includes(chain)) {
+      return await this.signInWithSolana(credentials)
+    }
+
+    throw new Error(`@supabase/auth-js: Unsupported chain "${chain}"`)
+  }
+
+  private async signInWithSolana(credentials: SolanaWeb3Credentials) {
+    const { chain, wallet, statement, options } = credentials
+
+    let resolvedWallet: SolanaWallet
+
+    if (typeof wallet === 'object' && wallet?.isSolana === true && (options?.url || isBrowser())) {
+      resolvedWallet = wallet
+    } else if (isBrowser()) {
+      const windowAny = window as any
+
+      if (!wallet || wallet === 'phantom') {
+        if (
+          'phantom' in windowAny &&
+          typeof windowAny.phantom === 'object' &&
+          windowAny.phantom &&
+          'isPhantom' in windowAny.phantom &&
+          windowAny.phantom.isPhantom === true &&
+          'solana' in windowAny.phantom &&
+          windowAny.phantom.solana &&
+          typeof windowAny.phantom.solana === 'object' &&
+          'isSolana' in windowAny.phantom.solana &&
+          windowAny.phantom.solana.isSolana === true &&
+          'signIn' in windowAny.phantom.solana &&
+          typeof windowAny.phantom.solana.signIn === 'function'
+        ) {
+          resolvedWallet = windowAny.phantom.solana as SolanaWallet
+        } else {
+          throw new Error(
+            `@supabase/auth-js: No compatible phantom wallet interface on the window object. Ensure user has installed Phantom wallet before calling signInWithWeb3.`
+          )
+        }
+      } else {
+        throw new Error(
+          `@supabase/auth-js: Wallet interface "${
+            wallet ?? 'phantom'
+          }" not detected in window object. Make sure user has a wallet installed.`
+        )
+      }
+    } else {
+      throw new Error(
+        '@supabase/auth-js: Both wallet as an object and url must be specified in non-browser environments.'
+      )
+    }
+
+    const url = new URL(options?.url ?? window.location.href)
+
+    const [output] = await resolvedWallet.signIn({
+      nonce: generateNonce(),
+      issuedAt: new Date().toISOString(),
+
+      ...options?.signInWithSolana,
+
+      // non-overridable properties
+      version: '1',
+      //chain,
+      domain: url.hostname,
+      uri: url.href,
+
+      statement: statement,
+    })
+
+    try {
+      const { data, error } = await _request(
+        this.fetch,
+        'POST',
+        `${this.url}/token?grant_type=web3`,
+        {
+          headers: this.headers,
+          body: {
+            chain,
+            message: new TextDecoder().decode(output.signedMessage),
+            signature: bytesToBase64URL(output.signature),
+
+            ...(options?.captchaToken
+              ? { gotrue_meta_security: { captcha_token: options?.captchaToken } }
+              : null),
+          },
+          xform: _sessionResponse,
+        }
+      )
+      if (error) {
+        throw error
+      }
+      if (!data || !data.session || !data.user) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthInvalidTokenResponseError(),
+        }
+      }
+      if (data.session) {
+        await this._saveSession(data.session)
+        await this._notifyAllSubscribers('SIGNED_IN', data.session)
+      }
+      return { data: { ...data }, error }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error }
+      }
+
+      throw error
+    }
   }
 
   private async _exchangeCodeForSession(authCode: string): Promise<
