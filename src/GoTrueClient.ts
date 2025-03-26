@@ -1038,7 +1038,7 @@ export default class GoTrueClient {
       result:
         | {
             data: {
-              session: Session
+              session: Session | null
             }
             error: null
           }
@@ -1047,12 +1047,6 @@ export default class GoTrueClient {
               session: null
             }
             error: AuthError
-          }
-        | {
-            data: {
-              session: null
-            }
-            error: null
           }
     ) => Promise<R>
   ): Promise<R> {
@@ -1076,7 +1070,7 @@ export default class GoTrueClient {
   private async __loadSession(): Promise<
     | {
         data: {
-          session: Session
+          session: Session | null
         }
         error: null
       }
@@ -1085,12 +1079,6 @@ export default class GoTrueClient {
           session: null
         }
         error: AuthError
-      }
-    | {
-        data: {
-          session: null
-        }
-        error: null
       }
   > {
     this._debug('#__loadSession()', 'begin')
