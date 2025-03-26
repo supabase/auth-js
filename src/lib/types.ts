@@ -5,6 +5,7 @@ import { Fetch } from './fetch'
 export type Provider =
   | 'apple'
   | 'azure'
+  | 'beyondidentity'
   | 'bitbucket'
   | 'discord'
   | 'facebook'
