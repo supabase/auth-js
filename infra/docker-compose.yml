@@ -38,6 +38,8 @@ services:
       GOTRUE_SMS_TWILIO_MESSAGE_SERVICE_SID: '${GOTRUE_SMS_TWILIO_MESSAGE_SERVICE_SID}'
       GOTRUE_SMS_AUTOCONFIRM: 'false'
       GOTRUE_COOKIE_KEY: 'sb'
+      GOTRUE_PKCE_CROSS_DEVICE_ENABLED: 'true'
+      GOTRUE_PKCE_SESSION_EXPIRY: '300'
     depends_on:
       - db
     restart: on-failure
