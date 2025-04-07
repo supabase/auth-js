@@ -492,6 +492,7 @@ export default class GoTrueClient {
       const { data, error } = res
 
       if (error || !data) {
+        await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
         return { data: { user: null, session: null }, error: error }
       }
 
@@ -505,6 +506,7 @@ export default class GoTrueClient {
 
       return { data: { user, session }, error: null }
     } catch (error) {
+      await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
@@ -853,6 +855,7 @@ export default class GoTrueClient {
       return { data: { ...data, redirectType: redirectType ?? null }, error }
     } catch (error) {
       if (isAuthError(error)) {
+        await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
         return { data: { user: null, session: null, redirectType: null }, error }
       }
 
@@ -961,6 +964,7 @@ export default class GoTrueClient {
       }
       throw new AuthInvalidCredentialsError('You must provide either an email or phone number.')
     } catch (error) {
+      await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
       }
@@ -1060,6 +1064,7 @@ export default class GoTrueClient {
         xform: _ssoResponse,
       })
     } catch (error) {
+      await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
       if (isAuthError(error)) {
         return { data: null, error }
       }
@@ -1503,6 +1508,7 @@ export default class GoTrueClient {
         return { data: { user: session.user }, error: null }
       })
     } catch (error) {
+      await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
       if (isAuthError(error)) {
         return { data: { user: null }, error }
       }
@@ -1933,6 +1939,7 @@ export default class GoTrueClient {
         redirectTo: options.redirectTo,
       })
     } catch (error) {
+      await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
       if (isAuthError(error)) {
         return { data: null, error }
       }
@@ -1994,6 +2001,7 @@ export default class GoTrueClient {
       }
       return { data: { provider: credentials.provider, url: data?.url }, error: null }
     } catch (error) {
+      await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
       if (isAuthError(error)) {
         return { data: { provider: credentials.provider, url: null }, error }
       }
@@ -2279,6 +2287,7 @@ export default class GoTrueClient {
     // so we can safely suppress the warning returned by future getSession calls
     this.suppressGetSessionWarning = true
     await setItemAsync(this.storage, this.storageKey, session)
+    await removeItemAsync(this.storage, `${this.storageKey}-code-verifier`)
   }
 
   private async _removeSession() {
