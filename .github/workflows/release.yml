@@ -6,6 +6,9 @@ on:
       - master
       - release/*
 
+permissions:
+  contents: read
+
 jobs:
   release_please:
     runs-on: ubuntu-latest
@@ -54,7 +57,7 @@ jobs:
             # release-please only ignores releases that have a form like [A-Z0-9]<version>, so prefixing with rc<version>
             RELEASE_NAME="rc$RELEASE_VERSION"
           else
-            MAIN_RELEASE_VERSION=${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}
+            MAIN_RELEASE_VERSION="${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}"
             RELEASE_VERSION="$MAIN_RELEASE_VERSION"
             RELEASE_NAME="v$RELEASE_VERSION"
           fi
@@ -125,7 +128,7 @@ jobs:
             PR_NUMBER='${{ steps.release.outputs.pr && fromJSON(steps.release.outputs.pr).number }}'
 
             GH_TOKEN='${{ github.token }}' gh release \
-              create $RELEASE_NAME \
+              create "$RELEASE_NAM"E \
               --title "v$RELEASE_VERSION" \
               --prerelease \
               -n "This is a release candidate. See release-please PR #$PR_NUMBER for context."
