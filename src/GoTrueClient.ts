@@ -53,7 +53,7 @@ import { polyfillGlobalThis } from './lib/polyfills'
 import { version } from './lib/version'
 import { LockAcquireTimeoutError, navigatorLock } from './lib/locks'
 
-import type {
+import {
   AuthChangeEvent,
   AuthResponse,
   AuthResponsePassword,
@@ -108,7 +108,7 @@ import type {
   JwtHeader,
   SolanaWeb3Credentials,
   SolanaWallet,
-  Web3Credentials,
+  Web3Credentials, GenerateCodeChallengeResponse
 } from './lib/types'
 import { stringToUint8Array, bytesToBase64URL } from './lib/base64url'
 
@@ -897,6 +897,40 @@ export default class GoTrueClient {
     } catch (error) {
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Generate a code challenge and method pair. Code challenges are consumed by the
+   * `auth.admin.issueAuthCode` method.
+   *
+   * Code challenges are the hash of a one time password (OTP) saved securely on the client. The challenge is then
+   * used for generating an `auth code`. The `auth.exchangeCodeForSession` uses this generated `auth code` and
+   * the unhashed OTP which was securely stored on the client to authenticate a user's session.
+   *
+   * NOTE: this method generates a unique OTP each time it's called. If an OTP is already saved on the client the new
+   * OTP will overwrite the old OTP. In other words, the code passed to `auth.exchangeCodeForSession` must have been
+   * generated using the `codeChallenge` from the most recent call to this method.
+   */
+  async generateCodeChallengeAndMethod(): Promise<GenerateCodeChallengeResponse>
+  async generateCodeChallengeAndMethod(_getCodeChallengeAndMethod = getCodeChallengeAndMethod): Promise<GenerateCodeChallengeResponse> {
+    try {
+      const [codeChallenge, codeChallengeMethod] = await _getCodeChallengeAndMethod(
+        this.storage,
+        this.storageKey
+      )
+      return {
+        data: {
+          codeChallenge,
+          codeChallengeMethod
+        },
+        error: null
+      }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: null, error }
       }
       throw error
     }

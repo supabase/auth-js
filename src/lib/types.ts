@@ -128,6 +128,18 @@ export type AuthResponsePassword =
       error: AuthError
     }
 
+export type CodeChallengeMethod = "s256" | "plain"
+
+export type GenerateCodeChallengeResponse =
+  | {
+      data: { codeChallenge: string; codeChallengeMethod: CodeChallengeMethod }
+      error: null
+    }
+  | {
+      data: null
+      error: AuthError
+    }
+
 /**
  * AuthOtpResponse is returned when OTP is used.
  *
@@ -316,6 +328,7 @@ export interface Factor {
 
 export interface UserAppMetadata {
   provider?: string
+
   [key: string]: any
 }
 
@@ -663,6 +676,7 @@ export type SolanaWeb3Credentials =
 export type Web3Credentials = SolanaWeb3Credentials
 
 export type VerifyOtpParams = VerifyMobileOtpParams | VerifyEmailOtpParams | VerifyTokenHashParams
+
 export interface VerifyMobileOtpParams {
   /** The user's phone number. */
   phone: string
@@ -682,6 +696,7 @@ export interface VerifyMobileOtpParams {
     captchaToken?: string
   }
 }
+
 export interface VerifyEmailOtpParams {
   /** The user's email address. */
   email: string
@@ -994,7 +1009,9 @@ export interface GoTrueMFAApi {
    *
    */
   enroll(params: MFAEnrollTOTPParams): Promise<AuthMFAEnrollTOTPResponse>
+
   enroll(params: MFAEnrollPhoneParams): Promise<AuthMFAEnrollPhoneResponse>
+
   enroll(params: MFAEnrollParams): Promise<AuthMFAEnrollResponse>
 
   /**
@@ -1277,5 +1294,6 @@ export interface JWK {
   key_ops: string[]
   alg?: string
   kid?: string
+
   [key: string]: any
 }
