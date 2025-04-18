@@ -128,7 +128,7 @@ export type AuthResponsePassword =
       error: AuthError
     }
 
-export type CodeChallengeMethod = "s256" | "plain"
+export type CodeChallengeMethod = 's256' | 'plain'
 
 export type GenerateCodeChallengeResponse =
   | {

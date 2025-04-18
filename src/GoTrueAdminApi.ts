@@ -91,21 +91,24 @@ export default class GoTrueAdminApi {
     codeChallenge: string
   }): Promise<
     | {
-    data: {
-      authCode: string
-    }
-    error: null
-  }
+        data: {
+          authCode: string
+        }
+        error: null
+      }
     | {
-    data: null
-    error: AuthError
-  }
+        data: null
+        error: AuthError
+      }
   >
-  async issueAuthCode(payload: {
-    userID: string
-    codeChallengeMethod: CodeChallengeMethod
-    codeChallenge: string
-  }, __request = _request) {
+  async issueAuthCode(
+    payload: {
+      userID: string
+      codeChallengeMethod: CodeChallengeMethod
+      codeChallenge: string
+    },
+    __request = _request
+  ) {
     try {
       const { userID, codeChallengeMethod, codeChallenge } = payload
       return await __request(this.fetch, 'POST', `${this.url}/admin/authcode`, {

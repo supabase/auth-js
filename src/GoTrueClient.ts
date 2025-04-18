@@ -108,7 +108,8 @@ import {
   JwtHeader,
   SolanaWeb3Credentials,
   SolanaWallet,
-  Web3Credentials, GenerateCodeChallengeResponse
+  Web3Credentials,
+  GenerateCodeChallengeResponse,
 } from './lib/types'
 import { stringToUint8Array, bytesToBase64URL } from './lib/base64url'
 
@@ -915,7 +916,9 @@ export default class GoTrueClient {
    * generated using the `codeChallenge` from the most recent call to this method.
    */
   async generateCodeChallengeAndMethod(): Promise<GenerateCodeChallengeResponse>
-  async generateCodeChallengeAndMethod(_getCodeChallengeAndMethod = getCodeChallengeAndMethod): Promise<GenerateCodeChallengeResponse> {
+  async generateCodeChallengeAndMethod(
+    _getCodeChallengeAndMethod = getCodeChallengeAndMethod
+  ): Promise<GenerateCodeChallengeResponse> {
     try {
       const [codeChallenge, codeChallengeMethod] = await _getCodeChallengeAndMethod(
         this.storage,
@@ -924,9 +927,9 @@ export default class GoTrueClient {
       return {
         data: {
           codeChallenge,
-          codeChallengeMethod
+          codeChallengeMethod,
         },
-        error: null
+        error: null,
       }
     } catch (error) {
       if (isAuthError(error)) {
