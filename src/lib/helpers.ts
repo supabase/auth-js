@@ -1,7 +1,7 @@
 import { API_VERSION_HEADER_NAME, BASE64URL_REGEX } from './constants'
 import { AuthInvalidJwtError } from './errors'
-import { base64UrlToUint8Array, stringFromBase64URL, stringToBase64URL } from './base64url'
-import { JwtHeader, JwtPayload, SupportedStorage } from './types'
+import { base64UrlToUint8Array, stringFromBase64URL } from './base64url'
+import { JwtHeader, JwtPayload, SupportedStorage, CodeChallengeMethod } from './types'
 
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
@@ -296,7 +296,7 @@ export async function getCodeChallengeAndMethod(
   storage: SupportedStorage,
   storageKey: string,
   isPasswordRecovery = false
-) {
+): Promise<[string, CodeChallengeMethod]> {
   const codeVerifier = generatePKCEVerifier()
   let storedCodeVerifier = codeVerifier
   if (isPasswordRecovery) {

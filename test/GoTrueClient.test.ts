@@ -1,19 +1,19 @@
-import { AuthError } from '../src/lib/errors'
+import { AuthError, isAuthError } from '../src/lib/errors'
 import { STORAGE_KEY } from '../src/lib/constants'
 import { memoryLocalStorageAdapter } from '../src/lib/local-storage'
 import GoTrueClient from '../src/GoTrueClient'
 import {
+  authAdminApiAutoConfirmEnabledClient,
   authClient as auth,
-  authClientWithSession as authWithSession,
+  authClient,
   authClientWithAsymmetricSession as authWithAsymmetricSession,
+  authClientWithSession as authWithSession,
   authSubscriptionClient,
-  clientApiAutoConfirmOffSignupsEnabledClient as phoneClient,
   clientApiAutoConfirmDisabledClient as signUpDisabledClient,
   clientApiAutoConfirmEnabledClient as signUpEnabledClient,
-  authAdminApiAutoConfirmEnabledClient,
-  GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
-  authClient,
+  clientApiAutoConfirmOffSignupsEnabledClient as phoneClient,
   GOTRUE_URL_SIGNUP_ENABLED_ASYMMETRIC_AUTO_CONFIRM_ON,
+  GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
 import { JWK, Session } from '../src'
@@ -1197,6 +1197,55 @@ describe('fetchJwk', () => {
       // @ts-ignore 'Allow access to private fetchJwk'
       await authWithAsymmetricSession.fetchJwk('123')
       expect(fetchedUrls).toHaveLength(c.fetchedUrlsLength)
+    })
+  })
+})
+
+describe('GoTrueClient (PKCE Code Challenge)', () => {
+  describe('generateCodeChallengeAndMethod', () => {
+    test('returns the code challenge and method on success', async () => {
+      const getCodeChallengeAndMethod = jest.fn()
+      getCodeChallengeAndMethod.mockResolvedValueOnce(['some-challenge', 'S256'])
+
+      const { data, error } = await authClient.generateCodeChallengeAndMethod(
+        // @ts-expect-error -- Expected 0 arguments, but got 1
+        getCodeChallengeAndMethod
+      )
+
+      expect(error).toBeNull()
+      expect(data).toMatchObject({
+        codeChallenge: 'some-challenge',
+        codeChallengeMethod: 'S256',
+      })
+      expect(getCodeChallengeAndMethod).toHaveBeenCalledTimes(1)
+    })
+
+    test('returns { data: null, error } if an AuthError is thrown', async () => {
+      const authErr = new AuthError('Auth error for testing')
+      const getCodeChallengeAndMethod = jest.fn()
+      getCodeChallengeAndMethod.mockRejectedValueOnce(authErr)
+
+      const { data, error } = await authClient.generateCodeChallengeAndMethod(
+        // @ts-expect-error -- Expected 0 arguments, but got 1
+        getCodeChallengeAndMethod
+      )
+
+      expect(data).toBeNull()
+      expect(error).toBe(authErr)
+      expect(isAuthError(error)).toBe(true)
+      expect(getCodeChallengeAndMethod).toHaveBeenCalledTimes(1)
+    })
+
+    test('rethrows if a non-AuthError is thrown', async () => {
+      const genericErr = new Error('Generic error')
+      const getCodeChallengeAndMethod = jest.fn()
+      getCodeChallengeAndMethod.mockRejectedValueOnce(genericErr)
+
+      await expect(
+        // @ts-expect-error -- Expected 0 arguments, but got 1
+        authClient.generateCodeChallengeAndMethod(getCodeChallengeAndMethod)
+      ).rejects.toThrow(genericErr)
+      expect(getCodeChallengeAndMethod).toHaveBeenCalledTimes(1)
     })
   })
 })
