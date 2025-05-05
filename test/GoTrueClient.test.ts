@@ -908,16 +908,149 @@ describe('User management', () => {
 })
 
 describe('MFA', () => {
+  const setupUserWithMFA = async () => {
+    const { email, password } = mockUserCredentials()
+    const { data: signUpData, error: signUpError } = await authWithSession.signUp({
+      email,
+      password,
+    })
+    expect(signUpError).toBeNull()
+    expect(signUpData.session).not.toBeNull()
+    
+    // Wait for client initialization
+    await authWithSession.initialize()
+    
+    // Sign in to get a valid session
+    const { error: signInError } = await authWithSession.signInWithPassword({
+      email,
+      password,
+    })
+    expect(signInError).toBeNull()
+    
+    return { email, password }
+  }
+
+  beforeEach(async () => {
+    await authWithSession.signOut()
+  })
+
   test('enroll({factorType: "totp"}) returns totp', async () => {
+    await setupUserWithMFA()
     const { data, error } = await authWithSession.mfa.enroll({
       factorType: 'totp',
     })
 
-    if (error) {
-      throw error
-    }
+    expect(error).toBeNull()
+    expect(data!.totp.qr_code).not.toBeNull()
+  })
 
-    expect(data.totp.qr_code).not.toBeNull()
+  test('enroll({factorType: "totp"}) should fail without session', async () => {
+    await authWithSession.signOut()
+    const { data, error } = await authWithSession.mfa.enroll({
+      factorType: 'totp',
+    })
+
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('Bearer token')
+    expect(data).toBeNull()
+  })
+
+  test('challenge should create MFA challenge', async () => {
+    await setupUserWithMFA()
+    const { data: enrollData, error: enrollError } = await authWithSession.mfa.enroll({
+      factorType: 'totp',
+    })
+    expect(enrollError).toBeNull()
+    expect(enrollData!.totp).not.toBeNull()
+
+    const { data: challengeData, error: challengeError } = await authWithSession.mfa.challenge({
+      factorId: enrollData!.id
+    })
+
+    expect(challengeError).toBeNull()
+    expect(challengeData!.id).not.toBeNull()
+    expect(challengeData!.expires_at).not.toBeNull()
+  })
+
+  test('verify should verify MFA challenge', async () => {
+    await setupUserWithMFA()
+    const { data: enrollData, error: enrollError } = await authWithSession.mfa.enroll({
+      factorType: 'totp',
+    })
+    expect(enrollError).toBeNull()
+    expect(enrollData!.totp).not.toBeNull()
+
+    const { data: challengeData, error: challengeError } = await authWithSession.mfa.challenge({
+      factorId: enrollData!.id
+    })
+    expect(challengeError).toBeNull()
+
+    const { data: verifyData, error: verifyError } = await authWithSession.mfa.verify({
+      factorId: enrollData!.id,
+      challengeId: challengeData!.id,
+      code: '123456'
+    })
+
+    expect(verifyError).not.toBeNull()
+    expect(verifyError?.message).toContain('Invalid TOTP code')
+    expect(verifyData).toBeNull()
+  })
+
+  test('challengeAndVerify should handle MFA challenge and verification in one call', async () => {
+    await setupUserWithMFA()
+    const { data: enrollData, error: enrollError } = await authWithSession.mfa.enroll({
+      factorType: 'totp',
+    })
+    expect(enrollError).toBeNull()
+    expect(enrollData!.totp).not.toBeNull()
+
+    const { data: verifyData, error: verifyError } = await authWithSession.mfa.challengeAndVerify({
+      factorId: enrollData!.id,
+      code: '123456'
+    })
+
+    expect(verifyError).not.toBeNull()
+    expect(verifyError?.message).toContain('Invalid TOTP code')
+    expect(verifyData).toBeNull()
+  })
+
+  test('unenroll should remove MFA factor', async () => {
+    await setupUserWithMFA()
+    const { data: enrollData, error: enrollError } = await authWithSession.mfa.enroll({
+      factorType: 'totp',
+    })
+    expect(enrollError).toBeNull()
+    expect(enrollData!.totp).not.toBeNull()
+
+    const { error: unenrollError } = await authWithSession.mfa.unenroll({
+      factorId: enrollData!.id
+    })
+
+    expect(unenrollError).toBeNull()
+
+    // Wait for unenrollment to be processed
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    // Verify factor was removed
+    const { data: factorsData } = await authWithSession.mfa.listFactors()
+    expect(factorsData!.all).toHaveLength(0)
+    expect(factorsData!.totp).toHaveLength(0)
+  })
+
+  test('getAuthenticatorAssuranceLevel should return current AAL', async () => {
+    await setupUserWithMFA()
+    const { data: enrollData, error: enrollError } = await authWithSession.mfa.enroll({
+      factorType: 'totp',
+    })
+    expect(enrollError).toBeNull()
+    expect(enrollData!.totp).not.toBeNull()
+
+    const { data: aalData, error: aalError } = await authWithSession.mfa.getAuthenticatorAssuranceLevel()
+
+    expect(aalError).toBeNull()
+    expect(aalData!.currentLevel).toBeDefined()
+    expect(aalData!.nextLevel).toBeDefined()
+    expect(aalData!.currentAuthenticationMethods).toBeDefined()
   })
 })
 
