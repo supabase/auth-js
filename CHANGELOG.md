@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.70.0](https://github.com/supabase/auth-js/compare/v2.69.1...v2.70.0) (2025-05-06)
+
+
+### Features
+
+* add `signInWithWeb3` with solana ([#1037](https://github.com/supabase/auth-js/issues/1037)) ([cff5bcb](https://github.com/supabase/auth-js/commit/cff5bcb8399a46b293cfa8688d89882924e7edab))
+
 ## [2.69.1](https://github.com/supabase/auth-js/compare/v2.69.0...v2.69.1) (2025-03-24)
 
 
