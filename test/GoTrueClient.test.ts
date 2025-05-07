@@ -917,10 +917,8 @@ describe('MFA', () => {
     expect(signUpError).toBeNull()
     expect(signUpData.session).not.toBeNull()
     
-    // Wait for client initialization
     await authWithSession.initialize()
     
-    // Sign in to get a valid session
     const { error: signInError } = await authWithSession.signInWithPassword({
       email,
       password,
@@ -928,6 +926,23 @@ describe('MFA', () => {
     expect(signInError).toBeNull()
     
     return { email, password }
+  }
+
+  const setupUserWithMFAAndTOTP = async () => {
+    const credentials = await setupUserWithMFA()
+    
+    // Add the common TOTP enrollment part
+    const { data: enrollData, error: enrollError } = await authWithSession.mfa.enroll({
+      factorType: 'totp',
+    })
+    expect(enrollError).toBeNull()
+    expect(enrollData!.totp).not.toBeNull()
+    
+    return {
+      ...credentials,
+      factorId: enrollData!.id,
+      totp: enrollData!.totp
+    }
   }
 
   beforeEach(async () => {
@@ -956,15 +971,10 @@ describe('MFA', () => {
   })
 
   test('challenge should create MFA challenge', async () => {
-    await setupUserWithMFA()
-    const { data: enrollData, error: enrollError } = await authWithSession.mfa.enroll({
-      factorType: 'totp',
-    })
-    expect(enrollError).toBeNull()
-    expect(enrollData!.totp).not.toBeNull()
+    const { factorId } = await setupUserWithMFAAndTOTP()
 
     const { data: challengeData, error: challengeError } = await authWithSession.mfa.challenge({
-      factorId: enrollData!.id
+      factorId
     })
 
     expect(challengeError).toBeNull()
@@ -973,20 +983,15 @@ describe('MFA', () => {
   })
 
   test('verify should verify MFA challenge', async () => {
-    await setupUserWithMFA()
-    const { data: enrollData, error: enrollError } = await authWithSession.mfa.enroll({
-      factorType: 'totp',
-    })
-    expect(enrollError).toBeNull()
-    expect(enrollData!.totp).not.toBeNull()
+    const { factorId } = await setupUserWithMFAAndTOTP()
 
     const { data: challengeData, error: challengeError } = await authWithSession.mfa.challenge({
-      factorId: enrollData!.id
+      factorId
     })
     expect(challengeError).toBeNull()
 
     const { data: verifyData, error: verifyError } = await authWithSession.mfa.verify({
-      factorId: enrollData!.id,
+      factorId,
       challengeId: challengeData!.id,
       code: '123456'
     })
@@ -997,15 +1002,10 @@ describe('MFA', () => {
   })
 
   test('challengeAndVerify should handle MFA challenge and verification in one call', async () => {
-    await setupUserWithMFA()
-    const { data: enrollData, error: enrollError } = await authWithSession.mfa.enroll({
-      factorType: 'totp',
-    })
-    expect(enrollError).toBeNull()
-    expect(enrollData!.totp).not.toBeNull()
+    const { factorId } = await setupUserWithMFAAndTOTP()
 
     const { data: verifyData, error: verifyError } = await authWithSession.mfa.challengeAndVerify({
-      factorId: enrollData!.id,
+      factorId,
       code: '123456'
     })
 
@@ -1015,15 +1015,10 @@ describe('MFA', () => {
   })
 
   test('unenroll should remove MFA factor', async () => {
-    await setupUserWithMFA()
-    const { data: enrollData, error: enrollError } = await authWithSession.mfa.enroll({
-      factorType: 'totp',
-    })
-    expect(enrollError).toBeNull()
-    expect(enrollData!.totp).not.toBeNull()
+    const { factorId } = await setupUserWithMFAAndTOTP()
 
     const { error: unenrollError } = await authWithSession.mfa.unenroll({
-      factorId: enrollData!.id
+      factorId
     })
 
     expect(unenrollError).toBeNull()
@@ -1038,12 +1033,7 @@ describe('MFA', () => {
   })
 
   test('getAuthenticatorAssuranceLevel should return current AAL', async () => {
-    await setupUserWithMFA()
-    const { data: enrollData, error: enrollError } = await authWithSession.mfa.enroll({
-      factorType: 'totp',
-    })
-    expect(enrollError).toBeNull()
-    expect(enrollData!.totp).not.toBeNull()
+    const { factorId } = await setupUserWithMFAAndTOTP()
 
     const { data: aalData, error: aalError } = await authWithSession.mfa.getAuthenticatorAssuranceLevel()
 
