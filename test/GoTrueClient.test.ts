@@ -814,6 +814,34 @@ describe('The auth client can signin with third-party oAuth providers', () => {
     })
   })
 
+  describe('Developers are warned if subscribing with an async function', () => {
+    const originalWarn = console.warn
+    let warnings: any[][] = []
+
+    beforeEach(() => {
+      console.warn = (...args: any[]) => {
+        console.log('WARN', ...args)
+
+        warnings.push(args)
+      }
+    })
+
+    afterEach(() => {
+      console.warn = originalWarn
+      warnings = []
+    })
+
+    test('Subscribing a non-async listener should not log a warning', async () => {
+      authSubscriptionClient.onAuthStateChange(() => console.log('onAuthStateChange was called'))
+      expect(warnings.length).toEqual(0)
+    })
+
+    test('Subscribing an async listener should log a warning', async () => {
+      authSubscriptionClient.onAuthStateChange(async () => console.log('onAuthStateChange was called'))
+      expect(warnings.length).toEqual(1)
+    })
+  })
+
   describe('Sign Up Enabled', () => {
     test('User can sign up', async () => {
       const { email, password } = mockUserCredentials()
