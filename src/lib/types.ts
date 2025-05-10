@@ -6,6 +6,7 @@ import type { SolanaSignInInput, SolanaSignInOutput } from '@solana/wallet-stand
 export type Provider =
   | 'apple'
   | 'azure'
+  | 'beyondidentity'
   | 'bitbucket'
   | 'discord'
   | 'facebook'
