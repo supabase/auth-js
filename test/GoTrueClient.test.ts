@@ -14,9 +14,13 @@ import {
   GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
   authClient,
   GOTRUE_URL_SIGNUP_ENABLED_ASYMMETRIC_AUTO_CONFIRM_ON,
+  authClientWithSession,
+  pkceClient,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
 import { JWK, Session } from '../src'
+
+const TEST_USER_DATA = { info: 'some info' }
 
 describe('GoTrueClient', () => {
   // @ts-expect-error 'Allow access to private _refreshAccessToken'
@@ -327,6 +331,13 @@ describe('GoTrueClient', () => {
       expect(error?.message).toEqual('No browser detected.')
       expect(session).toBeNull()
     })
+
+    test('exchangeCodeForSession() should fail with invalid authCode', async () => {
+      const { error } = await pkceClient.exchangeCodeForSession('mock_code')
+      
+      expect(error).not.toBeNull()
+      expect(error?.status).toEqual(400)
+    })
   })
 
   describe('Email Auth', () => {
@@ -343,6 +354,61 @@ describe('GoTrueClient', () => {
       expect(data.user).not.toBeNull()
 
       expect(data.user?.email).toEqual(email)
+    })
+
+    test('signUp() with email and PKCE flowType', async () => {
+      const { email, password } = mockUserCredentials()
+
+      const { error, data } = await pkceClient.signUp({email, password})
+
+      expect(error).toBeNull()
+      expect(data.session).not.toBeNull()
+      expect(data.user).not.toBeNull()
+      expect(data.user?.email).toEqual(email)
+    })
+
+    test('signUp() with email and options', async () => {
+      const { email, password } = mockUserCredentials()
+
+      const { error, data } = await auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: email,
+          data: { ...TEST_USER_DATA }
+        }
+      })
+
+      expect(error).toBeNull()
+      expect(data.session).not.toBeNull()
+      expect(data.user).not.toBeNull()
+
+      expect(data.user?.email).toEqual(email)
+      expect(data?.user?.user_metadata).toMatchObject(TEST_USER_DATA)
+    })
+
+    test('fail to signUp() with invalid password', async () => {
+      const { error, data } = await auth.signUp({ email: 'asd@a.aa', password: '123'})
+
+      expect(data?.session).toBeNull()
+      expect(error).not.toBeNull()
+      expect(error?.message).toContain("Password should be at least 6 characters")
+    })
+
+    test('fail to signUp() with invalid email', async () => {
+      const { error, data } = await auth.signUp({ email: 'a', password: '123456'})
+
+      expect(data?.session).toBeNull()
+      expect(error).not.toBeNull()
+      expect(error?.message).toContain("Unable to validate email address: invalid format")
+    })
+
+    test('resend() with email', async () => {
+      const { email } = mockUserCredentials()
+
+      const { error } = await auth.resend({ email, type: 'signup'})
+
+      expect(error).toBeNull()
     })
   })
 
@@ -363,19 +429,6 @@ describe('GoTrueClient', () => {
       expect(error?.status).toEqual(500)
     })
 
-    test('signUp() with phone', async () => {
-      const { phone, password } = mockUserCredentials()
-
-      const { error, data } = await phoneClient.signUp({
-        phone,
-        password,
-      })
-
-      expect(error).not.toBeNull()
-      expect(data.session).toBeNull()
-      expect(data.user).toBeNull()
-    })
-
     test('signInWithOtp() with phone', async () => {
       const { phone } = mockUserCredentials()
 
@@ -385,6 +438,32 @@ describe('GoTrueClient', () => {
       expect(error).not.toBeNull()
       expect(data.session).toBeNull()
       expect(data.user).toBeNull()
+    })
+
+    test('signUp() with phone and options', async () => {
+      const { phone, password } = mockUserCredentials()
+
+      const { error, data } = await phoneClient.signUp({
+        phone,
+        password,
+        options: {
+          data: { ...TEST_USER_DATA },
+          channel: 'whatsapp',
+          captchaToken: 'some_token'
+        }
+      })
+
+      expect(error).not.toBeNull()
+      expect(data.session).toBeNull()
+      expect(data.user).toBeNull()
+    })
+
+    test('resend() with phone', async () => {
+      const { phone } = mockUserCredentials()
+
+      const { error } = await auth.resend({ phone, type: 'phone_change'})
+
+      expect(error).toBeNull()
     })
 
     test('verifyOTP()', async () => {
@@ -1321,5 +1400,36 @@ describe('fetchJwk', () => {
       await authWithAsymmetricSession.fetchJwk('123')
       expect(fetchedUrls).toHaveLength(c.fetchedUrlsLength)
     })
+  })
+})
+
+describe('signInAnonymously', () => {
+  test('should successfully sign in anonymously', async () => {
+    const { data, error } = await authClientWithSession.signInAnonymously()
+    
+    expect(error).toBeNull()
+    expect(data).not.toBeNull()
+    expect(data.session).not.toBeNull()
+    expect(data.user).not.toBeNull()
+    expect(data.user?.is_anonymous).toBe(true)
+
+    const { data: savedSession } = await authClientWithSession.getSession()
+    expect(savedSession.session).not.toBeNull()
+  })
+
+  test('should sign in anonymously with user data', async () => {
+    const { data, error } = await authClient.signInAnonymously({ options: { data: TEST_USER_DATA } })
+    
+    expect(error).toBeNull()
+    expect(data).not.toBeNull()
+    expect(data?.user?.user_metadata).toEqual(TEST_USER_DATA)
+  })
+  
+  test('fail to sign in anonymously when it is disabled on the server', async () => {
+    const { data, error } = await phoneClient.signInAnonymously()
+    
+    expect(data?.session).toBeNull()
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain("Anonymous sign-ins are disabled")
   })
 })

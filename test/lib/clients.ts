@@ -87,6 +87,15 @@ export const clientApiAutoConfirmDisabledClient = new GoTrueClient({
   storage: new MemoryStorage(),
 })
 
+export const pkceClient = new GoTrueClient({
+  url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+  autoRefreshToken: false,
+  persistSession: true,
+  storage: new MemoryStorage(),
+  flowType: 'pkce',
+})
+
+
 export const authAdminApiAutoConfirmEnabledClient = new GoTrueAdminApi({
   url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
   headers: {
