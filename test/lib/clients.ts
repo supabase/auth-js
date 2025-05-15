@@ -95,6 +95,11 @@ export const pkceClient = new GoTrueClient({
   flowType: 'pkce',
 })
 
+export const autoRefreshClient = new GoTrueClient({
+  url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+  autoRefreshToken: true,
+  persistSession: true,
+})
 
 export const authAdminApiAutoConfirmEnabledClient = new GoTrueAdminApi({
   url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
