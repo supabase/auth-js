@@ -5,8 +5,7 @@ on:
     branches-ignore: # Run the checks on all branches but the protected ones
       - master
       - release/*
-
-  pull_request_target:
+  pull_request:
     branches:
       - master
       - release/*
@@ -31,7 +30,7 @@ jobs:
           sparse-checkout: |
             .github
 
-      - if: ${{ github.event_name == 'pull_request_target' }}
+      - if: ${{ github.event_name == 'pull_request' }}
         run: |
           set -ex
           TMP_FILE=$(mktemp)
