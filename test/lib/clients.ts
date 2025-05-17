@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken'
 import { GoTrueAdminApi, GoTrueClient } from '../../src/index'
+import { SupportedStorage } from '../../src/lib/types'
 
 export const SIGNUP_ENABLED_AUTO_CONFIRM_OFF_PORT = 9999
 
@@ -145,3 +146,13 @@ export const serviceRoleApiClientNoSms = new GoTrueAdminApi({
     Authorization: `Bearer ${SERVICE_ROLE_JWT}`,
   },
 })
+
+export function getClientWithSpecificStorage(storage: SupportedStorage) {
+  return new GoTrueClient({
+    url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+    storageKey: 'test-speciic-storage',
+    autoRefreshToken: false,
+    persistSession: true,
+    storage,
+  })
+}
