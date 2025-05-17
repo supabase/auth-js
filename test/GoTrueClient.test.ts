@@ -16,6 +16,7 @@ import {
   GOTRUE_URL_SIGNUP_ENABLED_ASYMMETRIC_AUTO_CONFIRM_ON,
   pkceClient,
   autoRefreshClient,
+  getClientWithSpecificStorage,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
 import { JWK, Provider, Session } from '../src'
@@ -1764,5 +1765,153 @@ describe('Session Management', () => {
     
     // Cleanup
     subscription?.unsubscribe()
+  })
+})
+
+describe('Storage adapter edge cases', () => {
+
+  test('should handle storage failure gracefully', async () => {
+    const brokenStorage = {
+      getItem: async () => { throw new Error('getItem failed message') },
+      setItem: async () => { throw new Error('setItem failed message') },
+      removeItem: async () => { throw new Error('removeItem failed message') },
+    }
+    const client = getClientWithSpecificStorage(brokenStorage)
+
+    await expect(client.signOut()).rejects.toThrow('getItem failed message')
+  })
+
+  test('should handle storage getItem failure in getSession', async () => {
+    const brokenStorage = {
+      getItem: async () => { throw new Error('getItem failed message') },
+      setItem: async () => {},
+      removeItem: async () => {},
+    }
+    const client = getClientWithSpecificStorage(brokenStorage)
+    await expect(client.getSession()).rejects.toThrow('getItem failed message')
+  })
+
+  test('should handle storage setItem failure in _saveSession', async () => {
+    const brokenStorage = {
+      getItem: async () => '{}',
+      setItem: async () => { throw new Error('setItem failed message') },
+      removeItem: async () => {},
+    }
+    const client = getClientWithSpecificStorage(brokenStorage)
+    const session = {
+      access_token: 'test-token',
+      refresh_token: 'test-refresh',
+      expires_in: 3600,
+      token_type: 'bearer',
+      user: null
+    }
+    // @ts-expect-error private method
+    await expect(client._saveSession(session)).rejects.toThrow('setItem failed message')
+
+    const { data, error } = await client.getSession()
+    expect(error).toBeNull()
+    expect(data.session).toBeNull()
+  })
+
+  test('should handle storage removeItem failure in _removeSession', async () => {
+    const brokenStorage = {
+      getItem: async () => '{}',
+      setItem: async () => {},
+      removeItem: async () => { throw new Error('removeItem failed message') },
+    }
+    const client = getClientWithSpecificStorage(brokenStorage)
+
+    await expect(client.getSession()).rejects.toThrow('removeItem failed message')
+  })
+
+  test('should handle invalid JSON in storage', async () => {
+    const invalidStorage = {
+      getItem: async () => 'invalid-json',
+      setItem: async () => {},
+      removeItem: async () => {},
+    }
+    const client = getClientWithSpecificStorage(invalidStorage)
+    const { data, error } = await client.getSession()
+    expect(error).toBeNull()
+    expect(data.session).toBeNull()
+  })
+
+  test('should handle null storage value', async () => {
+    const nullStorage = {
+      getItem: async () => null,
+      setItem: async () => {},
+      removeItem: async () => {},
+    }
+    const client = getClientWithSpecificStorage(nullStorage)
+    const { data, error } = await client.getSession()
+    expect(error).toBeNull()
+    expect(data.session).toBeNull()
+  })
+
+  test('should handle empty storage value', async () => {
+    const emptyStorage = {
+      getItem: async () => '',
+      setItem: async () => {},
+      removeItem: async () => {},
+    }
+    const client = getClientWithSpecificStorage(emptyStorage)
+    const { data, error } = await client.getSession()
+    expect(error).toBeNull()
+    expect(data.session).toBeNull()
+  })
+
+  test('should handle malformed session data', async () => {
+    const malformedStorage = {
+      getItem: async () => JSON.stringify({ access_token: 'test' }), // Missing required fields
+      setItem: async () => {},
+      removeItem: async () => {},
+    }
+    const client = getClientWithSpecificStorage(malformedStorage)
+    const { data, error } = await client.getSession()
+    expect(error).toBeNull()
+    expect(data.session).toBeNull()
+  })
+
+  test('should handle expired session data', async () => {
+    const expiredStorage = {
+      getItem: async () => JSON.stringify({
+        access_token: 'test',
+        refresh_token: 'test',
+        expires_in: 3600,
+        expires_at: Math.floor(Date.now() / 1000) - 1000, // Expired 1 second ago
+        token_type: 'bearer',
+        user: null
+      }),
+      setItem: async () => {},
+      removeItem: async () => {},
+    }
+    const client = getClientWithSpecificStorage(expiredStorage)
+    // @ts-expect-error private method
+    client._refreshAccessToken = async () => ({ data: { session: null, user: null }, error: null })
+    const { data, error } = await client.getSession()
+
+    expect(data.session).toBeNull()
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('Auth session missing!')
+  })
+
+  test('should return false for _isImplicitGrantCallback with missing params', () => {
+    const client = getClientWithSpecificStorage(memoryLocalStorageAdapter())
+    // @ts-expect-error private method
+    expect(client._isImplicitGrantCallback({})).toBe(false)
+  })
+
+  test('should return false for _isPKCECallback with missing params', async () => {
+    const client = getClientWithSpecificStorage(memoryLocalStorageAdapter())
+    // @ts-expect-error private method
+    await expect(client._isPKCECallback({})).resolves.toBe(false)
+  })
+
+  test('should build provider URL with _getUrlForProvider', async () => {
+    const client = getClientWithSpecificStorage(memoryLocalStorageAdapter())
+    // @ts-expect-error private method
+    const url = await client._getUrlForProvider(GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON, 'google', { redirectTo: 'http://localhost' })
+    expect(typeof url).toBe('string')
+    expect(url).toContain('google')
   })
 })
