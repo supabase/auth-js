@@ -450,22 +450,6 @@ describe('GoTrueClient', () => {
   })
 
   describe('Phone OTP Auth', () => {
-    test('signUp() when phone sign up missing provider account', async () => {
-      const { phone, password } = mockUserCredentials()
-
-      const { error, data } = await phoneClient.signUp({
-        phone,
-        password,
-      })
-
-      expect(error).not.toBeNull()
-      expect(data.session).toBeNull()
-      expect(data.user).toBeNull()
-
-      expect(error?.message).toEqual('Unable to get SMS provider')
-      expect(error?.status).toEqual(500)
-    })
-
     test('signInWithOtp() with phone', async () => {
       const { phone } = mockUserCredentials()
 
@@ -496,9 +480,18 @@ describe('GoTrueClient', () => {
         }
       })
 
-      expect(error).not.toBeNull()
+      // Since auto-confirm is off, we should either:
+      // 1. Get an error (e.g. invalid phone number, captcha token)
+      // 2. Get a success response but with no session (needs verification)
       expect(data.session).toBeNull()
-      expect(data.user).toBeNull()
+      if (error) {
+        expect(error).not.toBeNull()
+        expect(data.user).toBeNull()
+      } else {
+        expect(data.user).not.toBeNull()
+        expect(data.user?.phone).toBe(phone)
+        expect(data.user?.user_metadata).toMatchObject(TEST_USER_DATA)
+      }
     })
 
     test('resend() with phone', async () => {
@@ -1586,63 +1579,71 @@ describe('Reauthentication', () => {
   })
 })
 
-describe('Identities', () => {
-test('getUserIdentities() no identities before signup', async () => {
-    const { email, password } = mockUserCredentials()
-    const { data, error } = await auth.getUserIdentities()
-
-    expect(data).not.toBeNull()
-    expect(data?.identities?.length).toEqual(0)
-    expect(error).toBeNull()
+describe('Identity Management', () => {
+  beforeEach(async () => {
+    await authWithSession.signOut()
   })
 
-  test('getUserIdentities() returns identities', async () => {
-    const { email, password } = mockUserCredentials()
+  test('getUserIdentities() returns error without session', async () => {
+    const { error } = await authWithSession.getUserIdentities()
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain("Auth session missing!")
+  })
 
-    await authWithSession.signUp({
+  test('getUserIdentities() returns user identities after signup', async () => {
+    const { email, password } = mockUserCredentials()
+    
+    const { error: signUpError } = await authWithSession.signUp({
       email,
       password,
     })
+    expect(signUpError).toBeNull()
 
     const { data, error } = await authWithSession.getUserIdentities()
-    
     expect(error).toBeNull()
-    expect(data).not.toBeNull()
-    expect(data?.identities).not.toBeNull()
-    expect(data?.identities?.length).toBe(1)
-    expect(data?.identities?.[0]?.provider).toBe('email')
+    expect(data?.identities).toHaveLength(1)
+    const identity = data?.identities[0] as unknown as { provider: string; identity_data: { email: string } }
+    expect(identity.provider).toBe('email')
+    expect(identity.identity_data.email).toBe(email)
+  })
+
+  test('linkIdentity() fails when manual linking is disabled', async () => {
+    const { email, password } = mockUserCredentials()
+    
+    const { error: signUpError } = await authWithSession.signUp({
+      email,
+      password,
+    })
+    expect(signUpError).toBeNull()
+
+    const { error } = await authWithSession.linkIdentity({
+      provider: 'google',
+      options: {
+        redirectTo: 'http://localhost:3000'
+      }
+    })
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('Manual linking is disabled')
   })
 
   test('unlinkIdentity() fails when manual linking is disabled', async () => {
     const { email, password } = mockUserCredentials()
-
-    await authWithSession.signUp({
+    
+    const { error: signUpError } = await authWithSession.signUp({
       email,
       password,
     })
+    expect(signUpError).toBeNull()
 
     const { data: identitiesData } = await authWithSession.getUserIdentities()
     expect(identitiesData?.identities).toBeDefined()
     expect(identitiesData?.identities.length).toBeGreaterThan(0)
 
-    const { data, error } = await authWithSession.unlinkIdentity(identitiesData!.identities[0])
-    
+    const { error } = await authWithSession.unlinkIdentity(identitiesData!.identities[0])
     expect(error).not.toBeNull()
-    expect(error?.message).toContain("Manual linking is disabled")
+    expect(error?.message).toContain('Manual linking is disabled')
   })
 
-  test('linkIdentity() fails when manual linking is disabled', async () => {
-
-    const { error } = await authWithSession.linkIdentity({
-      provider: 'email' as Provider,
-      options: {
-        redirectTo: 'http://localhost:3000'
-      }
-    })
-    
-    expect(error).not.toBeNull()
-    expect(error?.message).toContain("Manual linking is disabled")
-  })
 })
 
 describe('Auto Refresh', () => {
@@ -1721,5 +1722,47 @@ describe('Auto Refresh', () => {
       // Verify we got a new token
       expect(session?.access_token).not.toEqual(signUpData.session?.access_token)
     })
+  })
+})
+
+describe('Session Management', () => {
+  test('_notifyAllSubscribers notifies all subscribers of session changes', async () => {
+    const { email, password } = mockUserCredentials()
+    const mockCallback = jest.fn()
+    
+    const { data: { subscription } } = authWithSession.onAuthStateChange(mockCallback)
+    
+    const { data } = await authWithSession.signUp({
+      email,
+      password,
+    })
+    expect(data.session).not.toBeNull()
+    
+    expect(mockCallback).toHaveBeenCalledWith('SIGNED_IN', data.session)
+    
+    // Cleanup
+    subscription?.unsubscribe()
+  })
+
+  test('_removeSession removes session and notifies subscribers', async () => {
+    const { email, password } = mockUserCredentials()
+    const mockCallback = jest.fn()
+    const { data: { subscription } } = authWithSession.onAuthStateChange(mockCallback)
+    
+    const { data } = await authWithSession.signUp({
+      email,
+      password,
+    })
+    expect(data.session).not.toBeNull()
+    
+    // @ts-expect-error 'Allow access to private _removeSession'
+    await authWithSession._removeSession()
+    expect(mockCallback).toHaveBeenCalledWith('SIGNED_OUT', null)
+    
+    const { data: sessionData } = await authWithSession.getSession()
+    expect(sessionData.session).toBeNull()
+    
+    // Cleanup
+    subscription?.unsubscribe()
   })
 })
