@@ -960,6 +960,11 @@ describe('The auth client can signin with third-party oAuth providers', () => {
 })
 
 describe('User management', () => {
+  
+  beforeEach(async () => {
+    await authWithSession.signOut()
+  })
+
   test('resetPasswordForEmail() sends an email for password recovery', async () => {
     const { email, password } = mockUserCredentials()
 
@@ -1051,10 +1056,6 @@ describe('MFA', () => {
       totp: enrollData!.totp
     }
   }
-
-  beforeEach(async () => {
-    await authWithSession.signOut()
-  })
 
   test('enroll({factorType: "totp"}) returns totp', async () => {
     await setupUserWithMFA()
@@ -1768,8 +1769,79 @@ describe('Session Management', () => {
   })
 })
 
-describe('Storage adapter edge cases', () => {
+describe('Session Management Edge Cases', () => {
+  test('getSession() with invalid refreshToken should return session with invalid tokens', async () => {
+    const { email, password } = mockUserCredentials()
 
+    await authWithSession.signUp({
+      email,
+      password,
+    })
+
+    // Set an invalid refresh token in storage
+    // @ts-expect-error 'Allow access to protected storage'
+    const storage = authWithSession.storage
+    // @ts-expect-error 'Allow access to protected storageKey'
+    const storageKey = authWithSession.storageKey
+
+    const invalidSession = {
+      access_token: 'invalid-token',
+      refresh_token: 'invalid-refresh-token',
+      expires_in: 3600,
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      token_type: 'bearer',
+      user: null
+    }
+
+    await storage.setItem(storageKey, JSON.stringify(invalidSession))
+
+    const { data, error } = await authWithSession.getSession()
+
+    expect(error).toBeNull()
+    expect(data.session).not.toBeNull()
+    expect(data.session).toEqual(invalidSession)
+  })
+
+  test('getSession() with expired refreshToken should return error for invalid token', async () => {
+    const { email, password } = mockUserCredentials()
+
+    const { data: signUpData } = await authWithSession.signUp({
+      email,
+      password,
+    })
+
+    // Manually expire the refresh token by setting it to a timestamp in the past
+    const expiredSeconds = Math.floor(Date.now() / 1000) - 3600 // 1 hour in the past
+
+    // @ts-expect-error 'Allow access to protected storage'
+    const storage = authWithSession.storage
+    // @ts-expect-error 'Allow access to protected storageKey'
+    const storageKey = authWithSession.storageKey
+
+    // Get the current session and modify it to be expired
+    const currentSession = JSON.parse((await storage.getItem(storageKey)) || 'null')
+    const expiredSession = {
+      ...currentSession,
+      expires_at: expiredSeconds,
+      access_token: 'expired-token',
+      refresh_token: 'expired-refresh-token'
+    }
+
+    await storage.setItem(storageKey, JSON.stringify(expiredSession))
+
+    // Verify the session was properly stored
+    const storedSession = JSON.parse((await storage.getItem(storageKey)) || 'null')
+    expect(storedSession.expires_at).toBe(expiredSeconds)
+
+    const { data, error } = await authWithSession.getSession()
+
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('Invalid Refresh Token')
+    expect(data.session).toBeNull()
+  })
+})
+
+describe('Storage adapter edge cases', () => {
   test('should handle storage failure gracefully', async () => {
     const brokenStorage = {
       getItem: async () => { throw new Error('getItem failed message') },
