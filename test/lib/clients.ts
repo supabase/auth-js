@@ -150,7 +150,7 @@ export const serviceRoleApiClientNoSms = new GoTrueAdminApi({
 export function getClientWithSpecificStorage(storage: SupportedStorage) {
   return new GoTrueClient({
     url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
-    storageKey: 'test-speciic-storage',
+    storageKey: 'test-specific-storage',
     autoRefreshToken: false,
     persistSession: true,
     storage,
