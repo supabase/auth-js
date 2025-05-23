@@ -341,7 +341,7 @@ describe('GoTrueClient', () => {
 
     test('exchangeCodeForSession() should fail with invalid authCode', async () => {
       const { error } = await pkceClient.exchangeCodeForSession('mock_code')
-      
+
       expect(error).not.toBeNull()
       expect(error?.status).toEqual(400)
     })
@@ -366,7 +366,7 @@ describe('GoTrueClient', () => {
     test('signUp() with email and PKCE flowType', async () => {
       const { email, password } = mockUserCredentials()
 
-      const { error, data } = await pkceClient.signUp({email, password})
+      const { error, data } = await pkceClient.signUp({ email, password })
 
       expect(error).toBeNull()
       expect(data.session).not.toBeNull()
@@ -395,7 +395,7 @@ describe('GoTrueClient', () => {
     })
 
     test('fail to signUp() with invalid password', async () => {
-      const { error, data } = await auth.signUp({ email: 'asd@a.aa', password: '123'})
+      const { error, data } = await auth.signUp({ email: 'asd@a.aa', password: '123' })
 
       expect(data?.session).toBeNull()
       expect(error).not.toBeNull()
@@ -403,7 +403,7 @@ describe('GoTrueClient', () => {
     })
 
     test('fail to signUp() with invalid email', async () => {
-      const { error, data } = await auth.signUp({ email: 'a', password: '123456'})
+      const { error, data } = await auth.signUp({ email: 'a', password: '123456' })
 
       expect(data?.session).toBeNull()
       expect(error).not.toBeNull()
@@ -413,8 +413,8 @@ describe('GoTrueClient', () => {
     test('resend() with email', async () => {
       const { email } = mockUserCredentials()
 
-      const { error } = await auth.resend({ 
-        email, type: 'signup', 
+      const { error } = await auth.resend({
+        email, type: 'signup',
         options: { emailRedirectTo: email }
       })
 
@@ -498,7 +498,7 @@ describe('GoTrueClient', () => {
     test('resend() with phone', async () => {
       const { phone } = mockUserCredentials()
 
-      const { error } = await phoneClient.resend({ phone, type: 'phone_change'})
+      const { error } = await phoneClient.resend({ phone, type: 'phone_change' })
 
       expect(error).toBeNull()
     })
@@ -506,7 +506,7 @@ describe('GoTrueClient', () => {
     test('verifyOTP() fails with invalid token', async () => {
       const { phone } = mockUserCredentials()
 
-      const { error } = await phoneClient.verifyOtp({ phone, type: 'phone_change', token: '123456'})
+      const { error } = await phoneClient.verifyOtp({ phone, type: 'phone_change', token: '123456' })
 
       expect(error).not.toBeNull()
       expect(error?.message).toContain("Token has expired or is invalid")
@@ -960,7 +960,7 @@ describe('The auth client can signin with third-party oAuth providers', () => {
 })
 
 describe('User management', () => {
-  
+
   beforeEach(async () => {
     await authWithSession.signOut()
   })
@@ -1028,28 +1028,28 @@ describe('MFA', () => {
     })
     expect(signUpError).toBeNull()
     expect(signUpData.session).not.toBeNull()
-    
+
     await authWithSession.initialize()
-    
+
     const { error: signInError } = await authWithSession.signInWithPassword({
       email,
       password,
     })
     expect(signInError).toBeNull()
-    
+
     return { email, password }
   }
 
   const setupUserWithMFAAndTOTP = async () => {
     const credentials = await setupUserWithMFA()
-    
+
     // Add the common TOTP enrollment part
     const { data: enrollData, error: enrollError } = await authWithSession.mfa.enroll({
       factorType: 'totp',
     })
     expect(enrollError).toBeNull()
     expect(enrollData!.totp).not.toBeNull()
-    
+
     return {
       ...credentials,
       factorId: enrollData!.id,
@@ -1435,7 +1435,7 @@ describe('fetchJwk', () => {
 describe('signInAnonymously', () => {
   test('should successfully sign in anonymously', async () => {
     const { data, error } = await authWithSession.signInAnonymously()
-    
+
     expect(error).toBeNull()
     expect(data).not.toBeNull()
     expect(data.session).not.toBeNull()
@@ -1448,15 +1448,15 @@ describe('signInAnonymously', () => {
 
   test('should sign in anonymously with user data', async () => {
     const { data, error } = await authClient.signInAnonymously({ options: { data: TEST_USER_DATA } })
-    
+
     expect(error).toBeNull()
     expect(data).not.toBeNull()
     expect(data?.user?.user_metadata).toEqual(TEST_USER_DATA)
   })
-  
+
   test('fail to sign in anonymously when it is disabled on the server', async () => {
     const { data, error } = await phoneClient.signInAnonymously()
-    
+
     expect(data?.session).toBeNull()
     expect(error).not.toBeNull()
     expect(error?.message).toContain("Anonymous sign-ins are disabled")
@@ -1558,7 +1558,7 @@ describe('ID Token Authentication', () => {
 describe('Reauthentication', () => {
   test('reauthenticate() fails without session', async () => {
     const { data, error } = await auth.reauthenticate()
-    
+
     expect(data?.session).toBeNull()
     expect(error).not.toBeNull()
     expect(error?.message).toContain("Reauthentication requires the user to have an email or a phone number")
@@ -1573,7 +1573,7 @@ describe('Reauthentication', () => {
     })
 
     const { data, error } = await authWithSession.reauthenticate()
-    
+
     expect(error).toBeNull()
     expect(data).not.toBeNull()
     expect(data?.session).toBeNull()
@@ -1594,7 +1594,7 @@ describe('Identity Management', () => {
 
   test('getUserIdentities() returns user identities after signup', async () => {
     const { email, password } = mockUserCredentials()
-    
+
     const { error: signUpError } = await authWithSession.signUp({
       email,
       password,
@@ -1611,7 +1611,7 @@ describe('Identity Management', () => {
 
   test('linkIdentity() fails when manual linking is disabled', async () => {
     const { email, password } = mockUserCredentials()
-    
+
     const { error: signUpError } = await authWithSession.signUp({
       email,
       password,
@@ -1630,7 +1630,7 @@ describe('Identity Management', () => {
 
   test('unlinkIdentity() fails when manual linking is disabled', async () => {
     const { email, password } = mockUserCredentials()
-    
+
     const { error: signUpError } = await authWithSession.signUp({
       email,
       password,
@@ -1664,7 +1664,7 @@ describe('Auto Refresh', () => {
   describe('_recoverAndRefresh', () => {
     test('should recover and refresh session when valid session exists', async () => {
       const { email, password } = mockUserCredentials()
-      
+
       const { data: signUpData } = await autoRefreshClient.signUp({
         email,
         password,
@@ -1673,7 +1673,7 @@ describe('Auto Refresh', () => {
 
       // @ts-expect-error 'Allow access to private _recoverAndRefresh'
       const session: Session | null = await autoRefreshClient._recoverAndRefresh()
-      
+
       expect(session).not.toBeNull()
       expect(session?.access_token).not.toBeNull()
       expect(session?.refresh_token).not.toBeNull()
@@ -1681,16 +1681,16 @@ describe('Auto Refresh', () => {
 
     test('should return null session when no valid session exists', async () => {
       await autoRefreshClient.signOut()
-      
+
       // @ts-expect-error 'Allow access to private _recoverAndRefresh'
       const session: Session | undefined = await autoRefreshClient._recoverAndRefresh()
-      
+
       expect(session).toBeUndefined()
     })
 
     test('should handle expired session by attempting refresh', async () => {
       const { email, password } = mockUserCredentials()
-      
+
       const { data: signUpData } = await autoRefreshClient.signUp({
         email,
         password,
@@ -1717,7 +1717,7 @@ describe('Auto Refresh', () => {
 
       // @ts-expect-error 'Allow access to private _recoverAndRefresh'
       const session: Session | null = await autoRefreshClient._recoverAndRefresh()
-      
+
       expect(session).not.toBeNull()
       expect(session?.access_token).not.toBeNull()
       expect(session?.refresh_token).not.toBeNull()
@@ -1731,17 +1731,17 @@ describe('Session Management', () => {
   test('_notifyAllSubscribers notifies all subscribers of session changes', async () => {
     const { email, password } = mockUserCredentials()
     const mockCallback = jest.fn()
-    
+
     const { data: { subscription } } = authWithSession.onAuthStateChange(mockCallback)
-    
+
     const { data } = await authWithSession.signUp({
       email,
       password,
     })
     expect(data.session).not.toBeNull()
-    
+
     expect(mockCallback).toHaveBeenCalledWith('SIGNED_IN', data.session)
-    
+
     // Cleanup
     subscription?.unsubscribe()
   })
@@ -1750,20 +1750,20 @@ describe('Session Management', () => {
     const { email, password } = mockUserCredentials()
     const mockCallback = jest.fn()
     const { data: { subscription } } = authWithSession.onAuthStateChange(mockCallback)
-    
+
     const { data } = await authWithSession.signUp({
       email,
       password,
     })
     expect(data.session).not.toBeNull()
-    
+
     // @ts-expect-error 'Allow access to private _removeSession'
     await authWithSession._removeSession()
     expect(mockCallback).toHaveBeenCalledWith('SIGNED_OUT', null)
-    
+
     const { data: sessionData } = await authWithSession.getSession()
     expect(sessionData.session).toBeNull()
-    
+
     // Cleanup
     subscription?.unsubscribe()
   })
@@ -1856,8 +1856,8 @@ describe('Storage adapter edge cases', () => {
   test('should handle storage getItem failure in getSession', async () => {
     const brokenStorage = {
       getItem: async () => { throw new Error('getItem failed message') },
-      setItem: async () => {},
-      removeItem: async () => {},
+      setItem: async () => { },
+      removeItem: async () => { },
     }
     const client = getClientWithSpecificStorage(brokenStorage)
     await expect(client.getSession()).rejects.toThrow('getItem failed message')
@@ -1867,7 +1867,7 @@ describe('Storage adapter edge cases', () => {
     const brokenStorage = {
       getItem: async () => '{}',
       setItem: async () => { throw new Error('setItem failed message') },
-      removeItem: async () => {},
+      removeItem: async () => { },
     }
     const client = getClientWithSpecificStorage(brokenStorage)
     const session = {
@@ -1888,7 +1888,7 @@ describe('Storage adapter edge cases', () => {
   test('should handle storage removeItem failure in _removeSession', async () => {
     const brokenStorage = {
       getItem: async () => '{}',
-      setItem: async () => {},
+      setItem: async () => { },
       removeItem: async () => { throw new Error('removeItem failed message') },
     }
     const client = getClientWithSpecificStorage(brokenStorage)
@@ -1899,8 +1899,8 @@ describe('Storage adapter edge cases', () => {
   test('should handle invalid JSON in storage', async () => {
     const invalidStorage = {
       getItem: async () => 'invalid-json',
-      setItem: async () => {},
-      removeItem: async () => {},
+      setItem: async () => { },
+      removeItem: async () => { },
     }
     const client = getClientWithSpecificStorage(invalidStorage)
     const { data, error } = await client.getSession()
@@ -1911,8 +1911,8 @@ describe('Storage adapter edge cases', () => {
   test('should handle null storage value', async () => {
     const nullStorage = {
       getItem: async () => null,
-      setItem: async () => {},
-      removeItem: async () => {},
+      setItem: async () => { },
+      removeItem: async () => { },
     }
     const client = getClientWithSpecificStorage(nullStorage)
     const { data, error } = await client.getSession()
@@ -1923,8 +1923,8 @@ describe('Storage adapter edge cases', () => {
   test('should handle empty storage value', async () => {
     const emptyStorage = {
       getItem: async () => '',
-      setItem: async () => {},
-      removeItem: async () => {},
+      setItem: async () => { },
+      removeItem: async () => { },
     }
     const client = getClientWithSpecificStorage(emptyStorage)
     const { data, error } = await client.getSession()
@@ -1935,8 +1935,8 @@ describe('Storage adapter edge cases', () => {
   test('should handle malformed session data', async () => {
     const malformedStorage = {
       getItem: async () => JSON.stringify({ access_token: 'test' }), // Missing required fields
-      setItem: async () => {},
-      removeItem: async () => {},
+      setItem: async () => { },
+      removeItem: async () => { },
     }
     const client = getClientWithSpecificStorage(malformedStorage)
     const { data, error } = await client.getSession()
@@ -1954,8 +1954,8 @@ describe('Storage adapter edge cases', () => {
         token_type: 'bearer',
         user: null
       }),
-      setItem: async () => {},
-      removeItem: async () => {},
+      setItem: async () => { },
+      removeItem: async () => { },
     }
     const client = getClientWithSpecificStorage(expiredStorage)
     // @ts-expect-error private method
@@ -1985,5 +1985,20 @@ describe('Storage adapter edge cases', () => {
     const url = await client._getUrlForProvider(GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON, 'google', { redirectTo: 'http://localhost' })
     expect(typeof url).toBe('string')
     expect(url).toContain('google')
+  })
+})
+
+describe('SSO Authentication', () => {
+  test('signInWithSSO should return error when SAML is disabled', async () => {
+    const { data, error } = await auth.signInWithSSO({
+      providerId: 'valid-provider-id',
+      options: {
+        redirectTo: 'http://localhost:3000/callback'
+      }
+    })
+
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('SAML 2.0 is disabled')
+    expect(data).toBeNull()
   })
 })
