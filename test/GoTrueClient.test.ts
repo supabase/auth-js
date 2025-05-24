@@ -495,6 +495,13 @@ describe('GoTrueClient', () => {
       expect(error).toBeNull()
     })
 
+    test('resend() fails without email or phone', async () => {
+      const { error } = await auth.resend({} as any)
+
+      expect(error).not.toBeNull()
+      expect(error?.message).toContain('You must provide either an email or phone number')
+    })
+
     test('signUp() should fail when both email and phone are missing', async () => {
       const { data, error } = await auth.signUp({
         password: 'password123'
@@ -611,7 +618,12 @@ describe('GoTrueClient', () => {
     test('resend() with phone', async () => {
       const { phone } = mockUserCredentials()
 
-      const { error } = await phoneClient.resend({ phone, type: 'phone_change' })
+      const { error } = await phoneClient.resend({ 
+        phone, type: 'phone_change', 
+        options: {
+          captchaToken: 'some_token',
+        } 
+      })
 
       expect(error).toBeNull()
     })
