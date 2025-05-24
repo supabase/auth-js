@@ -20,6 +20,7 @@ import {
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
 import { JWK, Provider, Session } from '../src'
+import { webcrypto } from 'node:crypto'
 
 const TEST_USER_DATA = { info: 'some info' }
 
@@ -618,11 +619,11 @@ describe('GoTrueClient', () => {
     test('resend() with phone', async () => {
       const { phone } = mockUserCredentials()
 
-      const { error } = await phoneClient.resend({ 
-        phone, type: 'phone_change', 
+      const { error } = await phoneClient.resend({
+        phone, type: 'phone_change',
         options: {
           captchaToken: 'some_token',
-        } 
+        }
       })
 
       expect(error).toBeNull()
@@ -1417,7 +1418,7 @@ describe('getClaims', () => {
     expect(signUpError).toBeNull()
     expect(signUpData.session).not.toBeNull()
 
-    const verifySpy = jest.spyOn(crypto.subtle, 'verify').mockImplementation(async () => false)
+    const verifySpy = jest.spyOn(webcrypto.subtle, 'verify').mockImplementation(async () => false)
 
     const { data, error } = await authWithAsymmetricSession.getClaims()
 
