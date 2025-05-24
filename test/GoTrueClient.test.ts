@@ -1271,21 +1271,14 @@ describe('getClaims', () => {
     const storageKey = authWithSession.storageKey
 
     const invalidSession = {
+      ...signUpData.session,
       access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4MTA3MDc0LCJpYXQiOjE3NDgxMDM0NzQsImlzcyI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJzdWIiOiIxMjM0NTY3ODkwIiwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
       refresh_token: 'invalid-refresh-token',
-      expires_in: 3600,
-      expires_at: Math.floor(Date.now() / 1000) + 3600,
-      token_type: 'bearer',
-      user: null
     }
 
     await storage.setItem(storageKey, JSON.stringify(invalidSession))
 
-    const { data, error } = await authWithSession.getClaims()
-
-    expect(error).not.toBeNull()
-    expect(error?.message).toContain('invalid JWT: unable to parse or verify signature, signature is invalid')
-    expect(data).toBeNull()
+    await expect(authWithSession.getClaims()).rejects.toThrow('JWT has expired')
   })
 
   test('getClaims fetches JWKS to verify asymmetric jwt', async () => {
@@ -1326,6 +1319,28 @@ describe('getClaims', () => {
     expect(fetchedResponse).toHaveLength(2)
   })
 
+  test('getClaims should return error for Invalid JWT signature', async () => {
+    const { email, password } = mockUserCredentials()
+
+    const { data: signUpData, error: signUpError } = await authWithAsymmetricSession.signUp({
+      email,
+      password,
+    })
+
+    expect(signUpError).toBeNull()
+    expect(signUpData.session).not.toBeNull()
+
+    const verifySpy = jest.spyOn(crypto.subtle, 'verify').mockImplementation(async () => false)
+
+    const { data, error } = await authWithAsymmetricSession.getClaims()
+
+    verifySpy.mockRestore()
+
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('Invalid JWT signature')
+    expect(data).toBeNull()
+  })
+
   test('getClaims should return error for invalid base64url encoded access_token', async () => {
     const { email, password } = mockUserCredentials()
 
@@ -1334,7 +1349,6 @@ describe('getClaims', () => {
       password,
     })
 
-    // Set an invalid JWT token in storage
     // @ts-expect-error 'Allow access to protected storage'
     const storage = authWithSession.storage
     // @ts-expect-error 'Allow access to protected storageKey'
