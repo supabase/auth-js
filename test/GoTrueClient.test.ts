@@ -420,10 +420,20 @@ describe('GoTrueClient', () => {
 
       expect(error).toBeNull()
     })
+
+    test('signUp() should fail when both email and phone are missing', async () => {
+      const { data, error } = await auth.signUp({
+        password: 'password123'
+      } as any)
+
+      expect(error).not.toBeNull()
+      expect(error?.message).toContain('You must provide either an email or phone number and a password')
+      expect(data.session).toBeNull()
+      expect(data.user).toBeNull()
+    })
   })
 
   describe('signInWithOtp', () => {
-
     test('signInWithOtp() for email', async () => {
       const { email } = mockUserCredentials()
       const userMetadata = { hello: 'world' }
@@ -444,6 +454,35 @@ describe('GoTrueClient', () => {
       const { data, error } = await pkceClient.signInWithOtp({
         phone,
       })
+      expect(error).not.toBeNull()
+      expect(data.session).toBeNull()
+      expect(data.user).toBeNull()
+    })
+
+    test('signInWithOtp() should fail when both email and phone are missing', async () => {
+      const { data, error } = await auth.signInWithOtp({
+        options: {
+          data: { hello: 'world' }
+        }
+      } as any)
+
+      expect(error).not.toBeNull()
+      expect(error?.message).toContain('You must provide either an email or phone number')
+      expect(data.session).toBeNull()
+      expect(data.user).toBeNull()
+    })
+
+    test('signInWithOtp() with PKCE flow should return error', async () => {
+      const { email } = mockUserCredentials()
+      const { data, error } = await pkceClient.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false,
+          captchaToken: 'some_token',
+          emailRedirectTo: email,
+        }
+      })
+
       expect(error).not.toBeNull()
       expect(data.session).toBeNull()
       expect(data.user).toBeNull()
@@ -506,7 +545,14 @@ describe('GoTrueClient', () => {
     test('verifyOTP() fails with invalid token', async () => {
       const { phone } = mockUserCredentials()
 
-      const { error } = await phoneClient.verifyOtp({ phone, type: 'phone_change', token: '123456' })
+      const { error } = await phoneClient.verifyOtp({
+        phone, type: 'phone_change',
+        token: '123456',
+        options: {
+          redirectTo: 'http://localhost:3000/callback',
+          captchaToken: 'some_token',
+        }
+      })
 
       expect(error).not.toBeNull()
       expect(error?.message).toContain("Token has expired or is invalid")
@@ -836,12 +882,42 @@ describe('User management', () => {
     const { error, data } = await auth.signInWithPassword({
       email,
       password: password + '-wrong',
+      options: {
+        captchaToken: 'some_token',
+      }
     })
 
     expect(error).not.toBeNull()
     expect(error?.message).not.toBeNull()
     expect(data.session).toBeNull()
   })
+
+  test('signIn() with the wrong phone', async () => {
+    const { password } = mockUserCredentials()
+
+    const { error, data } = await auth.signInWithPassword({
+      phone: '+34123',
+      password: password,
+      options: {
+        captchaToken: 'some_token',
+      }
+    })
+
+    expect(error).not.toBeNull()
+    expect(error?.message).not.toBeNull()
+    expect(data.session).toBeNull()
+  })
+})
+
+test('signInWithPassword() should fail when both email and phone are missing', async () => {
+  const { data, error } = await auth.signInWithPassword({
+    password: 'password123'
+  } as any)
+
+  expect(error).not.toBeNull()
+  expect(error?.message).toContain('You must provide either an email or phone number and a password')
+  expect(data.session).toBeNull()
+  expect(data.user).toBeNull()
 })
 
 describe('The auth client can signin with third-party oAuth providers', () => {
@@ -1178,6 +1254,40 @@ describe('getClaims', () => {
     expect(authWithSession.getUser).toHaveBeenCalled()
   })
 
+  test('getClaims should return error for invalid JWT format', async () => {
+    const { email, password } = mockUserCredentials()
+
+    const { data: signUpData, error: signUpError } = await authWithSession.signUp({
+      email,
+      password,
+    })
+
+    expect(signUpError).toBeNull()
+    expect(signUpData.session).not.toBeNull()
+
+    // @ts-expect-error 'Allow access to protected storage'
+    const storage = authWithSession.storage
+    // @ts-expect-error 'Allow access to protected storageKey'
+    const storageKey = authWithSession.storageKey
+
+    const invalidSession = {
+      access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4MTA3MDc0LCJpYXQiOjE3NDgxMDM0NzQsImlzcyI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJzdWIiOiIxMjM0NTY3ODkwIiwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
+      refresh_token: 'invalid-refresh-token',
+      expires_in: 3600,
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      token_type: 'bearer',
+      user: null
+    }
+
+    await storage.setItem(storageKey, JSON.stringify(invalidSession))
+
+    const { data, error } = await authWithSession.getClaims()
+
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('invalid JWT: unable to parse or verify signature, signature is invalid')
+    expect(data).toBeNull()
+  })
+
   test('getClaims fetches JWKS to verify asymmetric jwt', async () => {
     const fetchedUrls: any[] = []
     const fetchedResponse: any[] = []
@@ -1214,6 +1324,68 @@ describe('getClaims', () => {
 
     // contains the response for getSession and fetchJwk
     expect(fetchedResponse).toHaveLength(2)
+  })
+
+  test('getClaims should return error for invalid base64url encoded access_token', async () => {
+    const { email, password } = mockUserCredentials()
+
+    await authWithSession.signUp({
+      email,
+      password,
+    })
+
+    // Set an invalid JWT token in storage
+    // @ts-expect-error 'Allow access to protected storage'
+    const storage = authWithSession.storage
+    // @ts-expect-error 'Allow access to protected storageKey'
+    const storageKey = authWithSession.storageKey
+
+    const invalidSession = {
+      access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzEwODg5NjAwLCJpYXQiOjE3MTA4ODYwMDAsImlzcyI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJzdWIiOiIxMjM0NTY3ODkwIiwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.invalid_signature',
+      refresh_token: 'invalid-refresh-token',
+      expires_in: 3600,
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      token_type: 'bearer',
+      user: null
+    }
+
+    await storage.setItem(storageKey, JSON.stringify(invalidSession))
+
+    const { data, error } = await authWithSession.getClaims()
+
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('JWT not in base64url format')
+    expect(data).toBeNull()
+  })
+
+  test('getClaims should refresh expired JWT token', async () => {
+    const { email, password } = mockUserCredentials()
+
+    const { data: signUpData, error: signUpError } = await authWithSession.signUp({
+      email,
+      password,
+    })
+
+    expect(signUpError).toBeNull()
+    expect(signUpData.session).not.toBeNull()
+
+    // @ts-expect-error 'Allow access to protected storage'
+    const storage = authWithSession.storage
+    // @ts-expect-error 'Allow access to protected storageKey'
+    const storageKey = authWithSession.storageKey
+
+    const expiredSession = {
+      ...signUpData.session,
+      expires_at: Math.floor(Date.now() / 1000) - 3600,
+    }
+
+    await storage.setItem(storageKey, JSON.stringify(expiredSession))
+
+    const { data, error } = await authWithSession.getClaims()
+
+    expect(error).toBeNull()
+    expect(data).not.toBeNull()
+    expect(data?.claims.email).toEqual(signUpData?.session?.user?.email)
   })
 })
 
@@ -1544,7 +1716,10 @@ describe('ID Token Authentication', () => {
     const credentials = {
       provider: 'google',
       token: 'mock-id-token',
-      nonce: 'mock-nonce'
+      nonce: 'mock-nonce',
+      options: {
+        captchaToken: 'some_token',
+      }
     }
 
     const { data, error } = await authClient.signInWithIdToken(credentials)
@@ -1989,8 +2164,8 @@ describe('Storage adapter edge cases', () => {
 })
 
 describe('SSO Authentication', () => {
-  test('signInWithSSO should return error when SAML is disabled', async () => {
-    const { data, error } = await auth.signInWithSSO({
+  test('signInWithSSO with PKCE return error when SAML is disabled', async () => {
+    const { data, error } = await pkceClient.signInWithSSO({
       providerId: 'valid-provider-id',
       options: {
         redirectTo: 'http://localhost:3000/callback'
