@@ -23,6 +23,8 @@ import { JWK, Provider, Session } from '../src'
 
 const TEST_USER_DATA = { info: 'some info' }
 
+const exparedAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4MTA3MDc0LCJpYXQiOjE3NDgxMDM0NzQsImlzcyI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJzdWIiOiIxMjM0NTY3ODkwIiwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
+
 describe('GoTrueClient', () => {
   // @ts-expect-error 'Allow access to private _refreshAccessToken'
   const refreshAccessTokenSpy = jest.spyOn(authWithSession, '_refreshAccessToken')
@@ -145,6 +147,78 @@ describe('GoTrueClient', () => {
       expect(updateError).toBeNull()
       expect(user).not.toBeNull()
       expect(user?.user_metadata).toMatchObject({ hello: 'world' })
+    })
+
+    test('setSession should fail with invalid access token', async () => {
+      const { email, password } = mockUserCredentials()
+
+      const { error, data } = await authWithSession.signUp({
+        email,
+        password,
+      })
+      expect(error).toBeNull()
+      expect(data.session).not.toBeNull()
+
+      const {
+        data: { session },
+        error: setSessionError,
+      } = await authWithSession.setSession({
+        access_token: 'invalid-access-token',
+        // @ts-expect-error 'data.session should not be null because of the assertion above'
+        refresh_token: data.session.refresh_token,
+      })
+      expect(setSessionError).not.toBeNull()
+      expect(setSessionError?.message).toContain('Invalid JWT structure')
+      expect(session).toBeNull()
+    })
+
+    test('setSession should fail with invalid refresh token', async () => {
+      const { email, password } = mockUserCredentials()
+
+      const { error, data } = await authWithSession.signUp({
+        email,
+        password,
+      })
+      expect(error).toBeNull()
+      expect(data.session).not.toBeNull()
+
+      const {
+        data: { session },
+        error: setSessionError,
+      } = await authWithSession.setSession({
+        access_token: exparedAccessToken,
+        refresh_token: 'invalid-refresh-token',
+      })
+      console.log(setSessionError)
+      console.log(session)
+
+      expect(setSessionError).not.toBeNull()
+      expect(setSessionError?.message).toContain('Invalid Refresh Token: Refresh Token Not Found')
+      expect(session).toBeNull()
+    })
+
+    test('setSession should fail without refresh_token', async () => {
+      const {
+        data: { session },
+        error: setSessionError,
+      } = await authWithSession.setSession({
+        access_token: 'valid-access-token',
+      } as any)
+      expect(setSessionError).not.toBeNull()
+      expect(setSessionError?.message).toContain('Auth session missing!')
+      expect(session).toBeNull()
+    })
+
+    test('setSession should fail without access_token', async () => {
+      const {
+        data: { session },
+        error: setSessionError,
+      } = await authWithSession.setSession({
+        refresh_token: 'valid-refresh-token',
+      } as any)
+      expect(setSessionError).not.toBeNull()
+      expect(setSessionError?.message).toContain('Auth session missing!')
+      expect(session).toBeNull()
     })
 
     test('getSession() should return the currentUser session', async () => {
@@ -1062,10 +1136,11 @@ describe('User management', () => {
 
   test('resetPasswordForEmail() if user does not exist, user details are not exposed', async () => {
     const redirectTo = 'http://localhost:9999/welcome'
-    const { error, data } = await authWithSession.resetPasswordForEmail(
+    const { error, data } = await phoneClient.resetPasswordForEmail(
       'this_user@does-not-exist.com',
       {
         redirectTo,
+        captchaToken: 'some_token',
       }
     )
     expect(data).toEqual({})
@@ -1254,7 +1329,7 @@ describe('getClaims', () => {
     expect(authWithSession.getUser).toHaveBeenCalled()
   })
 
-  test('getClaims should return error for invalid JWT format', async () => {
+  test('getClaims should return error for expared JWT format', async () => {
     const { email, password } = mockUserCredentials()
 
     const { data: signUpData, error: signUpError } = await authWithSession.signUp({
@@ -1272,7 +1347,7 @@ describe('getClaims', () => {
 
     const invalidSession = {
       ...signUpData.session,
-      access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4MTA3MDc0LCJpYXQiOjE3NDgxMDM0NzQsImlzcyI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJzdWIiOiIxMjM0NTY3ODkwIiwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
+      access_token: exparedAccessToken,
       refresh_token: 'invalid-refresh-token',
     }
 
@@ -1810,7 +1885,11 @@ describe('Identity Management', () => {
     const { error } = await authWithSession.linkIdentity({
       provider: 'google',
       options: {
-        redirectTo: 'http://localhost:3000'
+        redirectTo: 'http://localhost:3000',
+        scopes: 'openid profile email',
+        queryParams: {
+          prompt: 'select_account',
+        },
       }
     })
     expect(error).not.toBeNull()
