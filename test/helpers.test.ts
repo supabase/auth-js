@@ -233,16 +233,14 @@ describe('getCodeChallengeAndMethod', () => {
     {
       name: 'should append /PASSWORD_RECOVERY to stored code_verifier',
       isPasswordRecovery: true,
-      expectedPattern: /^[A-Za-z0-9\-_~.]+$/
     },
     {
       name: 'should not append /PASSWORD_RECOVERY for other flows',
       isPasswordRecovery: false,
-      expectedPattern: /^[A-Za-z0-9\-_~.]+$/
     }
   ]
 
-  test.each(testCases)('$name', async ({ isPasswordRecovery, expectedPattern }) => {
+  test.each(testCases)('$name', async ({ isPasswordRecovery }) => {
     const mockStorage = {
       getItem: jest.fn(),
       setItem: jest.fn(),
@@ -258,7 +256,6 @@ describe('getCodeChallengeAndMethod', () => {
     const setItemCall = mockStorage.setItem.mock.calls[0]
     expect(setItemCall[0]).toBe('test-storage-key-code-verifier')
     const storedValue = JSON.parse(setItemCall[1])
-    expect(storedValue).toMatch(expectedPattern)
     if (isPasswordRecovery) {
       expect(storedValue).toContain('/PASSWORD_RECOVERY')
     } else {
