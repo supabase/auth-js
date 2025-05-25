@@ -114,6 +114,16 @@ describe('GoTrueAdminApi', () => {
       expect(emails).toContain(email)
     })
 
+    test('listUsers() returns AuthError when page is invalid', async () => {
+      const { error, data } = await serviceRoleApiClient.listUsers({
+        page: -1,
+        perPage: 10,
+      })
+
+      expect(error).not.toBeNull()
+      expect(data.users).toEqual([])
+    })
+
     test('getUser() fetches a user by their access_token', async () => {
       const { email, password } = mockUserCredentials()
       const { error: initialError, data } = await authClientWithSession.signUp({
@@ -435,6 +445,27 @@ describe('GoTrueAdminApi', () => {
 
         expect(error?.message).toMatch(/^invalid JWT/)
       })
+
+      test('signOut() fails with invalid scope', async () => {
+        const { email, password } = mockUserCredentials()
+
+        const { error: signUpError } = await authClientWithSession.signUp({
+          email,
+          password,
+        })
+        expect(signUpError).toBeNull()
+
+        const { data: { session }, error } = await authClientWithSession.signInWithPassword({
+          email,
+          password,
+        })
+        expect(error).toBeNull()
+        expect(session).not.toBeNull()
+
+        await expect(authClientWithSession.signOut({ scope: 'invalid_scope' as any })).rejects.toThrow(
+          '@supabase/auth-js: Parameter scope must be one of global, local, others'
+        )
+      })
     })
   })
 
@@ -472,18 +503,6 @@ describe('GoTrueAdminApi', () => {
         expect(user).toBeNull()
         expect(error?.message).toEqual('Invalid phone number format (E.164 required)')
       })
-    })
-  })
-
-  describe('List Users', () => {
-    test('listUsers() returns AuthError when page is invalid', async () => {
-      const { error, data } = await serviceRoleApiClient.listUsers({
-        page: -1,
-        perPage: 10,
-      })
-
-      expect(error).not.toBeNull()
-      expect(data.users).toEqual([])
     })
   })
 
