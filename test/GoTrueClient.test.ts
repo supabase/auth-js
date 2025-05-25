@@ -19,12 +19,13 @@ import {
   getClientWithSpecificStorage,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
-import { JWK, Provider, Session } from '../src'
-import { webcrypto } from 'node:crypto'
+import { JWK, Session } from '../src'
 
 const TEST_USER_DATA = { info: 'some info' }
 
 const exparedAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4MTA3MDc0LCJpYXQiOjE3NDgxMDM0NzQsImlzcyI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJzdWIiOiIxMjM0NTY3ODkwIiwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
+
+const isNodeHigherThan18 = parseInt(process.version.slice(1).split('.')[0]) > 18;
 
 describe('GoTrueClient', () => {
   // @ts-expect-error 'Allow access to private _refreshAccessToken'
@@ -1342,33 +1343,6 @@ describe('getClaims', () => {
     expect(authWithSession.getUser).toHaveBeenCalled()
   })
 
-  test('getClaims should return error for expared JWT format', async () => {
-    const { email, password } = mockUserCredentials()
-
-    const { data: signUpData, error: signUpError } = await authWithSession.signUp({
-      email,
-      password,
-    })
-
-    expect(signUpError).toBeNull()
-    expect(signUpData.session).not.toBeNull()
-
-    // @ts-expect-error 'Allow access to protected storage'
-    const storage = authWithSession.storage
-    // @ts-expect-error 'Allow access to protected storageKey'
-    const storageKey = authWithSession.storageKey
-
-    const invalidSession = {
-      ...signUpData.session,
-      access_token: exparedAccessToken,
-      refresh_token: 'invalid-refresh-token',
-    }
-
-    await storage.setItem(storageKey, JSON.stringify(invalidSession))
-
-    await expect(authWithSession.getClaims()).rejects.toThrow('JWT has expired')
-  })
-
   test('getClaims fetches JWKS to verify asymmetric jwt', async () => {
     const fetchedUrls: any[] = []
     const fetchedResponse: any[] = []
@@ -1397,7 +1371,7 @@ describe('getClaims', () => {
     expect(data?.claims.email).toEqual(user?.email)
 
     // node 18 doesn't support crypto.subtle API by default unless built with the experimental-global-webcrypto flag
-    if (parseInt(process.version.slice(1).split('.')[0]) === 20) {
+    if (isNodeHigherThan18) {
       expect(fetchedUrls).toContain(
         GOTRUE_URL_SIGNUP_ENABLED_ASYMMETRIC_AUTO_CONFIRM_ON + '/.well-known/jwks.json'
       )
@@ -1405,6 +1379,58 @@ describe('getClaims', () => {
 
     // contains the response for getSession and fetchJwk
     expect(fetchedResponse).toHaveLength(2)
+  })
+
+  test('getClaims should return error for expired JWT format', async () => {
+    const { email, password } = mockUserCredentials()
+
+    const { data: signUpData, error: signUpError } = await authWithSession.signUp({
+      email,
+      password,
+    })
+
+    expect(signUpError).toBeNull()
+    expect(signUpData.session).not.toBeNull()
+
+    // @ts-expect-error 'Allow access to protected storage'
+    const storage = authWithSession.storage
+    // @ts-expect-error 'Allow access to protected storageKey'
+    const storageKey = authWithSession.storageKey
+
+    const invalidSession = {
+      ...signUpData.session,
+      access_token: exparedAccessToken,
+      refresh_token: 'invalid-refresh-token',
+    }
+
+    await storage.setItem(storageKey, JSON.stringify(invalidSession))
+
+    await expect(authWithSession.getClaims()).rejects.toThrow('JWT has expired')
+  })
+
+  test('getClaims should return error for Invalid JWT signature', async () => {
+    // node 18 doesn't support crypto.subtle API by default unless built with the experimental-global-webcrypto flag
+    if (!isNodeHigherThan18) {
+      console.warn('Skipping test due to Node version <= 18');
+      return;
+    }
+
+    const { email, password } = mockUserCredentials()
+    const { data: signUpData, error: signUpError } = await authWithAsymmetricSession.signUp({
+      email,
+      password,
+    })
+    expect(signUpError).toBeNull()
+    expect(signUpData.session).not.toBeNull()
+
+    const verifySpy = jest.spyOn(crypto.subtle, 'verify').mockImplementation(async () => false)
+
+    const { data, error } = await authWithAsymmetricSession.getClaims()
+
+    verifySpy.mockRestore()
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('Invalid JWT signature')
+    expect(data).toBeNull()
   })
 
   test('getClaims should return error for Invalid JWT signature', async () => {
