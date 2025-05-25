@@ -233,12 +233,12 @@ describe('getCodeChallengeAndMethod', () => {
     {
       name: 'should append /PASSWORD_RECOVERY to stored code_verifier',
       isPasswordRecovery: true,
-      expectedPattern: /^[A-Za-z0-9-_~]+\/PASSWORD_RECOVERY$/
+      expectedPattern: /^[A-Za-z0-9\-_~.]+$/
     },
     {
       name: 'should not append /PASSWORD_RECOVERY for other flows',
       isPasswordRecovery: false,
-      expectedPattern: /^[A-Za-z0-9-_~]+$/
+      expectedPattern: /^[A-Za-z0-9\-_~.]+$/
     }
   ]
 
@@ -259,6 +259,11 @@ describe('getCodeChallengeAndMethod', () => {
     expect(setItemCall[0]).toBe('test-storage-key-code-verifier')
     const storedValue = JSON.parse(setItemCall[1])
     expect(storedValue).toMatch(expectedPattern)
+    if (isPasswordRecovery) {
+      expect(storedValue).toContain('/PASSWORD_RECOVERY')
+    } else {
+      expect(storedValue).not.toContain('/PASSWORD_RECOVERY')
+    }
     expect(codeChallenge).toBeDefined()
     expect(codeChallengeMethod).toBeDefined()
   })
