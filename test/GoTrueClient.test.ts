@@ -2331,3 +2331,41 @@ describe('SSO Authentication', () => {
     expect(data).toBeNull()
   })
 })
+
+describe('Lock functionality', () => {
+  test('_acquireLock should execute function when lock is acquired', async () => {
+    const mockFn = jest.fn().mockResolvedValue('success')
+    // @ts-expect-error 'Allow access to private _acquireLock'
+    const result = await authWithSession._acquireLock(1000, mockFn)
+    expect(result).toBe('success')
+    expect(mockFn).toHaveBeenCalled()
+  })
+
+  test('_acquireLock should throw error when lock acquisition times out', async () => {
+    let shouldFail = false
+    const mockLock = jest.fn().mockImplementation(async (name, timeout, fn) => {
+      if (shouldFail) {
+        throw new Error('Lock acquisition timeout')
+      }
+      return fn()
+    })
+
+    const client = new GoTrueClient({
+      url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+      lock: mockLock,
+      autoRefreshToken: false,
+      persistSession: false
+    })
+
+    // Wait for initialization to complete
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Now make the lock fail
+    shouldFail = true
+
+    const mockFn = jest.fn()
+    // @ts-expect-error 'Allow access to private _acquireLock'
+    await expect(client._acquireLock(1000, mockFn)).rejects.toThrow('Lock acquisition timeout')
+    expect(mockFn).not.toHaveBeenCalled()
+  })
+})
