@@ -19,7 +19,7 @@ import {
   getClientWithSpecificStorage,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
-import { JWK, Session } from '../src'
+import { JWK, Provider, Session } from '../src'
 
 const TEST_USER_DATA = { info: 'some info' }
 
@@ -281,6 +281,12 @@ describe('GoTrueClient', () => {
       expect(refreshAccessTokenSpy).toBeCalledTimes(1)
       expect(data.session?.access_token).not.toEqual(userSession.session?.access_token)
     })
+
+    test('getSession() returns null when no session is stored', async () => {
+      const { data, error } = await auth.getSession();
+      expect(data?.session).toBeNull();
+      expect(error).toBeNull();
+    });
 
     test('getSession() returns null when no session is stored', async () => {
       const { data, error } = await auth.getSession();
@@ -579,10 +585,10 @@ describe('GoTrueClient', () => {
       const { data, error } = await phoneClient.signInWithOtp({
         phone,
         options: {
+          shouldCreateUser: true,
           data: { ...TEST_USER_DATA },
           channel: 'whatsapp',
-          captchaToken: 'some_token',
-          shouldCreateUser: true
+          captchaToken: 'some_token'
         }
       })
       expect(error).not.toBeNull()
@@ -606,7 +612,18 @@ describe('GoTrueClient', () => {
       // Since auto-confirm is off, we should either:
       // 1. Get an error (e.g. invalid phone number, captcha token)
       // 2. Get a success response but with no session (needs verification)
+      // Since auto-confirm is off, we should either:
+      // 1. Get an error (e.g. invalid phone number, captcha token)
+      // 2. Get a success response but with no session (needs verification)
       expect(data.session).toBeNull()
+      if (error) {
+        expect(error).not.toBeNull()
+        expect(data.user).toBeNull()
+      } else {
+        expect(data.user).not.toBeNull()
+        expect(data.user?.phone).toBe(phone)
+        expect(data.user?.user_metadata).toMatchObject(TEST_USER_DATA)
+      }
       if (error) {
         expect(error).not.toBeNull()
         expect(data.user).toBeNull()
@@ -1764,8 +1781,8 @@ describe('signInAnonymously', () => {
     expect(data.user).not.toBeNull()
     expect(data.user?.is_anonymous).toBe(true)
 
-    const { data: savedSession } = await authWithSession.getSession()
-    expect(savedSession.session).not.toBeNull()
+    const { data: sessionData } = await authWithSession.getSession()
+    expect(sessionData.session).not.toBeNull()
   })
 
   test('should sign in anonymously with user data', async () => {
