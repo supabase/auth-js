@@ -1332,6 +1332,34 @@ describe('MFA', () => {
     expect(aalData!.nextLevel).toBeDefined()
     expect(aalData!.currentAuthenticationMethods).toBeDefined()
   })
+
+  test('_listFactors returns correct factor lists', async () => {
+    // Mock getUser
+    pkceClient.getUser = jest.fn().mockResolvedValue({
+      data: {
+        user: {
+          id: 'test-user',
+          factors: [
+            { factor_type: 'totp', status: 'verified' },
+            { factor_type: 'totp', status: 'unverified' },
+            { factor_type: 'phone', status: 'verified' },
+            { factor_type: 'phone', status: 'unverified' }
+          ]
+        }
+      },
+      error: null
+    })
+
+    const result = await pkceClient['_listFactors']()
+
+    expect(result.error).toBeNull()
+    expect(result.data).not.toBeNull()
+    if (result.data) {
+      expect(result.data.all).toHaveLength(4)
+      expect(result.data.totp).toHaveLength(1)
+      expect(result.data.phone).toHaveLength(1)
+    }
+  })
 })
 
 describe('getClaims', () => {
@@ -2331,6 +2359,23 @@ describe('Storage adapter edge cases', () => {
     const url = await client._getUrlForProvider(GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON, 'google', { redirectTo: 'http://localhost' })
     expect(typeof url).toBe('string')
     expect(url).toContain('google')
+  })
+
+  test('_getUrlForProvider builds correct URL with PKCE flow', async () => {
+    const client = new GoTrueClient({
+      url: 'https://example.com',
+      autoRefreshToken: false,
+      persistSession: false,
+      flowType: 'pkce'
+    })
+
+    const url = await client['_getUrlForProvider']('https://example.com/authorize', 'github', {
+      redirectTo: 'http://localhost:3000/callback'
+    })
+
+    expect(url).toContain('provider=github')
+    expect(url).toContain('code_challenge=')
+    expect(url).toContain('code_challenge_method=')
   })
 })
 
