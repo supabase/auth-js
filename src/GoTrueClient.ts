@@ -2013,17 +2013,34 @@ export default class GoTrueClient {
             }
           }
         }
+      } else if (
+        currentSession.user &&
+        (currentSession.user as any).__isUserNotAvailableProxy === true
+      ) {
+        // If we have a proxy user, try to get the real user data
+        try {
+          const { data, error: userError } = await this._getUser(currentSession.access_token)
+
+          if (!userError && data?.user) {
+            currentSession.user = data.user
+            await this._saveSession(currentSession)
+            await this._notifyAllSubscribers('SIGNED_IN', currentSession)
+          } else {
+            this._debug(debugName, 'could not get user data, skipping SIGNED_IN notification')
+          }
+        } catch (getUserError) {
+          console.error('Error getting user data:', getUserError)
+          this._debug(
+            debugName,
+            'error getting user data, skipping SIGNED_IN notification',
+            getUserError
+          )
+        }
       } else {
         // no need to persist currentSession again, as we just loaded it from
         // local storage; persisting it again may overwrite a value saved by
         // another client with access to the same local storage
-
-        // Prevent sending a proxy user object as it can't be structured cloned
-        let finalPayloadSession =
-          currentSession.user && (currentSession.user as any).__isUserNotAvailableProxy
-            ? null
-            : currentSession
-        await this._notifyAllSubscribers('SIGNED_IN', finalPayloadSession)
+        await this._notifyAllSubscribers('SIGNED_IN', currentSession)
       }
     } catch (err) {
       this._debug(debugName, 'error', err)
