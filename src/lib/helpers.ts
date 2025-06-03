@@ -347,12 +347,6 @@ export function parseResponseAPIVersion(response: Response) {
 
 export function userNotAvailableProxy(): User {
   const proxyTarget = {} as User
-  Object.defineProperty(proxyTarget, '__isUserNotAvailableProxy', {
-    value: true,
-    writable: false,
-    enumerable: false,
-    configurable: false,
-  })
 
   return new Proxy(proxyTarget, {
     get: (target: any, prop: string) => {
