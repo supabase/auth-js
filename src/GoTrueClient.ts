@@ -1,5 +1,13 @@
 import GoTrueAdminApi from './GoTrueAdminApi'
-import { DEFAULT_HEADERS, EXPIRY_MARGIN, GOTRUE_URL, STORAGE_KEY } from './lib/constants'
+import {
+  DEFAULT_HEADERS,
+  EXPIRY_MARGIN_MS,
+  AUTO_REFRESH_TICK_DURATION_MS,
+  AUTO_REFRESH_TICK_THRESHOLD,
+  GOTRUE_URL,
+  STORAGE_KEY,
+  JWKS_TTL,
+} from './lib/constants'
 import {
   AuthError,
   AuthImplicitGrantRedirectError,
@@ -13,6 +21,7 @@ import {
   isAuthRetryableFetchError,
   isAuthSessionMissingError,
   isAuthImplicitGrantRedirectError,
+  AuthInvalidJwtError,
 } from './lib/errors'
 import {
   Fetch,
@@ -23,7 +32,6 @@ import {
   _ssoResponse,
 } from './lib/fetch'
 import {
-  decodeJWTPayload,
   Deferred,
   getItemAsync,
   isBrowser,
@@ -35,6 +43,9 @@ import {
   sleep,
   parseParametersFromURL,
   getCodeChallengeAndMethod,
+  getAlgorithm,
+  validateExp,
+  decodeJWT,
   userNotAvailableProxy,
   supportsLocalStorage,
 } from './lib/helpers'
@@ -80,7 +91,6 @@ import type {
   MFAVerifyParams,
   AuthMFAVerifyResponse,
   AuthMFAListFactorsResponse,
-  AMREntry,
   AuthMFAGetAuthenticatorAssuranceLevelResponse,
   AuthenticatorAssuranceLevels,
   Factor,
@@ -94,7 +104,14 @@ import type {
   MFAEnrollPhoneParams,
   AuthMFAEnrollTOTPResponse,
   AuthMFAEnrollPhoneResponse,
+  JWK,
+  JwtPayload,
+  JwtHeader,
+  SolanaWeb3Credentials,
+  SolanaWallet,
+  Web3Credentials,
 } from './lib/types'
+import { stringToUint8Array, bytesToBase64URL } from './lib/base64url'
 
 polyfillGlobalThis() // Make "globalThis" available
 
@@ -112,13 +129,6 @@ const DEFAULT_OPTIONS: Omit<
   debug: false,
   hasCustomAuthorizationHeader: false,
 }
-
-/** Current session will be checked for refresh at this interval. */
-const AUTO_REFRESH_TICK_DURATION = 30 * 1000
-
-/**
- * A token refresh will be attempted this many ticks before the current session expires. */
-const AUTO_REFRESH_TICK_THRESHOLD = 3
 
 async function lockNoOp<R>(name: string, acquireTimeout: number, fn: () => Promise<R>): Promise<R> {
   return await fn()
@@ -144,7 +154,11 @@ export default class GoTrueClient {
   protected storageKey: string
 
   protected flowType: AuthFlowType
-
+  /**
+   * The JWKS used for verifying asymmetric JWTs
+   */
+  protected jwks: { keys: JWK[] }
+  protected jwks_cached_at: number
   protected autoRefreshToken: boolean
   protected persistSession: boolean
   protected storage: SupportedStorage
@@ -228,7 +242,8 @@ export default class GoTrueClient {
     } else {
       this.lock = lockNoOp
     }
-
+    this.jwks = { keys: [] }
+    this.jwks_cached_at = Number.MIN_SAFE_INTEGER
     this.mfa = {
       verify: this._verify.bind(this),
       enroll: this._enroll.bind(this),
@@ -599,6 +614,214 @@ export default class GoTrueClient {
     return this._acquireLock(-1, async () => {
       return this._exchangeCodeForSession(authCode)
     })
+  }
+
+  /**
+   * Signs in a user by verifying a message signed by the user's private key.
+   * Only Solana supported at this time, using the Sign in with Solana standard.
+   */
+  async signInWithWeb3(credentials: Web3Credentials): Promise<
+    | {
+        data: { session: Session; user: User }
+        error: null
+      }
+    | { data: { session: null; user: null }; error: AuthError }
+  > {
+    const { chain } = credentials
+
+    if (chain === 'solana') {
+      return await this.signInWithSolana(credentials)
+    }
+
+    throw new Error(`@supabase/auth-js: Unsupported chain "${chain}"`)
+  }
+
+  private async signInWithSolana(credentials: SolanaWeb3Credentials) {
+    let message: string
+    let signature: Uint8Array
+
+    if ('message' in credentials) {
+      message = credentials.message
+      signature = credentials.signature
+    } else {
+      const { chain, wallet, statement, options } = credentials
+
+      let resolvedWallet: SolanaWallet
+
+      if (!isBrowser()) {
+        if (typeof wallet !== 'object' || !options?.url) {
+          throw new Error(
+            '@supabase/auth-js: Both wallet and url must be specified in non-browser environments.'
+          )
+        }
+
+        resolvedWallet = wallet
+      } else if (typeof wallet === 'object') {
+        resolvedWallet = wallet
+      } else {
+        const windowAny = window as any
+
+        if (
+          'solana' in windowAny &&
+          typeof windowAny.solana === 'object' &&
+          (('signIn' in windowAny.solana && typeof windowAny.solana.signIn === 'function') ||
+            ('signMessage' in windowAny.solana &&
+              typeof windowAny.solana.signMessage === 'function'))
+        ) {
+          resolvedWallet = windowAny.solana
+        } else {
+          throw new Error(
+            `@supabase/auth-js: No compatible Solana wallet interface on the window object (window.solana) detected. Make sure the user already has a wallet installed and connected for this app. Prefer passing the wallet interface object directly to signInWithWeb3({ chain: 'solana', wallet: resolvedUserWallet }) instead.`
+          )
+        }
+      }
+
+      const url = new URL(options?.url ?? window.location.href)
+
+      if ('signIn' in resolvedWallet && resolvedWallet.signIn) {
+        const output = await resolvedWallet.signIn({
+          issuedAt: new Date().toISOString(),
+
+          ...options?.signInWithSolana,
+
+          // non-overridable properties
+          version: '1',
+          domain: url.host,
+          uri: url.href,
+
+          ...(statement ? { statement } : null),
+        })
+
+        let outputToProcess: any
+
+        if (Array.isArray(output) && output[0] && typeof output[0] === 'object') {
+          outputToProcess = output[0]
+        } else if (
+          output &&
+          typeof output === 'object' &&
+          'signedMessage' in output &&
+          'signature' in output
+        ) {
+          outputToProcess = output
+        } else {
+          throw new Error('@supabase/auth-js: Wallet method signIn() returned unrecognized value')
+        }
+
+        if (
+          'signedMessage' in outputToProcess &&
+          'signature' in outputToProcess &&
+          (typeof outputToProcess.signedMessage === 'string' ||
+            outputToProcess.signedMessage instanceof Uint8Array) &&
+          outputToProcess.signature instanceof Uint8Array
+        ) {
+          message =
+            typeof outputToProcess.signedMessage === 'string'
+              ? outputToProcess.signedMessage
+              : new TextDecoder().decode(outputToProcess.signedMessage)
+          signature = outputToProcess.signature
+        } else {
+          throw new Error(
+            '@supabase/auth-js: Wallet method signIn() API returned object without signedMessage and signature fields'
+          )
+        }
+      } else {
+        if (
+          !('signMessage' in resolvedWallet) ||
+          typeof resolvedWallet.signMessage !== 'function' ||
+          !('publicKey' in resolvedWallet) ||
+          typeof resolvedWallet !== 'object' ||
+          !resolvedWallet.publicKey ||
+          !('toBase58' in resolvedWallet.publicKey) ||
+          typeof resolvedWallet.publicKey.toBase58 !== 'function'
+        ) {
+          throw new Error(
+            '@supabase/auth-js: Wallet does not have a compatible signMessage() and publicKey.toBase58() API'
+          )
+        }
+
+        message = [
+          `${url.host} wants you to sign in with your Solana account:`,
+          resolvedWallet.publicKey.toBase58(),
+          ...(statement ? ['', statement, ''] : ['']),
+          'Version: 1',
+          `URI: ${url.href}`,
+          `Issued At: ${options?.signInWithSolana?.issuedAt ?? new Date().toISOString()}`,
+          ...(options?.signInWithSolana?.notBefore
+            ? [`Not Before: ${options.signInWithSolana.notBefore}`]
+            : []),
+          ...(options?.signInWithSolana?.expirationTime
+            ? [`Expiration Time: ${options.signInWithSolana.expirationTime}`]
+            : []),
+          ...(options?.signInWithSolana?.chainId
+            ? [`Chain ID: ${options.signInWithSolana.chainId}`]
+            : []),
+          ...(options?.signInWithSolana?.nonce ? [`Nonce: ${options.signInWithSolana.nonce}`] : []),
+          ...(options?.signInWithSolana?.requestId
+            ? [`Request ID: ${options.signInWithSolana.requestId}`]
+            : []),
+          ...(options?.signInWithSolana?.resources?.length
+            ? [
+                'Resources',
+                ...options.signInWithSolana.resources.map((resource) => `- ${resource}`),
+              ]
+            : []),
+        ].join('\n')
+
+        const maybeSignature = await resolvedWallet.signMessage(
+          new TextEncoder().encode(message),
+          'utf8'
+        )
+
+        if (!maybeSignature || !(maybeSignature instanceof Uint8Array)) {
+          throw new Error(
+            '@supabase/auth-js: Wallet signMessage() API returned an recognized value'
+          )
+        }
+
+        signature = maybeSignature
+      }
+    }
+
+    try {
+      const { data, error } = await _request(
+        this.fetch,
+        'POST',
+        `${this.url}/token?grant_type=web3`,
+        {
+          headers: this.headers,
+          body: {
+            chain: 'solana',
+            message,
+            signature: bytesToBase64URL(signature),
+
+            ...(credentials.options?.captchaToken
+              ? { gotrue_meta_security: { captcha_token: credentials.options?.captchaToken } }
+              : null),
+          },
+          xform: _sessionResponse,
+        }
+      )
+      if (error) {
+        throw error
+      }
+      if (!data || !data.session || !data.user) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthInvalidTokenResponseError(),
+        }
+      }
+      if (data.session) {
+        await this._saveSession(data.session)
+        await this._notifyAllSubscribers('SIGNED_IN', data.session)
+      }
+      return { data: { ...data }, error }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error }
+      }
+
+      throw error
+    }
   }
 
   private async _exchangeCodeForSession(authCode: string): Promise<
@@ -1119,8 +1342,13 @@ export default class GoTrueClient {
         return { data: { session: null }, error: null }
       }
 
+      // A session is considered expired before the access token _actually_
+      // expires. When the autoRefreshToken option is off (or when the tab is
+      // in the background), very eager users of getSession() -- like
+      // realtime-js -- might send a valid JWT which will expire by the time it
+      // reaches the server.
       const hasExpired = currentSession.expires_at
-        ? currentSession.expires_at <= Date.now() / 1000
+        ? currentSession.expires_at * 1000 - Date.now() < EXPIRY_MARGIN_MS
         : false
 
       this._debug(
@@ -1309,17 +1537,6 @@ export default class GoTrueClient {
   }
 
   /**
-   * Decodes a JWT (without performing any validation).
-   */
-  private _decodeJWT(jwt: string): {
-    exp?: number
-    aal?: AuthenticatorAssuranceLevels | null
-    amr?: AMREntry[] | null
-  } {
-    return decodeJWTPayload(jwt)
-  }
-
-  /**
    * Sets the session data from the current session. If the current session is expired, setSession will take care of refreshing it to obtain a new session.
    * If the refresh token or access token in the current session is invalid, an error will be thrown.
    * @param currentSession The current session that minimally contains an access token and refresh token.
@@ -1348,7 +1565,7 @@ export default class GoTrueClient {
       let expiresAt = timeNow
       let hasExpired = true
       let session: Session | null = null
-      const payload = decodeJWTPayload(currentSession.access_token)
+      const { payload } = decodeJWT(currentSession.access_token)
       if (payload.exp) {
         expiresAt = payload.exp
         hasExpired = expiresAt <= timeNow
@@ -1528,7 +1745,7 @@ export default class GoTrueClient {
       }
 
       const actuallyExpiresIn = expiresAt - timeNow
-      if (actuallyExpiresIn * 1000 <= AUTO_REFRESH_TICK_DURATION) {
+      if (actuallyExpiresIn * 1000 <= AUTO_REFRESH_TICK_DURATION_MS) {
         console.warn(
           `@supabase/gotrue-js: Session as retrieved from URL expires in ${actuallyExpiresIn}s, should have been closer to ${expiresIn}s`
         )
@@ -1875,7 +2092,7 @@ export default class GoTrueClient {
             error &&
             isAuthRetryableFetchError(error) &&
             // retryable only if the request can be sent before the backoff overflows the tick duration
-            Date.now() + nextBackOffInterval - startedAt < AUTO_REFRESH_TICK_DURATION
+            Date.now() + nextBackOffInterval - startedAt < AUTO_REFRESH_TICK_DURATION_MS
           )
         }
       )
@@ -1988,12 +2205,12 @@ export default class GoTrueClient {
         return
       }
 
-      const timeNow = Math.round(Date.now() / 1000)
-      const expiresWithMargin = (currentSession.expires_at ?? Infinity) < timeNow + EXPIRY_MARGIN
+      const expiresWithMargin =
+        (currentSession.expires_at ?? Infinity) * 1000 - Date.now() < EXPIRY_MARGIN_MS
 
       this._debug(
         debugName,
-        `session has${expiresWithMargin ? '' : ' not'} expired with margin of ${EXPIRY_MARGIN}s`
+        `session has${expiresWithMargin ? '' : ' not'} expired with margin of ${EXPIRY_MARGIN_MS}s`
       )
 
       if (expiresWithMargin) {
@@ -2228,7 +2445,7 @@ export default class GoTrueClient {
 
     this._debug('#_startAutoRefresh()')
 
-    const ticker = setInterval(() => this._autoRefreshTokenTick(), AUTO_REFRESH_TICK_DURATION)
+    const ticker = setInterval(() => this._autoRefreshTokenTick(), AUTO_REFRESH_TICK_DURATION_MS)
     this.autoRefreshTicker = ticker
 
     if (ticker && typeof ticker === 'object' && typeof ticker.unref === 'function') {
@@ -2335,12 +2552,12 @@ export default class GoTrueClient {
 
               // session will expire in this many ticks (or has already expired if <= 0)
               const expiresInTicks = Math.floor(
-                (session.expires_at * 1000 - now) / AUTO_REFRESH_TICK_DURATION
+                (session.expires_at * 1000 - now) / AUTO_REFRESH_TICK_DURATION_MS
               )
 
               this._debug(
                 '#_autoRefreshTokenTick()',
-                `access token expires in ${expiresInTicks} ticks, a tick lasts ${AUTO_REFRESH_TICK_DURATION}ms, refresh threshold is ${AUTO_REFRESH_TICK_THRESHOLD} ticks`
+                `access token expires in ${expiresInTicks} ticks, a tick lasts ${AUTO_REFRESH_TICK_DURATION_MS}ms, refresh threshold is ${AUTO_REFRESH_TICK_THRESHOLD} ticks`
               )
 
               if (expiresInTicks <= AUTO_REFRESH_TICK_THRESHOLD) {
@@ -2698,7 +2915,7 @@ export default class GoTrueClient {
           }
         }
 
-        const payload = this._decodeJWT(session.access_token)
+        const { payload } = decodeJWT(session.access_token)
 
         let currentLevel: AuthenticatorAssuranceLevels | null = null
 
@@ -2720,5 +2937,132 @@ export default class GoTrueClient {
         return { data: { currentLevel, nextLevel, currentAuthenticationMethods }, error: null }
       })
     })
+  }
+
+  private async fetchJwk(kid: string, jwks: { keys: JWK[] } = { keys: [] }): Promise<JWK> {
+    // try fetching from the supplied jwks
+    let jwk = jwks.keys.find((key) => key.kid === kid)
+    if (jwk) {
+      return jwk
+    }
+
+    // try fetching from cache
+    jwk = this.jwks.keys.find((key) => key.kid === kid)
+
+    // jwk exists and jwks isn't stale
+    if (jwk && this.jwks_cached_at + JWKS_TTL > Date.now()) {
+      return jwk
+    }
+    // jwk isn't cached in memory so we need to fetch it from the well-known endpoint
+    const { data, error } = await _request(this.fetch, 'GET', `${this.url}/.well-known/jwks.json`, {
+      headers: this.headers,
+    })
+    if (error) {
+      throw error
+    }
+    if (!data.keys || data.keys.length === 0) {
+      throw new AuthInvalidJwtError('JWKS is empty')
+    }
+    this.jwks = data
+    this.jwks_cached_at = Date.now()
+    // Find the signing key
+    jwk = data.keys.find((key: any) => key.kid === kid)
+    if (!jwk) {
+      throw new AuthInvalidJwtError('No matching signing key found in JWKS')
+    }
+    return jwk
+  }
+
+  /**
+   * @experimental This method may change in future versions.
+   * @description Gets the claims from a JWT. If the JWT is symmetric JWTs, it will call getUser() to verify against the server. If the JWT is asymmetric, it will be verified against the JWKS using the WebCrypto API.
+   */
+  async getClaims(
+    jwt?: string,
+    jwks: { keys: JWK[] } = { keys: [] }
+  ): Promise<
+    | {
+        data: { claims: JwtPayload; header: JwtHeader; signature: Uint8Array }
+        error: null
+      }
+    | { data: null; error: AuthError }
+    | { data: null; error: null }
+  > {
+    try {
+      let token = jwt
+      if (!token) {
+        const { data, error } = await this.getSession()
+        if (error || !data.session) {
+          return { data: null, error }
+        }
+        token = data.session.access_token
+      }
+
+      const {
+        header,
+        payload,
+        signature,
+        raw: { header: rawHeader, payload: rawPayload },
+      } = decodeJWT(token)
+
+      // Reject expired JWTs
+      validateExp(payload.exp)
+
+      // If symmetric algorithm or WebCrypto API is unavailable, fallback to getUser()
+      if (
+        !header.kid ||
+        header.alg === 'HS256' ||
+        !('crypto' in globalThis && 'subtle' in globalThis.crypto)
+      ) {
+        const { error } = await this.getUser(token)
+        if (error) {
+          throw error
+        }
+        // getUser succeeds so the claims in the JWT can be trusted
+        return {
+          data: {
+            claims: payload,
+            header,
+            signature,
+          },
+          error: null,
+        }
+      }
+
+      const algorithm = getAlgorithm(header.alg)
+      const signingKey = await this.fetchJwk(header.kid, jwks)
+
+      // Convert JWK to CryptoKey
+      const publicKey = await crypto.subtle.importKey('jwk', signingKey, algorithm, true, [
+        'verify',
+      ])
+
+      // Verify the signature
+      const isValid = await crypto.subtle.verify(
+        algorithm,
+        publicKey,
+        signature,
+        stringToUint8Array(`${rawHeader}.${rawPayload}`)
+      )
+
+      if (!isValid) {
+        throw new AuthInvalidJwtError('Invalid JWT signature')
+      }
+
+      // If verification succeeds, decode and return claims
+      return {
+        data: {
+          claims: payload,
+          header,
+          signature,
+        },
+        error: null,
+      }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: null, error }
+      }
+      throw error
+    }
   }
 }

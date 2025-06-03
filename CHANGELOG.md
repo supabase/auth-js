@@ -1,5 +1,52 @@
 # Changelog
 
+## [2.70.0](https://github.com/supabase/auth-js/compare/v2.69.1...v2.70.0) (2025-05-16)
+
+
+### Features
+
+* add `signInWithWeb3` with solana ([#1037](https://github.com/supabase/auth-js/issues/1037)) ([cff5bcb](https://github.com/supabase/auth-js/commit/cff5bcb8399a46b293cfa8688d89882924e7edab))
+* validate uuid and sign out scope parameters to functions ([#1063](https://github.com/supabase/auth-js/issues/1063)) ([1bcb76e](https://github.com/supabase/auth-js/commit/1bcb76e479e51cd9bca2d7732d0bf3199e07a693))
+
+
+### Bug Fixes
+
+* add missing `deleted_at` property to `User` interface ([#1059](https://github.com/supabase/auth-js/issues/1059)) ([96da194](https://github.com/supabase/auth-js/commit/96da194b9ffb88643caa1547084fcee4dbe560f3))
+* export `processLock` from toplevel ([#1057](https://github.com/supabase/auth-js/issues/1057)) ([d99695a](https://github.com/supabase/auth-js/commit/d99695af9e632178be94502255c75496cda191ad))
+
+## [2.69.1](https://github.com/supabase/auth-js/compare/v2.69.0...v2.69.1) (2025-03-24)
+
+
+### Bug Fixes
+
+* `generatePKCEChallenge` should use btoa ([#1044](https://github.com/supabase/auth-js/issues/1044)) ([c06fafb](https://github.com/supabase/auth-js/commit/c06fafbc61fa1dec62ba0183530b6b566a135b75))
+
+## [2.69.0](https://github.com/supabase/auth-js/compare/v2.68.0...v2.69.0) (2025-03-22)
+
+
+### Features
+
+* introduce getClaims method to verify asymmetric JWTs ([#1030](https://github.com/supabase/auth-js/issues/1030)) ([daa2669](https://github.com/supabase/auth-js/commit/daa266949b336d2e78f2a7b9c9837b70abeab7a6))
+
+
+### Bug Fixes
+
+* assert type in `decodeJWTPayload` ([#1018](https://github.com/supabase/auth-js/issues/1018)) ([3d80039](https://github.com/supabase/auth-js/commit/3d80039e8b64402b615a924ff82f6562405ff705))
+* set jwks_cached_at ([#1039](https://github.com/supabase/auth-js/issues/1039)) ([9bdc023](https://github.com/supabase/auth-js/commit/9bdc0232e5939722606d22bbeaadb131f0dc2734))
+
+## [2.68.0](https://github.com/supabase/auth-js/compare/v2.67.3...v2.68.0) (2025-01-21)
+
+
+### Features
+
+* consider session expired with margin on getSession() without auto refresh ([#1027](https://github.com/supabase/auth-js/issues/1027)) ([80f88e4](https://github.com/supabase/auth-js/commit/80f88e4bd2809db765a8d103954e827d8473b7db))
+
+
+### Bug Fixes
+
+* remove `internal-types.ts` ([#1014](https://github.com/supabase/auth-js/issues/1014)) ([28ead89](https://github.com/supabase/auth-js/commit/28ead89af47bcdaccc6cc2f2c7f013bed8cf3d50))
+* update docs to add scrypt ([#1012](https://github.com/supabase/auth-js/issues/1012)) ([1225239](https://github.com/supabase/auth-js/commit/1225239e239bde1b25037a88867d4c484caf8301))
+
 ## [2.67.3](https://github.com/supabase/auth-js/compare/v2.67.2...v2.67.3) (2024-12-17)
 
 
