@@ -2017,7 +2017,13 @@ export default class GoTrueClient {
         // no need to persist currentSession again, as we just loaded it from
         // local storage; persisting it again may overwrite a value saved by
         // another client with access to the same local storage
-        await this._notifyAllSubscribers('SIGNED_IN', currentSession)
+
+        // Prevent sending a proxy user object as it can't be structured cloned
+        let finalPayloadSession =
+          currentSession.user && (currentSession.user as any).__isUserNotAvailableProxy
+            ? null
+            : currentSession
+        await this._notifyAllSubscribers('SIGNED_IN', finalPayloadSession)
       }
     } catch (err) {
       this._debug(debugName, 'error', err)
@@ -2127,15 +2133,37 @@ export default class GoTrueClient {
     // so we can safely suppress the warning returned by future getSession calls
     this.suppressGetSessionWarning = true
 
+    // Create a shallow copy to work with, to avoid mutating the original session object if it's used elsewhere
+    const sessionToProcess = { ...session }
+
+    const userIsProxy =
+      sessionToProcess.user && (sessionToProcess.user as any).__isUserNotAvailableProxy === true
     if (this.userStorage) {
-      await setItemAsync(this.userStorage, this.storageKey + '-user', { user: session.user })
+      if (!userIsProxy && sessionToProcess.user) {
+        // If it's a real user object, save it to userStorage.
+        await setItemAsync(this.userStorage, this.storageKey + '-user', {
+          user: sessionToProcess.user,
+        })
+      } else if (userIsProxy) {
+        // If it's the proxy, it means user was not found in userStorage.
+        // We should ensure no stale user data for this key exists in userStorage if we were to save null,
+        // or simply not save the proxy. For now, we don't save the proxy here.
+        // If there's a need to clear userStorage if user becomes proxy, that logic would go here.
+      }
 
-      const clone = structuredClone(session) as any // cast intentional as we're deleting the `user` property of a required type below
-      delete clone.user
+      // Prepare the main session data for primary storage: remove the user property before cloning
+      // This is important because the original session.user might be the proxy
+      const mainSessionData: Omit<Session, 'user'> & { user?: User } = { ...sessionToProcess }
+      delete mainSessionData.user // Remove user (real or proxy) before cloning for main storage
 
-      await setItemAsync(this.storage, this.storageKey, clone)
+      const clonedMainSessionData = structuredClone(mainSessionData)
+      await setItemAsync(this.storage, this.storageKey, clonedMainSessionData)
     } else {
-      await setItemAsync(this.storage, this.storageKey, session)
+      // No userStorage is configured.
+      // In this case, session.user should ideally not be a proxy.
+      // If it were, structuredClone would fail. This implies an issue elsewhere if user is a proxy here
+      const clonedSession = structuredClone(sessionToProcess) // sessionToProcess still has its original user property
+      await setItemAsync(this.storage, this.storageKey, clonedSession)
     }
   }
 

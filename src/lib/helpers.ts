@@ -346,8 +346,32 @@ export function parseResponseAPIVersion(response: Response) {
 }
 
 export function userNotAvailableProxy(): User {
-  return new Proxy({} as User, {
-    get: (_target: any, prop: string) => {
+  const proxyTarget = {} as User
+  Object.defineProperty(proxyTarget, '__isUserNotAvailableProxy', {
+    value: true,
+    writable: false,
+    enumerable: false,
+    configurable: false,
+  })
+
+  return new Proxy(proxyTarget, {
+    get: (target: any, prop: string) => {
+      if (prop === '__isUserNotAvailableProxy') {
+        return true
+      }
+      // Preventative check for common problematic symbols during cloning/inspection
+      // These symbols might be accessed by structuredClone or other internal mechanisms.
+      if (typeof prop === 'symbol') {
+        const sProp = (prop as symbol).toString()
+        if (
+          sProp === 'Symbol(Symbol.toPrimitive)' ||
+          sProp === 'Symbol(Symbol.toStringTag)' ||
+          sProp === 'Symbol(util.inspect.custom)'
+        ) {
+          // Node.js util.inspect
+          return undefined
+        }
+      }
       throw new Error(
         `@supabase/auth-js: client was created with userStorage option and there was no user stored in the user storage. Accessing the "${prop}" property of the session object is not supported. Please use getUser() instead.`
       )
