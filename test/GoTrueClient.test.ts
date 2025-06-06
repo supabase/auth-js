@@ -19,11 +19,11 @@ import {
   getClientWithSpecificStorage,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
-import { JWK, Provider, Session } from '../src'
+import { JWK, Session } from '../src'
 
 const TEST_USER_DATA = { info: 'some info' }
 
-const exparedAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4MTA3MDc0LCJpYXQiOjE3NDgxMDM0NzQsImlzcyI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJzdWIiOiIxMjM0NTY3ODkwIiwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
+const expiredAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ4MTA3MDc0LCJpYXQiOjE3NDgxMDM0NzQsImlzcyI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJzdWIiOiIxMjM0NTY3ODkwIiwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
 
 const isNodeHigherThan18 = parseInt(process.version.slice(1).split('.')[0]) > 18;
 
@@ -188,11 +188,9 @@ describe('GoTrueClient', () => {
         data: { session },
         error: setSessionError,
       } = await authWithSession.setSession({
-        access_token: exparedAccessToken,
+        access_token: expiredAccessToken,
         refresh_token: 'invalid-refresh-token',
       })
-      console.log(setSessionError)
-      console.log(session)
 
       expect(setSessionError).not.toBeNull()
       expect(setSessionError?.message).toContain('Invalid Refresh Token: Refresh Token Not Found')
@@ -609,9 +607,6 @@ describe('GoTrueClient', () => {
         }
       })
 
-      // Since auto-confirm is off, we should either:
-      // 1. Get an error (e.g. invalid phone number, captcha token)
-      // 2. Get a success response but with no session (needs verification)
       // Since auto-confirm is off, we should either:
       // 1. Get an error (e.g. invalid phone number, captcha token)
       // 2. Get a success response but with no session (needs verification)
@@ -1444,7 +1439,7 @@ describe('getClaims', () => {
 
     const invalidSession = {
       ...signUpData.session,
-      access_token: exparedAccessToken,
+      access_token: expiredAccessToken,
       refresh_token: 'invalid-refresh-token',
     }
 

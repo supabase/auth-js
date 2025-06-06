@@ -94,7 +94,7 @@ describe('GoTrueAdminApi', () => {
     })
   })
 
-  describe('User fetch', () => {
+  describe('List users', () => {
     test('listUsers() should return registered users', async () => {
       const { email } = mockUserCredentials()
       const { error: createError, data: createdUser } = await createNewUserWithEmail({ email })
@@ -123,7 +123,9 @@ describe('GoTrueAdminApi', () => {
       expect(error).not.toBeNull()
       expect(data.users).toEqual([])
     })
+  })
 
+  describe('Get user', () => {
     test('getUser() fetches a user by their access_token', async () => {
       const { email, password } = mockUserCredentials()
       const { error: initialError, data } = await authClientWithSession.signUp({
