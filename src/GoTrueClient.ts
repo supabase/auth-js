@@ -1394,6 +1394,7 @@ export default class GoTrueClient {
       }
 
       const { session, error } = await this._callRefreshToken(currentSession.refresh_token)
+
       if (error) {
         return { data: { session: null }, error }
       }
@@ -1572,6 +1573,10 @@ export default class GoTrueClient {
       }
 
       if (hasExpired) {
+        if (!this.autoRefreshToken) {
+          return { data: { user: null, session: null }, error: null }
+        }
+
         const { session: refreshedSession, error } = await this._callRefreshToken(
           currentSession.refresh_token
         )
@@ -1582,12 +1587,15 @@ export default class GoTrueClient {
         if (!refreshedSession) {
           return { data: { user: null, session: null }, error: null }
         }
+
         session = refreshedSession
       } else {
         const { data, error } = await this._getUser(currentSession.access_token)
+
         if (error) {
           throw error
         }
+
         session = {
           access_token: currentSession.access_token,
           refresh_token: currentSession.refresh_token,
