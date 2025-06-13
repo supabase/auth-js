@@ -33,24 +33,8 @@ describe('navigatorLock', () => {
     await expect(navigatorLock('test', 0, async () => 'success')).rejects.toThrow()
   })
 
-  it('should handle acquisition failure with timeout', async () => {
-    const originalAbortController = globalThis.AbortController
-    const mockAbort = jest.fn()
-    
-    globalThis.AbortController = jest.fn().mockImplementation(() => ({
-      signal: { aborted: false },
-      abort: mockAbort
-    })) as any
-  
-    ;(globalThis.navigator.locks.request as jest.Mock).mockImplementation((_, options, callback) => {
-      expect(options.signal).toBeDefined()
-      return Promise.resolve(callback(null))
-    })
-  
-    await navigatorLock('test', 100, async () => 'success')
-    expect(globalThis.AbortController).toHaveBeenCalled()
-    
-    globalThis.AbortController = originalAbortController
+  it('should not throw if browser is not following the Navigator LockManager spec', async () => {
+    await expect(navigatorLock('test-lock', 1, async () => 'success')).resolves.toBe('success')
   })
 })
 
