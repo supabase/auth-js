@@ -26,17 +26,6 @@ describe('GoTrueClient in browser environment', () => {
             writable: true,
         })
 
-        const mockBroadcastChannel = jest.fn().mockImplementation(() => ({
-            postMessage: jest.fn(),
-            addEventListener: jest.fn(),
-            removeEventListener: jest.fn(),
-            close: jest.fn(),
-        }))
-        Object.defineProperty(window, 'BroadcastChannel', {
-            value: mockBroadcastChannel,
-            writable: true,
-        })
-
         // Mock window.location
         const mockLocation = {
             href: 'http://localhost:9999',
@@ -49,34 +38,6 @@ describe('GoTrueClient in browser environment', () => {
             value: mockLocation,
             writable: true,
         })
-    })
-
-    it('should handle broadcast channel messages', async () => {
-        const mockPostMessage = jest.fn()
-        const mockAddEventListener = jest.fn()
-        const mockRemoveEventListener = jest.fn()
-        const mockClose = jest.fn()
-
-        const mockBroadcastChannel = jest.fn().mockImplementation(() => ({
-            postMessage: mockPostMessage,
-            addEventListener: mockAddEventListener,
-            removeEventListener: mockRemoveEventListener,
-            close: mockClose,
-        }))
-
-        Object.defineProperty(window, 'BroadcastChannel', {
-            value: mockBroadcastChannel,
-            writable: true,
-        })
-
-        const newClient = getClientWithSpecificStorage({
-            getItem: jest.fn(),
-            setItem: jest.fn(),
-            removeItem: jest.fn(),
-        })
-
-        expect(mockBroadcastChannel).toHaveBeenCalled()
-        expect(mockAddEventListener).toHaveBeenCalled()
     })
 
     it('should handle basic OAuth', async () => {
@@ -114,38 +75,6 @@ describe('GoTrueClient in browser environment', () => {
         await autoRefreshClient.stopAutoRefresh()
     })
 
-    it('should handle broadcast channel with different events', async () => {
-        const mockMessageHandler = jest.fn()
-        const mockBroadcastChannel = jest.fn().mockImplementation(() => ({
-            postMessage: jest.fn(),
-            addEventListener: (event: string, handler: any) => {
-                if (event === 'message') {
-                    mockMessageHandler(handler)
-                }
-            },
-            removeEventListener: jest.fn(),
-            close: jest.fn(),
-        }))
-
-        Object.defineProperty(window, 'BroadcastChannel', {
-            value: mockBroadcastChannel,
-            writable: true,
-        })
-
-        const newClient = getClientWithSpecificStorage({
-            getItem: jest.fn(),
-            setItem: jest.fn(),
-            removeItem: jest.fn(),
-        })
-
-        const messageHandler = mockMessageHandler.mock.calls[0][0]
-        messageHandler({ data: { event: 'SIGNED_IN', session: null } })
-        messageHandler({ data: { event: 'SIGNED_OUT', session: null } })
-        messageHandler({ data: { event: 'USER_UPDATED', session: null } })
-        messageHandler({ data: { event: 'PASSWORD_RECOVERY', session: null } })
-        messageHandler({ data: { event: 'TOKEN_REFRESHED', session: null } })
-    })
-
     it('should handle PKCE flow', async () => {
         const { email, password } = mockUserCredentials()
         const pkceClient = getClientWithSpecificStorage({
@@ -173,4 +102,133 @@ describe('GoTrueClient in browser environment', () => {
         expect(signinError).toBeNull()
         expect(signinData?.session).toBeDefined()
     })
-}) 
+})
+
+describe('Callback URL handling', () => {
+    let mockFetch: jest.Mock
+    let storedSession: string | null
+    const mockStorage = {
+        getItem: jest.fn(() => storedSession),
+        setItem: jest.fn((key: string, value: string) => {
+            storedSession = value
+        }),
+        removeItem: jest.fn(() => {
+            storedSession = null
+        }),
+    }
+
+    beforeEach(() => {
+        mockFetch = jest.fn()
+        global.fetch = mockFetch
+    })
+
+    it('should handle implicit grant callback', async () => {
+        // Set up URL with implicit grant callback parameters
+        window.location.href = 'http://localhost:9999/callback#access_token=test-token&refresh_token=test-refresh-token&expires_in=3600&token_type=bearer&type=implicit'
+
+        // Mock user info response
+        mockFetch.mockImplementation((url: string) => {
+            if (url.includes('/user')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        id: 'test-user',
+                        email: 'test@example.com',
+                        created_at: new Date().toISOString()
+                    })
+                })
+            }
+            return Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve({
+                    access_token: 'test-token',
+                    refresh_token: 'test-refresh-token',
+                    expires_in: 3600,
+                    token_type: 'bearer',
+                    user: { id: 'test-user' }
+                })
+            })
+        })
+
+        const client = getClientWithSpecificStorage(mockStorage)
+        await client.initialize()
+
+        const { data: { session } } = await client.getSession()
+        expect(session).toBeDefined()
+        expect(session?.access_token).toBe('test-token')
+        expect(session?.refresh_token).toBe('test-refresh-token')
+    })
+
+    it('should handle error in callback URL', async () => {
+        // Set up URL with error parameters
+        window.location.href = 'http://localhost:9999/callback#error=invalid_grant&error_description=Invalid+grant'
+
+        mockFetch.mockImplementation((url: string) => {
+            return Promise.resolve({
+                ok: false,
+                json: () => Promise.resolve({
+                    error: 'invalid_grant',
+                    error_description: 'Invalid grant'
+                })
+            })
+        })
+
+        const client = getClientWithSpecificStorage(mockStorage)
+        await client.initialize()
+
+        const { data: { session } } = await client.getSession()
+        expect(session).toBeNull()
+    })
+})
+
+describe('GoTrueClient BroadcastChannel', () => {
+    it('should handle multiple auth state change events', async () => {
+        const mockBroadcastChannel = jest.fn().mockImplementation(() => ({
+            postMessage: jest.fn(),
+            addEventListener: jest.fn(),
+            removeEventListener: jest.fn(),
+            close: jest.fn(),
+        }))
+        Object.defineProperty(window, 'BroadcastChannel', {
+            value: mockBroadcastChannel,
+            writable: true,
+        })
+
+        const mockStorage = {
+            getItem: jest.fn(),
+            setItem: jest.fn(),
+            removeItem: jest.fn(),
+        }
+
+        const client = getClientWithSpecificStorage(mockStorage)
+        const mockCallback1 = jest.fn()
+        const mockCallback2 = jest.fn()
+
+        const { data: { subscription: sub1 } } = client.onAuthStateChange(mockCallback1)
+        const { data: { subscription: sub2 } } = client.onAuthStateChange(mockCallback2)
+
+        // Simulate a broadcast message
+        const mockEvent = {
+            data: {
+                event: 'SIGNED_IN',
+                session: {
+                    access_token: 'test-token',
+                    refresh_token: 'test-refresh-token',
+                    expires_in: 3600,
+                    token_type: 'bearer',
+                    user: { id: 'test-user' }
+                }
+            }
+        }
+
+        // Get the event listener that was registered
+        const eventListener = mockBroadcastChannel.mock.results[0].value.addEventListener.mock.calls[0][1]
+        eventListener(mockEvent)
+
+        expect(mockCallback1).toHaveBeenCalledWith('SIGNED_IN', mockEvent.data.session)
+        expect(mockCallback2).toHaveBeenCalledWith('SIGNED_IN', mockEvent.data.session)
+
+        sub1.unsubscribe()
+        sub2.unsubscribe()
+    })
+})
