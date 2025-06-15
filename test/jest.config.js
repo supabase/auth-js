@@ -11,4 +11,5 @@ module.exports = {
     '!**/vendor/**'
   ],
   rootDir: '..',
+  silent: true
 }

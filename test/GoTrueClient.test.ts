@@ -1850,7 +1850,7 @@ describe('Web3 Authentication', () => {
 
     expect(data?.session).toBeNull()
     expect(error).not.toBeNull()
-    expect(error?.message).toContain("unsupported_grant_type")
+    expect(error?.message).toContain("Web3 provider is disabled")
   })
 
   test('signInWithWeb3 should fail solana chain without message', async () => {
