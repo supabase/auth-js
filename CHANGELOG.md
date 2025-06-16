@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.71.0](https://github.com/supabase/auth-js/compare/v2.70.0...v2.71.0) (2025-06-16)
+
+
+### Features
+
+* introduce experimental split user and session storage ([#1023](https://github.com/supabase/auth-js/issues/1023)) ([e7b2f21](https://github.com/supabase/auth-js/commit/e7b2f2169cbbf2cd1e56526c488fc7c169335eac))
+
+
+### Bug Fixes
+
+* handle null current session with split session storage ([#1071](https://github.com/supabase/auth-js/issues/1071)) ([bc6192a](https://github.com/supabase/auth-js/commit/bc6192afd17e2995ca63acb7fbd4e7ee0b435687))
+
 ## [2.70.0](https://github.com/supabase/auth-js/compare/v2.69.1...v2.70.0) (2025-05-16)
 
 
