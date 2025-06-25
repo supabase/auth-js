@@ -362,7 +362,7 @@ export default class GoTrueClient {
    */
   private async _initialize(): Promise<InitializeResult> {
     try {
-      const params = parseParametersFromURL(window.location.href)
+      const params = isBrowser() ? parseParametersFromURL(window.location.href) : {}
       let callbackUrlType = 'none'
       if (this._isImplicitGrantCallback(params)) {
         callbackUrlType = 'implicit'
