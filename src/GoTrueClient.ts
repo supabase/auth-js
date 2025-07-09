@@ -2968,7 +2968,7 @@ export default class GoTrueClient {
     })
   }
 
-  private async fetchJwk(kid: string, jwks: { keys: JWK[] } = { keys: [] }): Promise<JWK> {
+  private async fetchJwk(kid: string, jwks: { keys: JWK[] } = { keys: [] }): Promise<JWK | null> {
     // try fetching from the supplied jwks
     let jwk = jwks.keys.find((key) => key.kid === kid)
     if (jwk) {
@@ -2992,7 +2992,7 @@ export default class GoTrueClient {
       throw error
     }
     if (!data.keys || data.keys.length === 0) {
-      throw new AuthInvalidJwtError('JWKS is empty')
+      return null
     }
 
     this.jwks = data
@@ -3001,7 +3001,7 @@ export default class GoTrueClient {
     // Find the signing key
     jwk = data.keys.find((key: any) => key.kid === kid)
     if (!jwk) {
-      throw new AuthInvalidJwtError('No matching signing key found in JWKS')
+      return null
     }
     return jwk
   }
@@ -3093,21 +3093,40 @@ export default class GoTrueClient {
         options?.keys ? { keys: options.keys } : options?.jwks
       )
 
-      // Convert JWK to CryptoKey
-      const publicKey = await crypto.subtle.importKey('jwk', signingKey, algorithm, true, [
-        'verify',
-      ])
+      if (signingKey) {
+        // Convert JWK to CryptoKey
+        const publicKey = await crypto.subtle.importKey('jwk', signingKey, algorithm, true, [
+          'verify',
+        ])
 
-      // Verify the signature
-      const isValid = await crypto.subtle.verify(
-        algorithm,
-        publicKey,
-        signature,
-        stringToUint8Array(`${rawHeader}.${rawPayload}`)
-      )
+        // Verify the signature
+        const isValid = await crypto.subtle.verify(
+          algorithm,
+          publicKey,
+          signature,
+          stringToUint8Array(`${rawHeader}.${rawPayload}`)
+        )
 
-      if (!isValid) {
-        throw new AuthInvalidJwtError('Invalid JWT signature')
+        if (!isValid) {
+          throw new AuthInvalidJwtError('Invalid JWT signature')
+        }
+      } else {
+        // no signing key found in the JWKS, this might mean that the developer rotated the JWT signing key too fast without waiting for all caches to be purged
+        // in this case, validate the JWT directly with the Auth server
+
+        const { error } = await this.getUser(token)
+        if (error) {
+          throw error
+        }
+        // getUser succeeds so the claims in the JWT can be trusted
+        return {
+          data: {
+            claims: payload,
+            header,
+            signature,
+          },
+          error: null,
+        }
       }
 
       // If verification succeeds, decode and return claims
