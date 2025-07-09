@@ -3066,12 +3066,16 @@ export default class GoTrueClient {
         validateExp(payload.exp)
       }
 
-      // If symmetric algorithm or WebCrypto API is unavailable, fallback to getUser()
-      if (
+      const signingKey =
+        !header.alg ||
+        header.alg.startsWith('HS') ||
         !header.kid ||
-        header.alg === 'HS256' ||
         !('crypto' in globalThis && 'subtle' in globalThis.crypto)
-      ) {
+          ? null
+          : await this.fetchJwk(header.kid, options?.keys ? { keys: options.keys } : options?.jwks)
+
+      // If symmetric algorithm or WebCrypto API is unavailable, fallback to getUser()
+      if (!signingKey) {
         const { error } = await this.getUser(token)
         if (error) {
           throw error
@@ -3088,45 +3092,22 @@ export default class GoTrueClient {
       }
 
       const algorithm = getAlgorithm(header.alg)
-      const signingKey = await this.fetchJwk(
-        header.kid,
-        options?.keys ? { keys: options.keys } : options?.jwks
+
+      // Convert JWK to CryptoKey
+      const publicKey = await crypto.subtle.importKey('jwk', signingKey, algorithm, true, [
+        'verify',
+      ])
+
+      // Verify the signature
+      const isValid = await crypto.subtle.verify(
+        algorithm,
+        publicKey,
+        signature,
+        stringToUint8Array(`${rawHeader}.${rawPayload}`)
       )
 
-      if (signingKey) {
-        // Convert JWK to CryptoKey
-        const publicKey = await crypto.subtle.importKey('jwk', signingKey, algorithm, true, [
-          'verify',
-        ])
-
-        // Verify the signature
-        const isValid = await crypto.subtle.verify(
-          algorithm,
-          publicKey,
-          signature,
-          stringToUint8Array(`${rawHeader}.${rawPayload}`)
-        )
-
-        if (!isValid) {
-          throw new AuthInvalidJwtError('Invalid JWT signature')
-        }
-      } else {
-        // no signing key found in the JWKS, this might mean that the developer rotated the JWT signing key too fast without waiting for all caches to be purged
-        // in this case, validate the JWT directly with the Auth server
-
-        const { error } = await this.getUser(token)
-        if (error) {
-          throw error
-        }
-        // getUser succeeds so the claims in the JWT can be trusted
-        return {
-          data: {
-            claims: payload,
-            header,
-            signature,
-          },
-          error: null,
-        }
+      if (!isValid) {
+        throw new AuthInvalidJwtError('Invalid JWT signature')
       }
 
       // If verification succeeds, decode and return claims
