@@ -328,6 +328,7 @@ export interface Factor {
 
 export interface UserAppMetadata {
   provider?: string
+  providers?: string[]
   [key: string]: any
 }
 
