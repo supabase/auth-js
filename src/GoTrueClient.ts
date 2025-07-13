@@ -114,6 +114,8 @@ import type {
   EthereumWallet,
 } from './lib/types'
 import { stringToUint8Array, bytesToBase64URL } from './lib/base64url'
+import { fromHex, getAddress, Hex, toHex } from 'viem'
+import { createSiweMessage, generateSiweNonce, SiweMessage } from 'viem/siwe'
 
 polyfillGlobalThis() // Make "globalThis" available
 
@@ -656,9 +658,9 @@ export default class GoTrueClient {
    */
   async signInWithWeb3(credentials: Web3Credentials): Promise<
     | {
-      data: { session: Session; user: User }
-      error: null
-    }
+        data: { session: Session; user: User }
+        error: null
+      }
     | { data: { session: null; user: null }; error: AuthError }
   > {
     const { chain } = credentials
@@ -673,10 +675,16 @@ export default class GoTrueClient {
     }
   }
 
-  private async signInWithEthereum(credentials: EthereumWeb3Credentials): Promise<
+  private async signInWithEthereum(
+    credentials: EthereumWeb3Credentials
+  ): Promise<
     | { data: { session: Session; user: User }; error: null }
     | { data: { session: null; user: null }; error: AuthError }
   > {
+    // TODO: flatten type
+    let message: string
+    let signature: Hex
+
     if ('message' in credentials) {
       message = credentials.message
       signature = credentials.signature
@@ -685,14 +693,111 @@ export default class GoTrueClient {
 
       let resolvedWallet: EthereumWallet
 
-      if (isBrowser()) {
-        if (typeof wallet !== "object" || options?.url) {
+      if (!isBrowser()) {
+        if (typeof wallet !== 'object' || !options?.url) {
           throw new Error(
             '@supabase/auth-js: Both wallet and url must be specified in non-browser environments.'
-            // WIP
+          )
+        }
+
+        resolvedWallet = wallet
+      } else if (typeof wallet === 'object') {
+        resolvedWallet = wallet
+      } else {
+        const windowAny = window as any
+
+        if (
+          'ethereum' in windowAny &&
+          typeof windowAny.ethereum === 'object' &&
+          'request' in windowAny.ethereum &&
+          typeof windowAny.ethereum.request === 'function'
+        ) {
+          resolvedWallet = windowAny.ethereum
+        } else {
+          throw new Error(
+            `@supabase/auth-js: No compatible Ethereum wallet interface on the window object (window.solana) detected. Make sure the user already has a wallet installed and connected for this app. Prefer passing the wallet interface object directly to signInWithWeb3({ chain: 'ethereum', wallet: resolvedUserWallet }) instead.`
           )
         }
       }
+
+      const url = new URL(options?.url ?? window.location.href)
+
+      const accounts = await resolvedWallet.request({
+        method: 'eth_requestAccounts',
+      })
+
+      const address = getAddress(accounts[0])
+
+      let chainId = options?.signInWithEthereum?.chainId
+      if (!chainId) {
+        const chainIdHex = await resolvedWallet.request({
+          method: 'eth_chainId',
+        })
+        chainId = fromHex(chainIdHex, 'number')
+      }
+
+      const siweMessage: SiweMessage = {
+        domain: url.host,
+        address: address,
+        statement: statement,
+        uri: url.href,
+        version: '1',
+        chainId: chainId,
+        nonce: options?.signInWithEthereum?.nonce || generateSiweNonce(),
+        issuedAt: options?.signInWithEthereum?.issuedAt ?? new Date(),
+        expirationTime: options?.signInWithEthereum?.expirationTime,
+        notBefore: options?.signInWithEthereum?.notBefore,
+        requestId: options?.signInWithEthereum?.requestId,
+        resources: options?.signInWithEthereum?.resources,
+      }
+
+      message = createSiweMessage(siweMessage)
+
+      // Sign message
+      signature = await resolvedWallet.request({
+        method: 'personal_sign',
+        params: [toHex(message), address],
+      })
+    }
+
+    try {
+      const { data, error } = await _request(
+        this.fetch,
+        'POST',
+        `${this.url}/token?grant_type=web3`,
+        {
+          headers: this.headers,
+          body: {
+            chain: 'ethereum',
+            message,
+            signature,
+            ...(credentials.options?.captchaToken
+              ? { gotrue_meta_security: { captcha_token: credentials.options?.captchaToken } }
+              : null),
+          },
+          xform: _sessionResponse,
+        }
+      )
+      if (error) {
+        throw error
+      }
+      if (!data || !data.session || !data.user) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthInvalidTokenResponseError(),
+        }
+      }
+      if (data.session) {
+        await this._saveSession(data.session)
+        await this._notifyAllSubscribers('SIGNED_IN', data.session)
+      }
+      return { data: { ...data }, error }
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error }
+      }
+
+      throw error
     }
   }
 
@@ -821,9 +926,9 @@ export default class GoTrueClient {
             : []),
           ...(options?.signInWithSolana?.resources?.length
             ? [
-              'Resources',
-              ...options.signInWithSolana.resources.map((resource) => `- ${resource}`),
-            ]
+                'Resources',
+                ...options.signInWithSolana.resources.map((resource) => `- ${resource}`),
+              ]
             : []),
         ].join('\n')
 
@@ -886,9 +991,9 @@ export default class GoTrueClient {
 
   private async _exchangeCodeForSession(authCode: string): Promise<
     | {
-      data: { session: Session; user: User; redirectType: string | null }
-      error: null
-    }
+        data: { session: Session; user: User; redirectType: string | null }
+        error: null
+      }
     | { data: { session: null; user: null; redirectType: null }; error: AuthError }
   > {
     const storageItem = await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)
@@ -1320,23 +1425,23 @@ export default class GoTrueClient {
     fn: (
       result:
         | {
-          data: {
-            session: Session
+            data: {
+              session: Session
+            }
+            error: null
           }
-          error: null
-        }
         | {
-          data: {
-            session: null
+            data: {
+              session: null
+            }
+            error: AuthError
           }
-          error: AuthError
-        }
         | {
-          data: {
-            session: null
+            data: {
+              session: null
+            }
+            error: null
           }
-          error: null
-        }
     ) => Promise<R>
   ): Promise<R> {
     this._debug('#_useSession', 'begin')
@@ -1358,23 +1463,23 @@ export default class GoTrueClient {
    */
   private async __loadSession(): Promise<
     | {
-      data: {
-        session: Session
+        data: {
+          session: Session
+        }
+        error: null
       }
-      error: null
-    }
     | {
-      data: {
-        session: null
+        data: {
+          session: null
+        }
+        error: AuthError
       }
-      error: AuthError
-    }
     | {
-      data: {
-        session: null
+        data: {
+          session: null
+        }
+        error: null
       }
-      error: null
-    }
   > {
     this._debug('#__loadSession()', 'begin')
 
@@ -1730,9 +1835,9 @@ export default class GoTrueClient {
     callbackUrlType: string
   ): Promise<
     | {
-      data: { session: Session; redirectType: string | null }
-      error: null
-    }
+        data: { session: Session; redirectType: string | null }
+        error: null
+      }
     | { data: { session: null; redirectType: null }; error: AuthError }
   > {
     try {
@@ -1946,13 +2051,13 @@ export default class GoTrueClient {
     this._debug('#onAuthStateChange()', 'registered callback with id', id)
 
     this.stateChangeEmitters.set(id, subscription)
-      ; (async () => {
-        await this.initializePromise
+    ;(async () => {
+      await this.initializePromise
 
-        await this._acquireLock(-1, async () => {
-          this._emitInitialSession(id)
-        })
-      })()
+      await this._acquireLock(-1, async () => {
+        this._emitInitialSession(id)
+      })
+    })()
 
     return { data: { subscription } }
   }
@@ -1991,9 +2096,9 @@ export default class GoTrueClient {
     } = {}
   ): Promise<
     | {
-      data: {}
-      error: null
-    }
+        data: {}
+        error: null
+      }
     | { data: null; error: AuthError }
   > {
     let codeChallenge: string | null = null
@@ -2031,11 +2136,11 @@ export default class GoTrueClient {
    */
   async getUserIdentities(): Promise<
     | {
-      data: {
-        identities: UserIdentity[]
+        data: {
+          identities: UserIdentity[]
+        }
+        error: null
       }
-      error: null
-    }
     | { data: null; error: AuthError }
   > {
     try {
@@ -2091,9 +2196,9 @@ export default class GoTrueClient {
    */
   async unlinkIdentity(identity: UserIdentity): Promise<
     | {
-      data: {}
-      error: null
-    }
+        data: {}
+        error: null
+      }
     | { data: null; error: AuthError }
   > {
     try {
@@ -3069,9 +3174,9 @@ export default class GoTrueClient {
     } = {}
   ): Promise<
     | {
-      data: { claims: JwtPayload; header: JwtHeader; signature: Uint8Array }
-      error: null
-    }
+        data: { claims: JwtPayload; header: JwtHeader; signature: Uint8Array }
+        error: null
+      }
     | { data: null; error: AuthError }
     | { data: null; error: null }
   > {
@@ -3099,9 +3204,9 @@ export default class GoTrueClient {
 
       const signingKey =
         !header.alg ||
-          header.alg.startsWith('HS') ||
-          !header.kid ||
-          !('crypto' in globalThis && 'subtle' in globalThis.crypto)
+        header.alg.startsWith('HS') ||
+        !header.kid ||
+        !('crypto' in globalThis && 'subtle' in globalThis.crypto)
           ? null
           : await this.fetchJwk(header.kid, options?.keys ? { keys: options.keys } : options?.jwks)
 
