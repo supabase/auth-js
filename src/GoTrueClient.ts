@@ -114,8 +114,14 @@ import type {
   EthereumWallet,
 } from './lib/types'
 import { stringToUint8Array, bytesToBase64URL } from './lib/base64url'
-import { fromHex, getAddress, Hex, toHex } from 'viem'
-import { createSiweMessage, generateSiweNonce, SiweMessage } from 'viem/siwe'
+import {
+  fromHex,
+  getAddress,
+  Hex,
+  toHex,
+  createSiweMessage,
+  SiweMessage,
+} from './lib/web3/ethereum'
 
 polyfillGlobalThis() // Make "globalThis" available
 
@@ -715,16 +721,16 @@ export default class GoTrueClient {
           resolvedWallet = windowAny.ethereum
         } else {
           throw new Error(
-            `@supabase/auth-js: No compatible Ethereum wallet interface on the window object (window.solana) detected. Make sure the user already has a wallet installed and connected for this app. Prefer passing the wallet interface object directly to signInWithWeb3({ chain: 'ethereum', wallet: resolvedUserWallet }) instead.`
+            `@supabase/auth-js: No compatible Ethereum wallet interface on the window object (window.ethereum) detected. Make sure the user already has a wallet installed and connected for this app. Prefer passing the wallet interface object directly to signInWithWeb3({ chain: 'ethereum', wallet: resolvedUserWallet }) instead.`
           )
         }
       }
 
       const url = new URL(options?.url ?? window.location.href)
 
-      const accounts = await resolvedWallet.request({
+      const accounts = (await resolvedWallet.request({
         method: 'eth_requestAccounts',
-      })
+      })) as string[]
 
       const address = getAddress(accounts[0])
 
@@ -733,7 +739,7 @@ export default class GoTrueClient {
         const chainIdHex = await resolvedWallet.request({
           method: 'eth_chainId',
         })
-        chainId = fromHex(chainIdHex, 'number')
+        chainId = fromHex(chainIdHex as Hex)
       }
 
       const siweMessage: SiweMessage = {
@@ -743,7 +749,7 @@ export default class GoTrueClient {
         uri: url.href,
         version: '1',
         chainId: chainId,
-        nonce: options?.signInWithEthereum?.nonce || generateSiweNonce(),
+        nonce: options?.signInWithEthereum?.nonce,
         issuedAt: options?.signInWithEthereum?.issuedAt ?? new Date(),
         expirationTime: options?.signInWithEthereum?.expirationTime,
         notBefore: options?.signInWithEthereum?.notBefore,
@@ -754,10 +760,10 @@ export default class GoTrueClient {
       message = createSiweMessage(siweMessage)
 
       // Sign message
-      signature = await resolvedWallet.request({
+      signature = (await resolvedWallet.request({
         method: 'personal_sign',
         params: [toHex(message), address],
-      })
+      })) as Hex
     }
 
     try {

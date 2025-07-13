@@ -1,4 +1,4 @@
-import { EIP1193Provider } from 'viem'
+import { EIP1193Provider } from './web3/ethereum'
 import { AuthError } from './errors'
 import { Fetch } from './fetch'
 import type { SolanaSignInInput, SolanaSignInOutput } from './web3/solana'

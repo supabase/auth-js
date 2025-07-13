@@ -37,8 +37,7 @@
     "docs:json": "typedoc --json docs/v2/spec.json --excludeExternals --excludePrivate --excludeProtected src/index.ts"
   },
   "dependencies": {
-    "@supabase/node-fetch": "^2.6.14",
-    "siwe": "^3.0.0"
+    "@supabase/node-fetch": "^2.6.14"
   },
   "devDependencies": {
     "@types/faker": "^5.1.6",
@@ -65,7 +64,6 @@
     "semantic-release-plugin-update-version-in-files": "^1.1.0",
     "ts-jest": "^28.0.7",
     "typedoc": "^0.22.16",
-    "typescript": "^4.7.4",
-    "viem": "^2.31.7"
+    "typescript": "^4.7.4"
   }
 }
