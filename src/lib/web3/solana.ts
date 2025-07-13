@@ -184,3 +184,4 @@ export interface SolanaSignInOutput {
    */
   readonly signatureType?: 'ed25519'
 }
+

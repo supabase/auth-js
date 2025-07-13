@@ -110,6 +110,8 @@ import type {
   SolanaWeb3Credentials,
   SolanaWallet,
   Web3Credentials,
+  EthereumWeb3Credentials,
+  EthereumWallet,
 } from './lib/types'
 import { stringToUint8Array, bytesToBase64URL } from './lib/base64url'
 
@@ -647,22 +649,51 @@ export default class GoTrueClient {
 
   /**
    * Signs in a user by verifying a message signed by the user's private key.
-   * Only Solana supported at this time, using the Sign in with Solana standard.
+   * Supports Ethereum (via Sign-In-With-Ethereum) & Solana (Sign-In-With-Solana) standards,
+   * both of which derive from the EIP-4361 standard
+   * With slight variation on Solana's side.
+   * @reference https://eips.ethereum.org/EIPS/eip-4361
    */
   async signInWithWeb3(credentials: Web3Credentials): Promise<
     | {
-        data: { session: Session; user: User }
-        error: null
-      }
+      data: { session: Session; user: User }
+      error: null
+    }
     | { data: { session: null; user: null }; error: AuthError }
   > {
     const { chain } = credentials
 
-    if (chain === 'solana') {
-      return await this.signInWithSolana(credentials)
+    switch (chain) {
+      case 'ethereum':
+        return await this.signInWithEthereum(credentials)
+      case 'solana':
+        return await this.signInWithSolana(credentials)
+      default:
+        throw new Error(`@supabase/auth-js: Unsupported chain "${chain}"`)
     }
+  }
 
-    throw new Error(`@supabase/auth-js: Unsupported chain "${chain}"`)
+  private async signInWithEthereum(credentials: EthereumWeb3Credentials): Promise<
+    | { data: { session: Session; user: User }; error: null }
+    | { data: { session: null; user: null }; error: AuthError }
+  > {
+    if ('message' in credentials) {
+      message = credentials.message
+      signature = credentials.signature
+    } else {
+      const { chain, wallet, statement, options } = credentials
+
+      let resolvedWallet: EthereumWallet
+
+      if (isBrowser()) {
+        if (typeof wallet !== "object" || options?.url) {
+          throw new Error(
+            '@supabase/auth-js: Both wallet and url must be specified in non-browser environments.'
+            // WIP
+          )
+        }
+      }
+    }
   }
 
   private async signInWithSolana(credentials: SolanaWeb3Credentials) {
@@ -790,9 +821,9 @@ export default class GoTrueClient {
             : []),
           ...(options?.signInWithSolana?.resources?.length
             ? [
-                'Resources',
-                ...options.signInWithSolana.resources.map((resource) => `- ${resource}`),
-              ]
+              'Resources',
+              ...options.signInWithSolana.resources.map((resource) => `- ${resource}`),
+            ]
             : []),
         ].join('\n')
 
@@ -855,9 +886,9 @@ export default class GoTrueClient {
 
   private async _exchangeCodeForSession(authCode: string): Promise<
     | {
-        data: { session: Session; user: User; redirectType: string | null }
-        error: null
-      }
+      data: { session: Session; user: User; redirectType: string | null }
+      error: null
+    }
     | { data: { session: null; user: null; redirectType: null }; error: AuthError }
   > {
     const storageItem = await getItemAsync(this.storage, `${this.storageKey}-code-verifier`)
@@ -1289,23 +1320,23 @@ export default class GoTrueClient {
     fn: (
       result:
         | {
-            data: {
-              session: Session
-            }
-            error: null
+          data: {
+            session: Session
           }
+          error: null
+        }
         | {
-            data: {
-              session: null
-            }
-            error: AuthError
+          data: {
+            session: null
           }
+          error: AuthError
+        }
         | {
-            data: {
-              session: null
-            }
-            error: null
+          data: {
+            session: null
           }
+          error: null
+        }
     ) => Promise<R>
   ): Promise<R> {
     this._debug('#_useSession', 'begin')
@@ -1327,23 +1358,23 @@ export default class GoTrueClient {
    */
   private async __loadSession(): Promise<
     | {
-        data: {
-          session: Session
-        }
-        error: null
+      data: {
+        session: Session
       }
+      error: null
+    }
     | {
-        data: {
-          session: null
-        }
-        error: AuthError
+      data: {
+        session: null
       }
+      error: AuthError
+    }
     | {
-        data: {
-          session: null
-        }
-        error: null
+      data: {
+        session: null
       }
+      error: null
+    }
   > {
     this._debug('#__loadSession()', 'begin')
 
@@ -1699,9 +1730,9 @@ export default class GoTrueClient {
     callbackUrlType: string
   ): Promise<
     | {
-        data: { session: Session; redirectType: string | null }
-        error: null
-      }
+      data: { session: Session; redirectType: string | null }
+      error: null
+    }
     | { data: { session: null; redirectType: null }; error: AuthError }
   > {
     try {
@@ -1915,13 +1946,13 @@ export default class GoTrueClient {
     this._debug('#onAuthStateChange()', 'registered callback with id', id)
 
     this.stateChangeEmitters.set(id, subscription)
-    ;(async () => {
-      await this.initializePromise
+      ; (async () => {
+        await this.initializePromise
 
-      await this._acquireLock(-1, async () => {
-        this._emitInitialSession(id)
-      })
-    })()
+        await this._acquireLock(-1, async () => {
+          this._emitInitialSession(id)
+        })
+      })()
 
     return { data: { subscription } }
   }
@@ -1960,9 +1991,9 @@ export default class GoTrueClient {
     } = {}
   ): Promise<
     | {
-        data: {}
-        error: null
-      }
+      data: {}
+      error: null
+    }
     | { data: null; error: AuthError }
   > {
     let codeChallenge: string | null = null
@@ -2000,11 +2031,11 @@ export default class GoTrueClient {
    */
   async getUserIdentities(): Promise<
     | {
-        data: {
-          identities: UserIdentity[]
-        }
-        error: null
+      data: {
+        identities: UserIdentity[]
       }
+      error: null
+    }
     | { data: null; error: AuthError }
   > {
     try {
@@ -2060,9 +2091,9 @@ export default class GoTrueClient {
    */
   async unlinkIdentity(identity: UserIdentity): Promise<
     | {
-        data: {}
-        error: null
-      }
+      data: {}
+      error: null
+    }
     | { data: null; error: AuthError }
   > {
     try {
@@ -3038,9 +3069,9 @@ export default class GoTrueClient {
     } = {}
   ): Promise<
     | {
-        data: { claims: JwtPayload; header: JwtHeader; signature: Uint8Array }
-        error: null
-      }
+      data: { claims: JwtPayload; header: JwtHeader; signature: Uint8Array }
+      error: null
+    }
     | { data: null; error: AuthError }
     | { data: null; error: null }
   > {
@@ -3068,9 +3099,9 @@ export default class GoTrueClient {
 
       const signingKey =
         !header.alg ||
-        header.alg.startsWith('HS') ||
-        !header.kid ||
-        !('crypto' in globalThis && 'subtle' in globalThis.crypto)
+          header.alg.startsWith('HS') ||
+          !header.kid ||
+          !('crypto' in globalThis && 'subtle' in globalThis.crypto)
           ? null
           : await this.fetchJwk(header.kid, options?.keys ? { keys: options.keys } : options?.jwks)
 
