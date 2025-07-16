@@ -19,10 +19,8 @@ import {
   getClientWithSpecificStorage,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
-import { JWK, Session, Web3Credentials } from '../src'
+import { JWK, Session } from '../src'
 import { setItemAsync } from '../src/lib/helpers'
-import { EIP1193Provider, EIP1193RequestFn } from '../src/lib/web3/ethereum'
-import { resolve } from 'path'
 
 const TEST_USER_DATA = { info: 'some info' }
 
