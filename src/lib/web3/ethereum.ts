@@ -88,14 +88,8 @@ export type SiweMessage = {
 
 export type EthereumSignInInput = SiweMessage
 
-// Helper functions
-
-function isAddress(address: string): boolean {
-  return /^0x[a-fA-F0-9]{40}$/.test(address)
-}
-
 export function getAddress(address: string): Address {
-  if (!isAddress(address)) {
+  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
     throw new Error(`@supabase/auth-js: Address "${address}" is invalid.`)
   }
   return address.toLowerCase() as Address
@@ -131,43 +125,40 @@ export function createSiweMessage(parameters: SiweMessage): string {
 
   // Validate fields
   {
-    if (chainId !== Math.floor(chainId))
+    if (!Number.isInteger(chainId))
       throw new Error(
         `@supabase/auth-js: Invalid SIWE message field "chainId". Chain ID must be a EIP-155 chain ID. Provided value: ${chainId}`
       )
 
-    if (!domain || typeof domain !== 'string')
+    if (!domain)
       throw new Error(
-        `@supabase/auth-js: Invalid SIWE message field "domain". Domain must be provided. Provided value: ${domain}`
+        `@supabase/auth-js: Invalid SIWE message field "domain". Domain must be provided.`
       )
 
-    if (nonce && (typeof nonce !== 'string' || nonce.length < 8))
+    if (nonce && nonce.length < 8)
       throw new Error(
         `@supabase/auth-js: Invalid SIWE message field "nonce". Nonce must be at least 8 characters. Provided value: ${nonce}`
       )
 
-    if (!uri || typeof uri !== 'string')
-      throw new Error(
-        `@supabase/auth-js: Invalid SIWE message field "uri". URI must be provided. Provided value: ${uri}`
-      )
+    if (!uri)
+      throw new Error(`@supabase/auth-js: Invalid SIWE message field "uri". URI must be provided.`)
 
     if (version !== '1')
       throw new Error(
         `@supabase/auth-js: Invalid SIWE message field "version". Version must be '1'. Provided value: ${version}`
       )
 
-    const statement = parameters.statement
-    if (statement?.includes('\n'))
+    if (parameters.statement?.includes('\n'))
       throw new Error(
-        `@supabase/auth-js: Invalid SIWE message field "statement". Statement must not include '\\n'. Provided value: ${statement}`
+        `@supabase/auth-js: Invalid SIWE message field "statement". Statement must not include '\\n'. Provided value: ${parameters.statement}`
       )
   }
 
   // Construct message
   const address = getAddress(parameters.address)
   const origin = scheme ? `${scheme}://${domain}` : domain
-  const statementText = parameters.statement ? `${parameters.statement}\n` : ''
-  const prefix = `${origin} wants you to sign in with your Ethereum account:\n${address}\n\n${statementText}`
+  const statement = parameters.statement ? `${parameters.statement}\n` : ''
+  const prefix = `${origin} wants you to sign in with your Ethereum account:\n${address}\n\n${statement}`
 
   let suffix = `URI: ${uri}\nVersion: ${version}\nChain ID: ${chainId}${
     nonce ? `\nNonce: ${nonce}` : ''
