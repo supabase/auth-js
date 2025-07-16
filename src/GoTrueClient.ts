@@ -728,9 +728,22 @@ export default class GoTrueClient {
 
       const url = new URL(options?.url ?? window.location.href)
 
-      const accounts = (await resolvedWallet.request({
-        method: 'eth_requestAccounts',
-      })) as string[]
+      const accounts = await resolvedWallet
+        .request({
+          method: 'eth_requestAccounts',
+        })
+        .then((accs) => accs as string[])
+        .catch(() => {
+          throw new Error(
+            `@supabase/auth-js: Wallet method eth_requestAccounts is missing or invalid`
+          )
+        })
+
+      if (!accounts || accounts.length === 0) {
+        throw new Error(
+          `@supabase/auth-js: No accounts available. Please ensure the wallet is connected.`
+        )
+      }
 
       const address = getAddress(accounts[0])
 

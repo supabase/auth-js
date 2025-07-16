@@ -23,6 +23,7 @@ export type EIP1193Events = {
 export type EIP1193RequestFn = (args: { method: string; params?: unknown }) => Promise<unknown>
 
 export type EIP1193Provider = EIP1193Events & {
+  address: string
   request: EIP1193RequestFn
 }
 

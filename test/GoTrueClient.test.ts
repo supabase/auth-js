@@ -19,8 +19,10 @@ import {
   getClientWithSpecificStorage,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
-import { JWK, Session } from '../src'
+import { JWK, Session, Web3Credentials } from '../src'
 import { setItemAsync } from '../src/lib/helpers'
+import { EIP1193Provider, EIP1193RequestFn } from '../src/lib/web3/ethereum'
+import { resolve } from 'path'
 
 const TEST_USER_DATA = { info: 'some info' }
 
@@ -1842,13 +1844,13 @@ describe('signInAnonymously', () => {
 describe('Web3 Authentication', () => {
   test('signInWithWeb3 should throw error for unsupported chain', async () => {
     const credentials = {
-      chain: 'ethereum' as any,
+      chain: 'polygon' as any,
       message: 'test message',
       signature: new Uint8Array([1, 2, 3]),
     }
 
     await expect(authClient.signInWithWeb3(credentials)).rejects.toThrow(
-      '@supabase/auth-js: Unsupported chain "ethereum"'
+      '@supabase/auth-js: Unsupported chain "polygon"'
     )
   })
 
@@ -1910,6 +1912,74 @@ describe('Web3 Authentication', () => {
 
     await expect(authClient.signInWithWeb3(credentials)).rejects.toThrow(
       '@supabase/auth-js: Wallet does not have a compatible signMessage() and publicKey.toBase58() API'
+    )
+  })
+
+  test('signInWithWeb3 should handle ethereum chain', async () => {
+    const credentials = {
+      chain: 'ethereum' as const,
+      message: 'test message',
+      signature: new Uint8Array([1, 2, 3]),
+    }
+
+    const { data, error } = await authClient.signInWithWeb3(credentials)
+
+    expect(data?.session).toBeNull()
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('Web3 provider is disabled')
+  })
+
+  test('signInWithWeb3 should fail ethereum chain without message', async () => {
+    const credentials = {
+      chain: 'ethereum' as const,
+      signature: new Uint8Array([1, 2, 3]),
+    }
+
+    await expect(authClient.signInWithWeb3(credentials)).rejects.toThrow(
+      '@supabase/auth-js: Both wallet and url must be specified in non-browser environments.'
+    )
+  })
+
+  test('signInWithWeb3 should fail ethereum chain without signMessage', async () => {
+    await expect(
+      authClient.signInWithWeb3({
+        chain: 'ethereum' as const,
+        wallet: {
+          address: '0xa1E993d09257291470e86778399D79A0864F327E',
+          on: () => void 0,
+          removeListener: () => void 0,
+          request: ({ method }) => {
+            if (method === 'eth_requestAccounts') {
+              return Promise.reject(
+                new Error('Missing or invalid. request() method: eth_requestAccounts')
+              )
+            }
+            return new Promise((resolve) => setTimeout(resolve, 100))
+          },
+        },
+        options: {
+          url: 'https://example.com',
+        },
+      })
+    ).rejects.toThrow('@supabase/auth-js: Wallet method eth_requestAccounts is missing or invalid')
+  })
+
+  test('signInWithWeb3 should fail ethereum chain without publicKey', async () => {
+    await expect(
+      authClient.signInWithWeb3({
+        chain: 'ethereum' as const,
+        wallet: {
+          address: '',
+          on: () => void 0,
+          removeListener: () => void 0,
+          request: () => new Promise((resolve) => resolve([])),
+        },
+        options: {
+          url: 'https://example.com',
+        },
+      })
+    ).rejects.toThrow(
+      '@supabase/auth-js: No accounts available. Please ensure the wallet is connected.'
     )
   })
 })
