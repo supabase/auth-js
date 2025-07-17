@@ -408,8 +408,8 @@ export function userNotAvailableProxy(): User {
 
 /**
  * Deep clones a JSON-serializable object using JSON.parse(JSON.stringify(obj)).
- * Note: Only works for JSON-safe data (no functions, Dates, Maps, Sets, etc.)
+ * Note: Only works for JSON-safe data.
  */
 export function deepClone<T>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj));
+  return JSON.parse(JSON.stringify(obj))
 }
