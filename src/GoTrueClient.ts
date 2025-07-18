@@ -2144,7 +2144,7 @@ export default class GoTrueClient {
       maybeSession !== null &&
       'access_token' in maybeSession &&
       'refresh_token' in maybeSession &&
-      'expires_at' in maybeSession
+      'expires_in' in maybeSession
 
     return isValidSession
   }
