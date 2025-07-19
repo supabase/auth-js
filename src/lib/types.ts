@@ -1,5 +1,6 @@
 import { AuthError } from './errors'
 import { Fetch } from './fetch'
+import type { SolanaSignInInput, SolanaSignInOutput } from './solana'
 
 /** One of the providers supported by GoTrue. */
 export type Provider =
@@ -69,6 +70,14 @@ export type GoTrueClientOptions = {
   persistSession?: boolean
   /* Provide your own local storage implementation to use instead of the browser's local storage. */
   storage?: SupportedStorage
+  /**
+   * Stores the user object in a separate storage location from the rest of the session data. When non-null, `storage` will only store a JSON object containing the access and refresh token and some adjacent metadata, while `userStorage` will only contain the user object under the key `storageKey + '-user'`.
+   *
+   * When this option is set and cookie storage is used, `getSession()` and other functions that load a session from the cookie store might not return back a user. It's very important to always use `getUser()` to fetch a user object in those scenarios.
+   *
+   * @experimental
+   */
+  userStorage?: SupportedStorage
   /* A custom fetch implementation. */
   fetch?: Fetch
   /* If set to 'pkce' PKCE flow. Defaults to the 'implicit' flow otherwise */
@@ -252,6 +261,10 @@ export interface Session {
    */
   expires_at?: number
   token_type: string
+
+  /**
+   * When using a separate user storage, accessing properties of this object will throw an error.
+   */
   user: User
 }
 
@@ -345,7 +358,9 @@ export interface User {
   updated_at?: string
   identities?: UserIdentity[]
   is_anonymous?: boolean
+  is_sso_user?: boolean
   factors?: Factor[]
+  deleted_at?: string
 }
 
 export interface UserAttributes {
@@ -520,6 +535,7 @@ export type SignUpWithPasswordCredentials =
         channel?: 'sms' | 'whatsapp'
       }
     }
+
 export type SignInWithPasswordCredentials =
   | {
       /** The user's email address. */
@@ -610,6 +626,54 @@ export type SignInWithIdTokenCredentials = {
     captchaToken?: string
   }
 }
+
+export type SolanaWallet = {
+  signIn?: (...inputs: SolanaSignInInput[]) => Promise<SolanaSignInOutput | SolanaSignInOutput[]>
+  publicKey?: {
+    toBase58: () => string
+  } | null
+
+  signMessage?: (message: Uint8Array, encoding?: 'utf8' | string) => Promise<Uint8Array> | undefined
+}
+
+export type SolanaWeb3Credentials =
+  | {
+      chain: 'solana'
+
+      /** Wallet interface to use. If not specified will default to `window.solana`. */
+      wallet?: SolanaWallet
+
+      /** Optional statement to include in the Sign in with Solana message. Must not include new line characters. Most wallets like Phantom **require specifying a statement!** */
+      statement?: string
+
+      options?: {
+        /** URL to use with the wallet interface. Some wallets do not allow signing a message for URLs different from the current page. */
+        url?: string
+
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+
+        signInWithSolana?: Partial<
+          Omit<SolanaSignInInput, 'version' | 'chain' | 'domain' | 'uri' | 'statement'>
+        >
+      }
+    }
+  | {
+      chain: 'solana'
+
+      /** Sign in with Solana compatible message. Must include `Issued At`, `URI` and `Version`. */
+      message: string
+
+      /** Ed25519 signature of the message. */
+      signature: Uint8Array
+
+      options?: {
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
+    }
+
+export type Web3Credentials = SolanaWeb3Credentials
 
 export type VerifyOtpParams = VerifyMobileOtpParams | VerifyEmailOtpParams | VerifyTokenHashParams
 export interface VerifyMobileOtpParams {
@@ -1199,3 +1263,35 @@ export type AuthMFAEnrollPhoneResponse =
       data: null
       error: AuthError
     }
+
+export type JwtHeader = {
+  alg: 'RS256' | 'ES256' | 'HS256'
+  kid: string
+  typ: string
+}
+
+export type RequiredClaims = {
+  iss: string
+  sub: string
+  aud: string | string[]
+  exp: number
+  iat: number
+  role: string
+  aal: AuthenticatorAssuranceLevels
+  session_id: string
+}
+
+export type JwtPayload = RequiredClaims & {
+  [key: string]: any
+}
+
+export interface JWK {
+  kty: 'RSA' | 'EC' | 'oct'
+  key_ops: string[]
+  alg?: string
+  kid?: string
+  [key: string]: any
+}
+
+export const SIGN_OUT_SCOPES = ['global', 'local', 'others'] as const
+export type SignOutScope = typeof SIGN_OUT_SCOPES[number]

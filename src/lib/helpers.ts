@@ -1,5 +1,7 @@
-import { API_VERSION_HEADER_NAME } from './constants'
-import { SupportedStorage } from './types'
+import { API_VERSION_HEADER_NAME, BASE64URL_REGEX } from './constants'
+import { AuthInvalidJwtError } from './errors'
+import { base64UrlToUint8Array, stringFromBase64URL } from './base64url'
+import { JwtHeader, JwtPayload, SupportedStorage, User } from './types'
 
 export function expiresAt(expiresIn: number) {
   const timeNow = Math.round(Date.now() / 1000)
@@ -141,34 +143,6 @@ export const removeItemAsync = async (storage: SupportedStorage, key: string): P
   await storage.removeItem(key)
 }
 
-export function decodeBase64URL(value: string): string {
-  const key = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
-  let base64 = ''
-  let chr1, chr2, chr3
-  let enc1, enc2, enc3, enc4
-  let i = 0
-  value = value.replace('-', '+').replace('_', '/')
-
-  while (i < value.length) {
-    enc1 = key.indexOf(value.charAt(i++))
-    enc2 = key.indexOf(value.charAt(i++))
-    enc3 = key.indexOf(value.charAt(i++))
-    enc4 = key.indexOf(value.charAt(i++))
-    chr1 = (enc1 << 2) | (enc2 >> 4)
-    chr2 = ((enc2 & 15) << 4) | (enc3 >> 2)
-    chr3 = ((enc3 & 3) << 6) | enc4
-    base64 = base64 + String.fromCharCode(chr1)
-
-    if (enc3 != 64 && chr2 != 0) {
-      base64 = base64 + String.fromCharCode(chr2)
-    }
-    if (enc4 != 64 && chr3 != 0) {
-      base64 = base64 + String.fromCharCode(chr3)
-    }
-  }
-  return base64
-}
-
 /**
  * A deferred represents some asynchronous work that is not yet finished, which
  * may or may not culminate in a value.
@@ -194,23 +168,38 @@ export class Deferred<T = any> {
   }
 }
 
-// Taken from: https://stackoverflow.com/questions/38552003/how-to-decode-jwt-token-in-javascript-without-using-a-library
-export function decodeJWTPayload(token: string) {
-  // Regex checks for base64url format
-  const base64UrlRegex = /^([a-z0-9_-]{4})*($|[a-z0-9_-]{3}=?$|[a-z0-9_-]{2}(==)?$)$/i
-
+export function decodeJWT(token: string): {
+  header: JwtHeader
+  payload: JwtPayload
+  signature: Uint8Array
+  raw: {
+    header: string
+    payload: string
+  }
+} {
   const parts = token.split('.')
 
   if (parts.length !== 3) {
-    throw new Error('JWT is not valid: not a JWT structure')
+    throw new AuthInvalidJwtError('Invalid JWT structure')
   }
 
-  if (!base64UrlRegex.test(parts[1])) {
-    throw new Error('JWT is not valid: payload is not in base64url format')
+  // Regex checks for base64url format
+  for (let i = 0; i < parts.length; i++) {
+    if (!BASE64URL_REGEX.test(parts[i] as string)) {
+      throw new AuthInvalidJwtError('JWT not in base64url format')
+    }
   }
-
-  const base64Url = parts[1]
-  return JSON.parse(decodeBase64URL(base64Url))
+  const data = {
+    // using base64url lib
+    header: JSON.parse(stringFromBase64URL(parts[0])),
+    payload: JSON.parse(stringFromBase64URL(parts[1])),
+    signature: base64UrlToUint8Array(parts[2]),
+    raw: {
+      header: parts[0],
+      payload: parts[1],
+    },
+  }
+  return data
 }
 
 /**
@@ -287,10 +276,6 @@ async function sha256(randomString: string) {
     .join('')
 }
 
-function base64urlencode(str: string) {
-  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
 export async function generatePKCEChallenge(verifier: string) {
   const hasCryptoSupport =
     typeof crypto !== 'undefined' &&
@@ -304,7 +289,7 @@ export async function generatePKCEChallenge(verifier: string) {
     return verifier
   }
   const hashed = await sha256(verifier)
-  return base64urlencode(hashed)
+  return btoa(hashed).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 export async function getCodeChallengeAndMethod(
@@ -343,4 +328,88 @@ export function parseResponseAPIVersion(response: Response) {
   } catch (e: any) {
     return null
   }
+}
+
+export function validateExp(exp: number) {
+  if (!exp) {
+    throw new Error('Missing exp claim')
+  }
+  const timeNow = Math.floor(Date.now() / 1000)
+  if (exp <= timeNow) {
+    throw new Error('JWT has expired')
+  }
+}
+
+export function getAlgorithm(
+  alg: 'HS256' | 'RS256' | 'ES256'
+): RsaHashedImportParams | EcKeyImportParams {
+  switch (alg) {
+    case 'RS256':
+      return {
+        name: 'RSASSA-PKCS1-v1_5',
+        hash: { name: 'SHA-256' },
+      }
+    case 'ES256':
+      return {
+        name: 'ECDSA',
+        namedCurve: 'P-256',
+        hash: { name: 'SHA-256' },
+      }
+    default:
+      throw new Error('Invalid alg claim')
+  }
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+export function validateUUID(str: string) {
+  if (!UUID_REGEX.test(str)) {
+    throw new Error('@supabase/auth-js: Expected parameter to be UUID but is not')
+  }
+}
+
+export function userNotAvailableProxy(): User {
+  const proxyTarget = {} as User
+
+  return new Proxy(proxyTarget, {
+    get: (target: any, prop: string) => {
+      if (prop === '__isUserNotAvailableProxy') {
+        return true
+      }
+      // Preventative check for common problematic symbols during cloning/inspection
+      // These symbols might be accessed by structuredClone or other internal mechanisms.
+      if (typeof prop === 'symbol') {
+        const sProp = (prop as symbol).toString()
+        if (
+          sProp === 'Symbol(Symbol.toPrimitive)' ||
+          sProp === 'Symbol(Symbol.toStringTag)' ||
+          sProp === 'Symbol(util.inspect.custom)'
+        ) {
+          // Node.js util.inspect
+          return undefined
+        }
+      }
+      throw new Error(
+        `@supabase/auth-js: client was created with userStorage option and there was no user stored in the user storage. Accessing the "${prop}" property of the session object is not supported. Please use getUser() instead.`
+      )
+    },
+    set: (_target: any, prop: string) => {
+      throw new Error(
+        `@supabase/auth-js: client was created with userStorage option and there was no user stored in the user storage. Setting the "${prop}" property of the session object is not supported. Please use getUser() to fetch a user object you can manipulate.`
+      )
+    },
+    deleteProperty: (_target: any, prop: string) => {
+      throw new Error(
+        `@supabase/auth-js: client was created with userStorage option and there was no user stored in the user storage. Deleting the "${prop}" property of the session object is not supported. Please use getUser() to fetch a user object you can manipulate.`
+      )
+    },
+  })
+}
+
+/**
+ * Deep clones a JSON-serializable object using JSON.parse(JSON.stringify(obj)).
+ * Note: Only works for JSON-safe data.
+ */
+export function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj))
 }
