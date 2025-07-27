@@ -26,6 +26,7 @@ export type Provider =
   | 'twitch'
   | 'twitter'
   | 'workos'
+  | 'zitadel'
   | 'zoom'
   | 'fly'
 
