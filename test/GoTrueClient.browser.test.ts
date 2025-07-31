@@ -355,3 +355,24 @@ describe('Web3 functionality in browser', () => {
     await expect(pkceClient.signInWithWeb3(credentials)).rejects.toThrow()
   })
 })
+
+describe('GoTrueClient constructor edge cases', () => {
+
+  it('should handle userStorage with persistSession', () => {
+    const customUserStorage = {
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      removeItem: jest.fn(),
+    }
+
+    const client = new (require('../src/GoTrueClient').default)({
+      url: 'http://localhost:9999',
+      userStorage: customUserStorage,
+      persistSession: true,
+      autoRefreshToken: false,
+    })
+
+    expect(client).toBeDefined()
+    expect((client as any).userStorage).toBe(customUserStorage)
+  })
+})
