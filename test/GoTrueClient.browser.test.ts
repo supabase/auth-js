@@ -110,12 +110,12 @@ describe('GoTrueClient in browser environment', () => {
     try {
       consoleWarnSpy = jest.spyOn(console, 'warn')
       consoleTraceSpy = jest.spyOn(console, 'trace')
-      getClientWithSpecificStorageKey('test-storage-key')
-      getClientWithSpecificStorageKey('test-storage-key')
+      getClientWithSpecificStorageKey('same-storage-key')
+      getClientWithSpecificStorageKey('same-storage-key')
       expect(consoleWarnSpy).toHaveBeenCalledTimes(1)
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringMatching(
-          /GoTrueClient@test-storage-key:1 .* Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key./
+          /GoTrueClient@same-storage-key:1 .* Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key./
         )
       )
       expect(consoleTraceSpy).not.toHaveBeenCalled()
@@ -131,17 +131,17 @@ describe('GoTrueClient in browser environment', () => {
     try {
       consoleWarnSpy = jest.spyOn(console, 'warn')
       consoleTraceSpy = jest.spyOn(console, 'trace')
-      getClientWithSpecificStorageKey('test-storage-key')
-      getClientWithSpecificStorageKey('test-storage-key', { debug: true })
+      getClientWithSpecificStorageKey('identical-storage-key')
+      getClientWithSpecificStorageKey('identical-storage-key', { debug: true })
       expect(consoleWarnSpy).toHaveBeenCalledTimes(1)
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringMatching(
-          /GoTrueClient@test-storage-key:1 .* Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key./
+          /GoTrueClient@identical-storage-key:1 .* Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key./
         )
       )
       expect(consoleTraceSpy).toHaveBeenCalledWith(
         expect.stringMatching(
-          /GoTrueClient@test-storage-key:1 .* Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key./
+          /GoTrueClient@identical-storage-key:1 .* Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key./
         )
       )
     } finally {
@@ -156,8 +156,8 @@ describe('GoTrueClient in browser environment', () => {
     try {
       consoleWarnSpy = jest.spyOn(console, 'warn')
       consoleTraceSpy = jest.spyOn(console, 'trace')
-      getClientWithSpecificStorageKey('test-storage-key1')
-      getClientWithSpecificStorageKey('test-storage-key2')
+      getClientWithSpecificStorageKey('first-storage-key')
+      getClientWithSpecificStorageKey('second-storage-key')
       expect(consoleWarnSpy).not.toHaveBeenCalled()
       expect(consoleTraceSpy).not.toHaveBeenCalled()
     } finally {
@@ -166,7 +166,7 @@ describe('GoTrueClient in browser environment', () => {
     }
   })
 
-  it('should not warn only when a second client with a duplicate key is created', () => {
+  it('should warn only when a second client with a duplicate key is created', () => {
     let consoleWarnSpy
     let consoleTraceSpy
     try {
