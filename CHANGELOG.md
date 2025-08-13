@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.72.0](https://github.com/supabase/auth-js/compare/v2.71.1...v2.72.0) (2025-08-13)
+
+
+### Features
+
+* add sign in with ethereum to `signInWithWeb3` ([#1082](https://github.com/supabase/auth-js/issues/1082)) ([483e24b](https://github.com/supabase/auth-js/commit/483e24be190f537eabdb85f8be2eee2b16797872))
+
 ## [2.71.1](https://github.com/supabase/auth-js/compare/v2.71.0...v2.71.1) (2025-07-17)
 
 
