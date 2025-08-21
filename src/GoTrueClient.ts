@@ -2050,6 +2050,7 @@ export default class GoTrueClient {
 
   /**
    * Receive a notification every time an auth event happens.
+   * A callback can be an async function and it runs synchronously during the processing of the changes causing the event. You can easily create a dead-lock by using await on a call to another method of the Supabase library.
    * @param callback A callback function to be invoked when an auth event happens.
    */
   onAuthStateChange(
@@ -2058,6 +2059,10 @@ export default class GoTrueClient {
     data: { subscription: Subscription }
   } {
     const id: string = uuid()
+    if (callback.constructor.name === 'AsyncFunction'){
+      console.log("Detect onAuthStateChange async callback, do not use other Supabase functions in the callback function. If you must, dispatch the functions once the callback has finished executing. https://github.com/supabase/auth-js/issues/762")
+    }
+    
     const subscription: Subscription = {
       id,
       callback,
