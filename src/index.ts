@@ -11,3 +11,12 @@ export {
   internals as lockInternals,
   processLock,
 } from './lib/locks'
+export {
+  prepareCredentialCreationOptionsForBrowser,
+  prepareCredentialRequestOptionsForBrowser,
+  prepareRegistrationResponseForServer,
+  prepareAuthenticationResponseForServer,
+  type ServerCredentialCreationOptions,
+  type ServerCredentialRequestOptions,
+  type ServerCredentialResponse,
+} from './lib/webauthn'

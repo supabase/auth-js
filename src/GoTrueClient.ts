@@ -54,6 +54,14 @@ import { memoryLocalStorageAdapter } from './lib/local-storage'
 import { polyfillGlobalThis } from './lib/polyfills'
 import { version } from './lib/version'
 import { LockAcquireTimeoutError, navigatorLock } from './lib/locks'
+import {
+  prepareAuthenticationResponseForServer,
+  prepareRegistrationResponseForServer,
+  prepareCredentialCreationOptionsForBrowser,
+  prepareCredentialRequestOptionsForBrowser,
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+} from './lib/webauthn'
 
 import type {
   AuthChangeEvent,
@@ -84,12 +92,19 @@ import type {
   VerifyOtpParams,
   GoTrueMFAApi,
   MFAEnrollParams,
-  AuthMFAEnrollResponse,
+  MFAEnrollResponse,
   MFAChallengeParams,
+  MFAChallengeWebAuthnParams,
+  MFAChallengeTOTPParams,
   AuthMFAChallengeResponse,
+  AuthMFAChallengeWebAuthnResponse,
+  AuthMFAChallengeTOTPResponse,
   MFAUnenrollParams,
   AuthMFAUnenrollResponse,
   MFAVerifyParams,
+  MFAVerifyTOTPParams,
+  MFAVerifyWebAuthnEnrollmentParams,
+  MFAVerifyWebAuthnAuthenticationParams,
   AuthMFAVerifyResponse,
   AuthMFAListFactorsResponse,
   AuthMFAGetAuthenticatorAssuranceLevelResponse,
@@ -103,8 +118,10 @@ import type {
   SignInAnonymouslyCredentials,
   MFAEnrollTOTPParams,
   MFAEnrollPhoneParams,
+  MFAEnrollWebAuthnParams,
   AuthMFAEnrollTOTPResponse,
   AuthMFAEnrollPhoneResponse,
+  AuthMFAEnrollWebAuthnResponse,
   JWK,
   JwtPayload,
   JwtHeader,
@@ -113,6 +130,8 @@ import type {
   Web3Credentials,
   EthereumWeb3Credentials,
   EthereumWallet,
+  TotpMFAVerifyParams,
+  WebAuthnMFAVerifyParams,
 } from './lib/types'
 import { stringToUint8Array, bytesToBase64URL } from './lib/base64url'
 import {
@@ -2911,9 +2930,11 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#enroll}
    */
-  private async _enroll(params: MFAEnrollTOTPParams): Promise<AuthMFAEnrollTOTPResponse>
-  private async _enroll(params: MFAEnrollPhoneParams): Promise<AuthMFAEnrollPhoneResponse>
-  private async _enroll(params: MFAEnrollParams): Promise<AuthMFAEnrollResponse> {
+  private async _enroll<T extends MFAEnrollParams>(
+    params: T
+  ): Promise<{ data: MFAEnrollResponse<T> | null; error: AuthError | null }> {
+    // TODO: for webauthn, create credentials using credentials.create() and then enroll it
+    // For Multi step, allow dev to specify .create(...) options and then pass it to the rest of the steps.
     try {
       return await this._useSession(async (result) => {
         const { data: sessionData, error: sessionError } = result
@@ -2921,10 +2942,62 @@ export default class GoTrueClient {
           return { data: null, error: sessionError }
         }
 
-        const body = {
-          friendly_name: params.friendlyName,
-          factor_type: params.factorType,
-          ...(params.factorType === 'phone' ? { phone: params.phone } : { issuer: params.issuer }),
+        let body:
+          | {
+              friendly_name?: string
+            }
+          | {
+              factor_type: 'totp'
+              issuer?: string
+            }
+          | {
+              factor_type: 'phone'
+              phone: string
+              friendly_name?: string
+            }
+          | {
+              factor_type: 'webauthn'
+              friendly_name?: string
+              web_authn?: {
+                rp_id?: string
+                rp_origins?: string[]
+                creation_response?: PublicKeyCredentialCreationOptions
+              }
+            }
+
+        switch (params.factorType) {
+          case 'totp':
+            body = {
+              factor_type: params.factorType,
+              ...(params.issuer && { issuer: params.issuer }),
+              ...(params.friendlyName && { friendly_name: params.friendlyName }),
+            }
+            break
+
+          case 'phone':
+            body = {
+              factor_type: params.factorType,
+              phone: params.phone, // 'phone' is required for this factor type
+              ...(params.friendlyName && { friendly_name: params.friendlyName }),
+            }
+            break
+
+          case 'webauthn':
+            body = {
+              factor_type: params.factorType,
+              ...(params.friendlyName && { friendly_name: params.friendlyName }),
+              ...(params.webAuthn && {
+                web_authn: {
+                  rp_id: params.webAuthn.rpId,
+                  rp_origins: params.webAuthn.rpOrigins,
+                  creation_response: params.webAuthn.creationResponse,
+                },
+              }),
+            }
+            break
+          default:
+            // @ts-expect-error TS2345: Type 'T["factorType"]' is not assignable to type '"totp" | "phone" | "webauthn"'.
+            throw new Error(`Unsupported factorType: ${params.factorType}`)
         }
 
         const { data, error } = await _request(this.fetch, 'POST', `${this.url}/factors`, {
@@ -2941,7 +3014,7 @@ export default class GoTrueClient {
           data.totp.qr_code = `data:image/svg+xml;utf-8,${data.totp.qr_code}`
         }
 
-        return { data, error: null }
+        return { data: data as MFAEnrollResponse<T>, error: null }
       })
     } catch (error) {
       if (isAuthError(error)) {
@@ -2954,7 +3027,15 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#verify}
    */
+  private async _verify(params: MFAVerifyTOTPParams): Promise<AuthMFAVerifyResponse>
+  private async _verify(params: MFAVerifyWebAuthnEnrollmentParams): Promise<AuthMFAVerifyResponse>
+  private async _verify(
+    params: MFAVerifyWebAuthnAuthenticationParams
+  ): Promise<AuthMFAVerifyResponse>
+  private async _verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse>
   private async _verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse> {
+    // TODO: single step: POST@ /challenge -> credentials.get({challenge}) -> user presses yubikey -> take signature and pass to /verify
+    // TODO: for multi step, challenge() -> manually call credentials.get(...) ->
     return this._acquireLock(-1, async () => {
       try {
         return await this._useSession(async (result) => {
@@ -2963,12 +3044,55 @@ export default class GoTrueClient {
             return { data: null, error: sessionError }
           }
 
+          // Build request body based on the type of verification
+          let body: {
+            challenge_id: string
+            code?: string
+            web_authn?: {
+              rp_id?: string
+              rp_origins?: string
+              creation_response?: RegistrationResponseJSON
+              assertion_response?: AuthenticationResponseJSON
+            }
+          } = { challenge_id: params.challengeId }
+
+          // TOTP verification
+          if ('code' in params && params.code) {
+            body.code = params.code
+          }
+
+          // WebAuthn verification
+          if ('webAuthn' in params && params.webAuthn) {
+            body.web_authn = {
+              rp_id: params.webAuthn.rpId,
+              rp_origins: params.webAuthn.rpOrigins,
+            }
+
+            // Check for enrollment (creationResponse)
+            if ('creationResponse' in params.webAuthn && params.webAuthn.creationResponse) {
+              body.web_authn.creation_response = prepareRegistrationResponseForServer(
+                params.webAuthn.creationResponse as PublicKeyCredential & {
+                  response: AuthenticatorAttestationResponse
+                }
+              )
+            }
+
+            // Check for authentication (assertionResponse)
+            if ('assertionResponse' in params.webAuthn && params.webAuthn.assertionResponse) {
+              body.web_authn.assertion_response = prepareAuthenticationResponseForServer(
+                params.webAuthn.assertionResponse as PublicKeyCredential & {
+                  response: AuthenticatorAssertionResponse
+                }
+              )
+            }
+          }
+
           const { data, error } = await _request(
             this.fetch,
             'POST',
             `${this.url}/factors/${params.factorId}/verify`,
             {
-              body: { code: params.code, challenge_id: params.challengeId },
+              body,
               headers: this.headers,
               jwt: sessionData?.session?.access_token,
             }
@@ -2997,6 +3121,11 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#challenge}
    */
+  private async _challenge(
+    params: MFAChallengeWebAuthnParams
+  ): Promise<AuthMFAChallengeWebAuthnResponse>
+  private async _challenge(params: MFAChallengeTOTPParams): Promise<AuthMFAChallengeTOTPResponse>
+  private async _challenge(params: MFAChallengeParams): Promise<AuthMFAChallengeResponse>
   private async _challenge(params: MFAChallengeParams): Promise<AuthMFAChallengeResponse> {
     return this._acquireLock(-1, async () => {
       try {
@@ -3006,16 +3135,45 @@ export default class GoTrueClient {
             return { data: null, error: sessionError }
           }
 
-          return await _request(
+          const body =
+            'webAuthn' in params
+              ? {
+                  web_authn: {
+                    rp_id: params.webAuthn.rpId,
+                    rp_origins: params.webAuthn.rpOrigins,
+                  },
+                }
+              : 'channel' in params && params.channel
+              ? { channel: params.channel }
+              : {}
+
+          const response = await _request(
             this.fetch,
             'POST',
             `${this.url}/factors/${params.factorId}/challenge`,
             {
-              body: { channel: params.channel },
+              body,
               headers: this.headers,
               jwt: sessionData?.session?.access_token,
             }
           )
+
+          // Convert WebAuthn options to browser format if present
+          if (response.data?.credential_creation_options?.publicKey) {
+            response.data.credential_creation_options_for_browser =
+              prepareCredentialCreationOptionsForBrowser(
+                response.data.credential_creation_options.publicKey
+              )
+          }
+
+          if (response.data?.credential_request_options?.publicKey) {
+            response.data.credential_request_options_for_browser =
+              prepareCredentialRequestOptionsForBrowser(
+                response.data.credential_request_options.publicKey
+              )
+          }
+
+          return response
         })
       } catch (error) {
         if (isAuthError(error)) {
@@ -3255,11 +3413,15 @@ export default class GoTrueClient {
       ])
 
       // Verify the signature
+      const signatureData = stringToUint8Array(`${rawHeader}.${rawPayload}`)
+
+      // TypeScript can't guarantee Uint8Array is backed by ArrayBuffer vs SharedArrayBuffer,
+      // but in practice both browser and Node.js always use ArrayBuffer for these operations
       const isValid = await crypto.subtle.verify(
         algorithm,
         publicKey,
-        signature,
-        stringToUint8Array(`${rawHeader}.${rawPayload}`)
+        signature as Uint8Array & { buffer: ArrayBuffer },
+        signatureData as Uint8Array & { buffer: ArrayBuffer }
       )
 
       if (!isValid) {

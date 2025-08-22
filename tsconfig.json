@@ -8,6 +8,8 @@
     "rootDir": "src",
     "sourceMap": true,
     "target": "ES2017",
+    "lib": ["ES2017", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
 
     "strict": true,
 
