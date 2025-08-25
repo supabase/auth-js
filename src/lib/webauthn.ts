@@ -39,11 +39,13 @@ export function prepareCredentialCreationOptionsForBrowser(
   }
 
   // Convert excludeCredentials[].id from base64url to ArrayBuffer
-  const excludeCredentials = options.excludeCredentials?.map((cred) => ({
-    ...cred,
-    id: base64UrlToUint8Array(cred.id).buffer,
-    type: cred.type || ('public-key' as PublicKeyCredentialType),
-  }))
+  const excludeCredentials = options.excludeCredentials?.map(
+    (cred: { id: string; type: 'public-key' }) => ({
+      ...cred,
+      id: base64UrlToUint8Array(cred.id).buffer,
+      type: cred.type || ('public-key' as PublicKeyCredentialType),
+    })
+  )
 
   return {
     ...options,
@@ -68,11 +70,13 @@ export function prepareCredentialRequestOptionsForBrowser(
   const challenge = base64UrlToUint8Array(options.challenge).buffer
 
   // Convert allowCredentials[].id from base64url to ArrayBuffer
-  const allowCredentials = options.allowCredentials?.map((cred) => ({
-    ...cred,
-    id: base64UrlToUint8Array(cred.id).buffer,
-    type: cred.type || ('public-key' as PublicKeyCredentialType),
-  }))
+  const allowCredentials = options.allowCredentials?.map(
+    (cred: { id: string; type: 'public-key' }) => ({
+      ...cred,
+      id: base64UrlToUint8Array(cred.id).buffer,
+      type: cred.type || ('public-key' as PublicKeyCredentialType),
+    })
+  )
 
   return {
     ...options,

@@ -92,10 +92,11 @@ import type {
   VerifyOtpParams,
   GoTrueMFAApi,
   MFAEnrollParams,
-  MFAEnrollResponse,
   MFAChallengeParams,
   MFAChallengeWebAuthnParams,
   MFAChallengeTOTPParams,
+  FactorType,
+  FactorShape,
   AuthMFAChallengeResponse,
   AuthMFAChallengeWebAuthnResponse,
   AuthMFAChallengeTOTPResponse,
@@ -130,8 +131,7 @@ import type {
   Web3Credentials,
   EthereumWeb3Credentials,
   EthereumWallet,
-  TotpMFAVerifyParams,
-  WebAuthnMFAVerifyParams,
+  ChallengeFactorShape,
 } from './lib/types'
 import { stringToUint8Array, bytesToBase64URL } from './lib/base64url'
 import {
@@ -2932,7 +2932,15 @@ export default class GoTrueClient {
    */
   private async _enroll<T extends MFAEnrollParams>(
     params: T
-  ): Promise<{ data: MFAEnrollResponse<T> | null; error: AuthError | null }> {
+  ): Promise<
+    T extends MFAEnrollTOTPParams
+      ? AuthMFAEnrollTOTPResponse
+      : T extends MFAEnrollPhoneParams
+      ? AuthMFAEnrollPhoneResponse
+      : T extends MFAEnrollWebAuthnParams
+      ? AuthMFAEnrollWebAuthnResponse
+      : never
+  > {
     // TODO: for webauthn, create credentials using credentials.create() and then enroll it
     // For Multi step, allow dev to specify .create(...) options and then pass it to the rest of the steps.
     try {
@@ -2986,13 +2994,6 @@ export default class GoTrueClient {
             body = {
               factor_type: params.factorType,
               ...(params.friendlyName && { friendly_name: params.friendlyName }),
-              ...(params.webAuthn && {
-                web_authn: {
-                  rp_id: params.webAuthn.rpId,
-                  rp_origins: params.webAuthn.rpOrigins,
-                  creation_response: params.webAuthn.creationResponse,
-                },
-              }),
             }
             break
           default:
@@ -3014,11 +3015,11 @@ export default class GoTrueClient {
           data.totp.qr_code = `data:image/svg+xml;utf-8,${data.totp.qr_code}`
         }
 
-        return { data: data as MFAEnrollResponse<T>, error: null }
+        return { data, error: null } as any
       })
     } catch (error) {
       if (isAuthError(error)) {
-        return { data: null, error }
+        return { data: null, error } as any
       }
       throw error
     }
@@ -3044,8 +3045,12 @@ export default class GoTrueClient {
             return { data: null, error: sessionError }
           }
 
+          if (!params.factorId) {
+            throw new Error('factorId is required')
+          }
+
           // Build request body based on the type of verification
-          let body: {
+          const body: {
             challenge_id: string
             code?: string
             web_authn?: {
@@ -3121,12 +3126,15 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#challenge}
    */
-  private async _challenge(
-    params: MFAChallengeWebAuthnParams
-  ): Promise<AuthMFAChallengeWebAuthnResponse>
-  private async _challenge(params: MFAChallengeTOTPParams): Promise<AuthMFAChallengeTOTPResponse>
-  private async _challenge(params: MFAChallengeParams): Promise<AuthMFAChallengeResponse>
-  private async _challenge(params: MFAChallengeParams): Promise<AuthMFAChallengeResponse> {
+  private async _challenge<F extends ChallengeFactorShape>(
+    params: MFAChallengeParams<F>
+  ): Promise<
+    F extends { type: 'webauthn' }
+      ? AuthMFAChallengeWebAuthnResponse
+      : F extends { type: 'totp' | 'phone' }
+      ? AuthMFAChallengeTOTPResponse
+      : AuthMFAChallengeResponse
+  > {
     return this._acquireLock(-1, async () => {
       try {
         return await this._useSession(async (result) => {
@@ -3136,7 +3144,7 @@ export default class GoTrueClient {
           }
 
           const body =
-            'webAuthn' in params
+            'webAuthn' in params && params.webAuthn
               ? {
                   web_authn: {
                     rp_id: params.webAuthn.rpId,
@@ -3160,24 +3168,26 @@ export default class GoTrueClient {
 
           // Convert WebAuthn options to browser format if present
           if (response.data?.credential_creation_options?.publicKey) {
-            response.data.credential_creation_options_for_browser =
-              prepareCredentialCreationOptionsForBrowser(
+            response.data.credential_creation_options = {
+              publicKey: prepareCredentialCreationOptionsForBrowser(
                 response.data.credential_creation_options.publicKey
-              )
+              ),
+            }
           }
 
           if (response.data?.credential_request_options?.publicKey) {
-            response.data.credential_request_options_for_browser =
-              prepareCredentialRequestOptionsForBrowser(
+            response.data.credential_request_options = {
+              publicKey: prepareCredentialRequestOptionsForBrowser(
                 response.data.credential_request_options.publicKey
-              )
+              ),
+            }
           }
 
-          return response
+          return response as any
         })
       } catch (error) {
         if (isAuthError(error)) {
-          return { data: null, error }
+          return { data: null, error } as any
         }
         throw error
       }
