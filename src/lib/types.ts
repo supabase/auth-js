@@ -8,6 +8,7 @@ import { EthereumSignInInput, Hex } from './web3/ethereum'
 export type Provider =
   | 'apple'
   | 'azure'
+  | 'beyondidentity'
   | 'bitbucket'
   | 'discord'
   | 'facebook'
