@@ -15,9 +15,10 @@ on:
 
 jobs:
   build-preview:
-    # Only run if PR has the 'trigger: preview' label and is on the correct repository
+    # Only run if PR has the 'trigger: preview' label, is on the correct repository, and targets master branch
     if: |
       github.repository == 'supabase/auth-js' &&
+      github.event.pull_request.base.ref == 'master' &&
       contains(github.event.pull_request.labels.*.name, 'trigger: preview')
     runs-on: ubuntu-latest
     timeout-minutes: 15
