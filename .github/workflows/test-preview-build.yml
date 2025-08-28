@@ -1,0 +1,145 @@
+name: TEST Preview Build (Branch Testing)
+
+permissions:
+  contents: read
+  pull-requests: read
+
+on:
+  # Allow manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Test mode - simulates a PR'
+        type: boolean
+        default: true
+  
+  # Also trigger on push to your specific branch for testing
+  push:
+    branches:
+      - chore/secure-proof-workflows
+    paths:
+      - '.github/workflows/**'
+      - 'src/**'
+      - 'package.json'
+  
+  # Normal PR trigger (for when you create a PR)
+  pull_request:
+    types: [opened, synchronize, labeled]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+
+jobs:
+  build-preview:
+    # Modified condition to allow testing from branch or manual trigger
+    if: |
+      github.repository == 'supabase/auth-js' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'trigger: preview')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      preview-url: ${{ steps.preview.outputs.url }}
+      test-info: ${{ steps.test-info.outputs.info }}
+    steps:
+      - name: Test Mode Info
+        id: test-info
+        run: |
+          echo "🧪 TEST MODE: Running preview build test"
+          echo "Trigger: ${{ github.event_name }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "SHA: ${{ github.sha }}"
+          
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "PR #${{ github.event.pull_request.number }}"
+            echo "info=PR-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          else
+            echo "info=BRANCH-TEST" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Log test author
+        run: |
+          echo "Test triggered by: ${{ github.actor }}"
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "PR #${{ github.event.pull_request.number }} from: ${{ github.event.pull_request.head.repo.full_name }}"
+          else
+            echo "Branch test from: ${{ github.ref }}"
+          fi
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Run tests
+        run: npm test
+        continue-on-error: false # Tests must pass
+      
+      - name: Create preview release
+        id: preview
+        run: |
+          set -e
+          echo "Creating preview release..."
+          OUTPUT=$(npx pkg-pr-new@latest publish --compact 2>&1)
+          echo "Full output:"
+          echo "$OUTPUT"
+          
+          # Extract the preview URL
+          PREVIEW_URL=$(echo "$OUTPUT" | grep -o 'https://pkg\.pr\.new/@supabase/[^[:space:]]*' | head -1)
+          
+          if [ -z "$PREVIEW_URL" ]; then
+            echo "Error: Failed to extract preview URL from pkg-pr-new output"
+            exit 1
+          fi
+          
+          echo "✅ Preview Release URL: $PREVIEW_URL"
+          echo "url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+      
+      # Save preview info for testing the next workflows
+      - name: Save preview info
+        run: |
+          mkdir -p preview-info
+          echo "${{ steps.preview.outputs.url }}" > preview-info/preview-url.txt
+          echo "${{ github.event.pull_request.number || 'branch-test' }}" > preview-info/pr-number.txt
+          echo "${{ github.sha }}" > preview-info/commit-sha.txt
+          echo "auth-js" > preview-info/package-name.txt
+          
+          echo "📦 Preview info saved:"
+          ls -la preview-info/
+          echo "Contents:"
+          cat preview-info/*.txt
+          
+      - name: Upload preview info
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-info-test
+          path: preview-info/
+          retention-days: 1
+      
+      - name: Summary
+        run: |
+          echo "## 🎉 Test Preview Build Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Preview URL:** \`${{ steps.preview.outputs.url }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Test Info:** ${{ steps.test-info.outputs.info }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "You can now:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check that the preview package was created" >> $GITHUB_STEP_SUMMARY
+          echo "2. Test the trigger-tests workflow manually using the preview URL" >> $GITHUB_STEP_SUMMARY
+          echo "3. Create a PR to test the full workflow chain" >> $GITHUB_STEP_SUMMARY
