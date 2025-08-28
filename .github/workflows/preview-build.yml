@@ -46,11 +46,6 @@ jobs:
       
       - name: Build
         run: npm run build
-      
-      - name: Run tests
-        run: npm test
-        continue-on-error: true # Don't fail preview on test failures
-      
       - name: Create preview release
         id: preview
         run: |
