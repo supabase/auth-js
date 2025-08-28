@@ -25,8 +25,9 @@ on:
 jobs:
   build-preview:
     # Modified condition to allow testing from branch or manual trigger
+    # Temporarily allow your fork for testing
     if: |
-      github.repository == 'supabase/auth-js' &&
+      (github.repository == 'supabase/auth-js') &&
       (
         github.event_name == 'workflow_dispatch' ||
         github.event_name == 'push' ||
