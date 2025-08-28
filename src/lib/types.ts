@@ -4,6 +4,8 @@ import { Fetch } from './fetch'
 import type { SolanaSignInInput, SolanaSignInOutput } from './web3/solana'
 import { EthereumSignInInput, Hex } from './web3/ethereum'
 
+// this is a test comment
+
 /** One of the providers supported by GoTrue. */
 export type Provider =
   | 'apple'
