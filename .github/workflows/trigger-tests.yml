@@ -27,6 +27,7 @@ jobs:
       github.repository == 'supabase/auth-js' &&
       (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       # For workflow_run trigger, download the preview info
       - name: Download preview info

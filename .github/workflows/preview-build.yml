@@ -20,6 +20,7 @@ jobs:
       github.repository == 'supabase/auth-js' &&
       contains(github.event.pull_request.labels.*.name, 'trigger: preview')
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       preview-url: ${{ steps.preview.outputs.url }}
       pr-number: ${{ github.event.pull_request.number }}

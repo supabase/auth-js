@@ -14,6 +14,7 @@ jobs:
     # Only run on the correct repository
     if: github.repository == 'supabase/auth-js'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       # Get PR number from the workflow run
       - name: Get PR info
