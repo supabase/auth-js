@@ -17,19 +17,10 @@ on:
   push:
     branches:
       - chore/secure-proof-workflows
-    paths:
-      - '.github/workflows/**'
-      - 'src/**'
-      - 'package.json'
   
   # Normal PR trigger (for when you create a PR)
   pull_request:
     types: [opened, synchronize, labeled]
-    paths:
-      - 'src/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'tsconfig.json'
 
 jobs:
   build-preview:
