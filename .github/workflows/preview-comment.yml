@@ -104,7 +104,7 @@ jobs:
             
             ${{ github.event.workflow_run.name == 'Trigger Supabase JS Tests' && github.event.workflow_run.conclusion == 'success' && '✅ **Supabase-js tests triggered successfully!**
             
-            The integration tests are now running. Results will be posted in the supabase-js repository when complete.' || '' }}
+            The integration tests are now running. Results will be posted here when complete.' || '' }}
             
             ${{ github.event.workflow_run.name == 'Trigger Supabase JS Tests' && github.event.workflow_run.conclusion == 'failure' && '⚠️ **Failed to trigger supabase-js tests**
             
