@@ -22,8 +22,10 @@ on:
 
 jobs:
   trigger-tests:
-    # Only run if the preview build succeeded
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # Only run if the preview build succeeded and on the correct repository
+    if: |
+      github.repository == 'supabase/auth-js' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     steps:
       # For workflow_run trigger, download the preview info

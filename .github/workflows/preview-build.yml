@@ -15,8 +15,9 @@ on:
 
 jobs:
   build-preview:
-    # Only run if PR has the 'trigger: preview' label
+    # Only run if PR has the 'trigger: preview' label and is on the correct repository
     if: |
+      github.repository == 'supabase/auth-js' &&
       contains(github.event.pull_request.labels.*.name, 'trigger: preview')
     runs-on: ubuntu-latest
     outputs:

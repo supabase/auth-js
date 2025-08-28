@@ -11,6 +11,8 @@ on:
 
 jobs:
   update-comment:
+    # Only run on the correct repository
+    if: github.repository == 'supabase/auth-js'
     runs-on: ubuntu-latest
     steps:
       # Get PR number from the workflow run
