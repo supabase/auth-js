@@ -1,146 +1,139 @@
 import GoTrueAdminApi from './GoTrueAdminApi'
 import {
-  DEFAULT_HEADERS,
-  EXPIRY_MARGIN_MS,
   AUTO_REFRESH_TICK_DURATION_MS,
   AUTO_REFRESH_TICK_THRESHOLD,
+  DEFAULT_HEADERS,
+  EXPIRY_MARGIN_MS,
   GOTRUE_URL,
-  STORAGE_KEY,
   JWKS_TTL,
+  STORAGE_KEY,
 } from './lib/constants'
 import {
   AuthError,
   AuthImplicitGrantRedirectError,
-  AuthPKCEGrantCodeExchangeError,
   AuthInvalidCredentialsError,
-  AuthSessionMissingError,
+  AuthInvalidJwtError,
   AuthInvalidTokenResponseError,
+  AuthPKCEGrantCodeExchangeError,
+  AuthSessionMissingError,
   AuthUnknownError,
   isAuthApiError,
   isAuthError,
+  isAuthImplicitGrantRedirectError,
   isAuthRetryableFetchError,
   isAuthSessionMissingError,
-  isAuthImplicitGrantRedirectError,
-  AuthInvalidJwtError,
 } from './lib/errors'
 import {
-  Fetch,
   _request,
   _sessionResponse,
   _sessionResponsePassword,
-  _userResponse,
   _ssoResponse,
+  _userResponse,
+  Fetch,
 } from './lib/fetch'
 import {
+  decodeJWT,
   deepClone,
   Deferred,
+  getAlgorithm,
+  getCodeChallengeAndMethod,
   getItemAsync,
   isBrowser,
+  parseParametersFromURL,
   removeItemAsync,
   resolveFetch,
-  setItemAsync,
-  uuid,
   retryable,
+  setItemAsync,
   sleep,
-  parseParametersFromURL,
-  getCodeChallengeAndMethod,
-  getAlgorithm,
-  validateExp,
-  decodeJWT,
-  userNotAvailableProxy,
   supportsLocalStorage,
+  userNotAvailableProxy,
+  uuid,
+  validateExp,
 } from './lib/helpers'
 import { memoryLocalStorageAdapter } from './lib/local-storage'
+import { LockAcquireTimeoutError, navigatorLock } from './lib/locks'
 import { polyfillGlobalThis } from './lib/polyfills'
 import { version } from './lib/version'
-import { LockAcquireTimeoutError, navigatorLock } from './lib/locks'
 import {
+  AuthenticationResponseJSON,
   prepareAuthenticationResponseForServer,
-  prepareRegistrationResponseForServer,
   prepareCredentialCreationOptionsForBrowser,
   prepareCredentialRequestOptionsForBrowser,
+  prepareRegistrationResponseForServer,
   RegistrationResponseJSON,
-  AuthenticationResponseJSON,
 } from './lib/webauthn'
 
+import { bytesToBase64URL, stringToUint8Array } from './lib/base64url'
 import type {
   AuthChangeEvent,
+  AuthenticatorAssuranceLevels,
+  AuthFlowType,
+  AuthMFAChallengeResponse,
+  AuthMFAChallengeTOTPResponse,
+  AuthMFAChallengeWebAuthnResponse,
+  AuthMFAEnrollPhoneResponse,
+  AuthMFAEnrollTOTPResponse,
+  AuthMFAEnrollWebAuthnResponse,
+  AuthMFAGetAuthenticatorAssuranceLevelResponse,
+  AuthMFAListFactorsResponse,
+  AuthMFAUnenrollResponse,
+  AuthMFAVerifyResponse,
+  AuthOtpResponse,
   AuthResponse,
   AuthResponsePassword,
   AuthTokenResponse,
   AuthTokenResponsePassword,
-  AuthOtpResponse,
   CallRefreshTokenResult,
+  ChallengeFactorShape,
+  EthereumWallet,
+  EthereumWeb3Credentials,
+  Factor,
   GoTrueClientOptions,
+  GoTrueMFAApi,
   InitializeResult,
+  JWK,
+  JwtHeader,
+  JwtPayload,
+  LockFunc,
+  MFAChallengeAndVerifyParams,
+  MFAChallengeParams,
+  MFAEnrollParams,
+  MFAEnrollPhoneParams,
+  MFAEnrollTOTPParams,
+  MFAEnrollWebAuthnParams,
+  MFAUnenrollParams,
+  MFAVerifyParams,
   OAuthResponse,
-  SSOResponse,
   Provider,
+  ResendParams,
   Session,
+  SignInAnonymouslyCredentials,
   SignInWithIdTokenCredentials,
   SignInWithOAuthCredentials,
   SignInWithPasswordCredentials,
   SignInWithPasswordlessCredentials,
-  SignUpWithPasswordCredentials,
   SignInWithSSO,
   SignOut,
+  SignUpWithPasswordCredentials,
+  SolanaWallet,
+  SolanaWeb3Credentials,
+  SSOResponse,
   Subscription,
   SupportedStorage,
   User,
   UserAttributes,
+  UserIdentity,
   UserResponse,
   VerifyOtpParams,
-  GoTrueMFAApi,
-  MFAEnrollParams,
-  MFAChallengeParams,
-  MFAChallengeWebAuthnParams,
-  MFAChallengeTOTPParams,
-  FactorType,
-  FactorShape,
-  AuthMFAChallengeResponse,
-  AuthMFAChallengeWebAuthnResponse,
-  AuthMFAChallengeTOTPResponse,
-  MFAUnenrollParams,
-  AuthMFAUnenrollResponse,
-  MFAVerifyParams,
-  MFAVerifyTOTPParams,
-  MFAVerifyWebAuthnEnrollmentParams,
-  MFAVerifyWebAuthnAuthenticationParams,
-  AuthMFAVerifyResponse,
-  AuthMFAListFactorsResponse,
-  AuthMFAGetAuthenticatorAssuranceLevelResponse,
-  AuthenticatorAssuranceLevels,
-  Factor,
-  MFAChallengeAndVerifyParams,
-  ResendParams,
-  AuthFlowType,
-  LockFunc,
-  UserIdentity,
-  SignInAnonymouslyCredentials,
-  MFAEnrollTOTPParams,
-  MFAEnrollPhoneParams,
-  MFAEnrollWebAuthnParams,
-  AuthMFAEnrollTOTPResponse,
-  AuthMFAEnrollPhoneResponse,
-  AuthMFAEnrollWebAuthnResponse,
-  JWK,
-  JwtPayload,
-  JwtHeader,
-  SolanaWeb3Credentials,
-  SolanaWallet,
   Web3Credentials,
-  EthereumWeb3Credentials,
-  EthereumWallet,
-  ChallengeFactorShape,
 } from './lib/types'
-import { stringToUint8Array, bytesToBase64URL } from './lib/base64url'
 import {
+  createSiweMessage,
   fromHex,
   getAddress,
   Hex,
-  toHex,
-  createSiweMessage,
   SiweMessage,
+  toHex,
 } from './lib/web3/ethereum'
 
 polyfillGlobalThis() // Make "globalThis" available
@@ -3028,13 +3021,12 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#verify}
    */
-  private async _verify(params: MFAVerifyTOTPParams): Promise<AuthMFAVerifyResponse>
-  private async _verify(params: MFAVerifyWebAuthnEnrollmentParams): Promise<AuthMFAVerifyResponse>
-  private async _verify(
-    params: MFAVerifyWebAuthnAuthenticationParams
-  ): Promise<AuthMFAVerifyResponse>
-  private async _verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse>
   private async _verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse> {
+    // : T extends MFAEnrollPhoneParams
+    // ? AuthMFAEnrollPhoneResponse
+    // : T extends MFAEnrollWebAuthnParams
+    // ? AuthMFAEnrollWebAuthnResponse
+    // : never
     // TODO: single step: POST@ /challenge -> credentials.get({challenge}) -> user presses yubikey -> take signature and pass to /verify
     // TODO: for multi step, challenge() -> manually call credentials.get(...) ->
     return this._acquireLock(-1, async () => {
@@ -3070,7 +3062,7 @@ export default class GoTrueClient {
           if ('webAuthn' in params && params.webAuthn) {
             body.web_authn = {
               rp_id: params.webAuthn.rpId,
-              rp_origins: params.webAuthn.rpOrigins,
+              rp_origins: params.webAuthn.rpOrigins?.join(','),
             }
 
             // Check for enrollment (creationResponse)
@@ -3148,7 +3140,7 @@ export default class GoTrueClient {
               ? {
                   web_authn: {
                     rp_id: params.webAuthn.rpId,
-                    rp_origins: params.webAuthn.rpOrigins,
+                    rp_origins: params.webAuthn.rpOrigins?.join(','),
                   },
                 }
               : 'channel' in params && params.channel

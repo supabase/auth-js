@@ -1,13 +1,7 @@
-import { EIP1193Provider } from './web3/ethereum'
 import { AuthError } from './errors'
 import { Fetch } from './fetch'
+import { EIP1193Provider, EthereumSignInInput, Hex } from './web3/ethereum'
 import type { SolanaSignInInput, SolanaSignInOutput } from './web3/solana'
-import { EthereumSignInInput, Hex } from './web3/ethereum'
-import type {
-  ServerCredentialCreationOptions,
-  ServerCredentialRequestOptions,
-  ServerCredentialResponse,
-} from './webauthn'
 
 /** One of the providers supported by GoTrue. */
 export type Provider =
@@ -322,24 +316,49 @@ export type ChallengeFactorShape = Extract<FactorShape, { type: 'totp' } | { typ
  * @see {@link GoTrueMFAApi#listFactors}
  * @see {@link GoTrueMFAAdminApi#listFactors}
  */
-export interface Factor {
-  /** ID of the factor. */
-  id: string
-
-  /** Friendly name of the factor, useful to disambiguate between multiple factors. */
-  friendly_name?: string
-
-  /**
-   * Type of factor. `totp`, `phone`, and `webauthn` supported with this version
-   */
-  factor_type: FactorType
-
-  /** Factor's status. */
-  status: 'verified' | 'unverified'
-
-  created_at: string
-  updated_at: string
-}
+export type Factor =
+  | {
+      /** ID of the factor. */
+      id: string
+      /** Friendly name of the factor, useful to disambiguate between multiple factors. */
+      friendly_name?: string
+      /** Type of factor. */
+      factor_type: 'totp' | 'phone'
+      /** Factor's status. */
+      status: 'verified' | 'unverified'
+      created_at: string
+      updated_at: string
+    }
+  | {
+      /** ID of the factor. */
+      id: string
+      /** Friendly name of the factor, useful to disambiguate between multiple factors. */
+      friendly_name?: string
+      /** Type of factor. */
+      factor_type: 'webauthn'
+      /** Factor's status - unverified. */
+      status: 'unverified'
+      created_at: string
+      updated_at: string
+    }
+  | {
+      /** ID of the factor. */
+      id: string
+      /** Friendly name of the factor, useful to disambiguate between multiple factors. */
+      friendly_name?: string
+      /** Type of factor. */
+      factor_type: 'webauthn'
+      /** Factor's status - verified. */
+      status: 'verified'
+      created_at: string
+      updated_at: string
+      /**
+       * WebAuthn Authenticator Attestation GUID.
+       * Only available for verified WebAuthn factors.
+       * Identifies the type/model of the authenticator.
+       */
+      web_authn_aaguid?: string
+    }
 
 export interface UserAppMetadata {
   provider?: string
@@ -944,9 +963,10 @@ export type MFAVerifyWebAuthnEnrollmentParams = MFAVerifyBaseParams & {
     /** Relying party ID */
     rpId?: string
     /** Relying party origins (comma-separated) */
-    rpOrigins?: string
+    rpOrigins?: string[]
     /** Creation response from the authenticator */
     creationResponse: Credential
+    assertionResponse?: never
   }
 }
 
@@ -960,6 +980,7 @@ export type MFAVerifyWebAuthnAuthenticationParams = MFAVerifyBaseParams & {
     rpOrigins?: string
     /** Assertion response from the authenticator */
     assertionResponse: PublicKeyCredential
+    creationResponse: never
   }
 }
 
@@ -975,8 +996,8 @@ export type WebAuthnMFAVerifyParams = {
     | {
         /** Relying party ID */
         rpId?: string
-        /** Relying party origins (comma-separated) */
-        rpOrigins?: string
+        /** Relying party origins */
+        rpOrigins?: string[]
         /** Creation response from the authenticator (for enrollment/unverified factors) */
         creationResponse: Credential
         assertionResponse?: never
@@ -984,10 +1005,10 @@ export type WebAuthnMFAVerifyParams = {
     | {
         /** Relying party ID */
         rpId?: string
-        /** Relying party origins (comma-separated) */
-        rpOrigins?: string
+        /** Relying party origins */
+        rpOrigins?: string[]
         /** Assertion response from the authenticator (for authentication/verified factors) */
-        assertionResponse: PublicKeyCredential
+        assertionResponse: Credential
         creationResponse?: never
       }
 }
@@ -1006,9 +1027,9 @@ export type MFAChallengeWebAuthnParams = {
   /** WebAuthn parameters for WebAuthn factor challenge */
   webAuthn: {
     /** Relying party ID */
-    rpId?: string
-    /** Relying party origins (comma-separated) */
-    rpOrigins?: string
+    rpId: string
+    /** Relying party origins*/
+    rpOrigins?: string[]
   }
 }
 
@@ -1081,18 +1102,16 @@ export type AuthMFAChallengeWebAuthnResponse =
         expires_at?: number
       } & (
         | {
-            /** WebAuthn credential creation options (for enrollment/unverified factors) */
             credential_creation_options: {
               publicKey: PublicKeyCredentialCreationOptions
             }
             credential_request_options?: never
           }
         | {
-            /** WebAuthn credential request options (for authentication with verified factors) */
+            credential_creation_options?: never
             credential_request_options: {
               publicKey: PublicKeyCredentialRequestOptions
             }
-            credential_creation_options?: never
           }
       )
       error: null
@@ -1222,9 +1241,6 @@ export interface GoTrueMFAApi {
    * Verifies a code against a challenge. The verification code is
    * provided by the user by entering a code seen in their authenticator app.
    */
-  verify(params: MFAVerifyTOTPParams): Promise<AuthMFAVerifyResponse>
-  verify(params: MFAVerifyWebAuthnEnrollmentParams): Promise<AuthMFAVerifyResponse>
-  verify(params: MFAVerifyWebAuthnAuthenticationParams): Promise<AuthMFAVerifyResponse>
   verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse>
 
   /**

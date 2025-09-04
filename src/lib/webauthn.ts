@@ -29,30 +29,37 @@ export function prepareCredentialCreationOptionsForBrowser(
     throw new Error('Credential creation options are required')
   }
 
+  // Destructure to separate fields that need transformation
+  const { challenge: challengeStr, user: userOpts, excludeCredentials, ...restOptions } = options
+
   // Convert challenge from base64url to ArrayBuffer
-  const challenge = base64UrlToUint8Array(options.challenge).buffer
+  const challenge = base64UrlToUint8Array(challengeStr).buffer as ArrayBuffer
 
   // Convert user.id from base64url to ArrayBuffer
   const user: PublicKeyCredentialUserEntity = {
-    ...options.user,
-    id: base64UrlToUint8Array(options.user.id).buffer as ArrayBuffer & { buffer: ArrayBuffer },
+    ...userOpts,
+    id: base64UrlToUint8Array(userOpts.id).buffer as ArrayBuffer,
   }
 
-  // Convert excludeCredentials[].id from base64url to ArrayBuffer
-  const excludeCredentials = options.excludeCredentials?.map(
-    (cred: { id: string; type: 'public-key' }) => ({
-      ...cred,
-      id: base64UrlToUint8Array(cred.id).buffer,
-      type: cred.type || ('public-key' as PublicKeyCredentialType),
-    })
-  )
-
-  return {
-    ...options,
+  // Build the result object
+  const result: PublicKeyCredentialCreationOptions = {
+    ...restOptions,
     challenge,
     user,
-    excludeCredentials,
-  } as PublicKeyCredentialCreationOptions
+  }
+
+  // Only add excludeCredentials if it exists
+  if (excludeCredentials) {
+    result.excludeCredentials = excludeCredentials.map((cred) => ({
+      ...cred,
+      id: base64UrlToUint8Array(cred.id).buffer as ArrayBuffer,
+      type: cred.type || ('public-key' as PublicKeyCredentialType),
+      // Cast transports to handle future transport types like "cable"
+      transports: cred.transports as AuthenticatorTransport[] | undefined,
+    }))
+  }
+
+  return result
 }
 
 /**
@@ -66,23 +73,30 @@ export function prepareCredentialRequestOptionsForBrowser(
     throw new Error('Credential request options are required')
   }
 
+  // Destructure to separate fields that need transformation
+  const { challenge: challengeStr, allowCredentials, ...restOptions } = options
+
   // Convert challenge from base64url to ArrayBuffer
-  const challenge = base64UrlToUint8Array(options.challenge).buffer
+  const challenge = base64UrlToUint8Array(challengeStr).buffer as ArrayBuffer
 
-  // Convert allowCredentials[].id from base64url to ArrayBuffer
-  const allowCredentials = options.allowCredentials?.map(
-    (cred: { id: string; type: 'public-key' }) => ({
-      ...cred,
-      id: base64UrlToUint8Array(cred.id).buffer,
-      type: cred.type || ('public-key' as PublicKeyCredentialType),
-    })
-  )
-
-  return {
-    ...options,
+  // Build the result object
+  const result: PublicKeyCredentialRequestOptions = {
+    ...restOptions,
     challenge,
-    allowCredentials,
-  } as PublicKeyCredentialRequestOptions
+  }
+
+  // Only add allowCredentials if it exists
+  if (allowCredentials) {
+    result.allowCredentials = allowCredentials.map((cred) => ({
+      ...cred,
+      id: base64UrlToUint8Array(cred.id).buffer as ArrayBuffer,
+      type: cred.type || ('public-key' as PublicKeyCredentialType),
+      // Cast transports to handle future transport types like "cable"
+      transports: cred.transports as AuthenticatorTransport[] | undefined,
+    }))
+  }
+
+  return result
 }
 
 /**
