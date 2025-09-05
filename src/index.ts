@@ -19,4 +19,8 @@ export {
   type ServerCredentialCreationOptions,
   type ServerCredentialRequestOptions,
   type ServerCredentialResponse,
+  WebAuthnError,
+  isWebAuthnError,
+  WebAuthnAbortService,
+  webAuthnAbortService,
 } from './lib/webauthn'

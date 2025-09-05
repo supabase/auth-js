@@ -4,7 +4,54 @@ import type {
   PublicKeyCredentialRequestOptionsJSON,
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
+  AuthenticatorAttachment,
 } from '@simplewebauthn/types'
+
+import { WebAuthnError, isWebAuthnError } from './webauthn.errors'
+
+export { WebAuthnError, isWebAuthnError }
+
+/**
+ * WebAuthn abort service to manage ceremony cancellation
+ */
+export class WebAuthnAbortService {
+  private controller: AbortController | undefined
+
+  /**
+   * Create an abort signal for a new WebAuthn operation.
+   * Automatically cancels any existing operation.
+   */
+  createNewAbortSignal(): AbortSignal {
+    // Abort any existing calls to navigator.credentials.create() or navigator.credentials.get()
+    if (this.controller) {
+      const abortError = new Error('Cancelling existing WebAuthn API call for new one')
+      abortError.name = 'AbortError'
+      this.controller.abort(abortError)
+    }
+
+    const newController = new AbortController()
+    this.controller = newController
+    return newController.signal
+  }
+
+  /**
+   * Manually cancel the current WebAuthn operation
+   */
+  cancelCeremony(): void {
+    if (this.controller) {
+      const abortError = new Error('Manually cancelling existing WebAuthn API call')
+      abortError.name = 'AbortError'
+      this.controller.abort(abortError)
+      this.controller = undefined
+    }
+  }
+}
+
+/**
+ * Singleton instance to ensure only one WebAuthn ceremony is active at a time.
+ * This prevents "operation already in progress" errors when retrying WebAuthn operations.
+ */
+export const webAuthnAbortService = new WebAuthnAbortService()
 
 /**
  * Server response format for WebAuthn credential creation options
@@ -114,6 +161,13 @@ export type { RegistrationResponseJSON, AuthenticationResponseJSON }
 export function prepareRegistrationResponseForServer(
   credential: PublicKeyCredential & { response: AuthenticatorAttestationResponse }
 ): RegistrationResponseJSON {
+  // Access authenticatorAttachment via type assertion to handle TypeScript version differences
+  // @simplewebauthn/types includes this property but base TypeScript 4.7.4 doesn't
+  const credentialWithAttachment = credential as PublicKeyCredential & {
+    response: AuthenticatorAttestationResponse
+    authenticatorAttachment?: string | null
+  }
+
   return {
     id: credential.id,
     rawId: credential.id,
@@ -123,7 +177,8 @@ export function prepareRegistrationResponseForServer(
     },
     type: 'public-key',
     clientExtensionResults: credential.getClientExtensionResults(),
-    authenticatorAttachment: credential.authenticatorAttachment as
+    // Convert null to undefined and cast to AuthenticatorAttachment type
+    authenticatorAttachment: (credentialWithAttachment.authenticatorAttachment ?? undefined) as
       | AuthenticatorAttachment
       | undefined,
   }
@@ -135,6 +190,13 @@ export function prepareRegistrationResponseForServer(
 export function prepareAuthenticationResponseForServer(
   credential: PublicKeyCredential & { response: AuthenticatorAssertionResponse }
 ): AuthenticationResponseJSON {
+  // Access authenticatorAttachment via type assertion to handle TypeScript version differences
+  // @simplewebauthn/types includes this property but base TypeScript 4.7.4 doesn't
+  const credentialWithAttachment = credential as PublicKeyCredential & {
+    response: AuthenticatorAssertionResponse
+    authenticatorAttachment?: string | null
+  }
+
   const clientExtensionResults = credential.getClientExtensionResults()
   const assertionResponse = credential.response
 
@@ -151,8 +213,43 @@ export function prepareAuthenticationResponseForServer(
     },
     type: 'public-key',
     clientExtensionResults,
-    authenticatorAttachment: credential.authenticatorAttachment as
+    // Convert null to undefined and cast to AuthenticatorAttachment type
+    authenticatorAttachment: (credentialWithAttachment.authenticatorAttachment ?? undefined) as
       | AuthenticatorAttachment
       | undefined,
   }
+}
+
+/**
+ * A simple test to determine if a hostname is a properly-formatted domain name
+ *
+ * A "valid domain" is defined here: https://url.spec.whatwg.org/#valid-domain
+ *
+ * Regex sourced from here:
+ * https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch08s15.html
+ */
+export function isValidDomain(hostname: string): boolean {
+  return (
+    // Consider localhost valid as well since it's okay wrt Secure Contexts
+    hostname === 'localhost' || /^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/i.test(hostname)
+  )
+}
+
+/**
+ * Determine if the browser is capable of Webauthn
+ * Referenced from @link https://github.com/MasterKale/SimpleWebAuthn/blob/master/packages/browser/src/helpers/browserSupportsWebAuthn.ts#L4
+ */
+export function browserSupportsWebAuthn(): boolean {
+  return _browserSupportsWebAuthnInternals.stubThis(
+    globalThis?.PublicKeyCredential !== undefined &&
+      typeof globalThis.PublicKeyCredential === 'function'
+  )
+}
+
+/**
+ * Make it possible to stub the return value during testing
+ * @ignore Don't include this in docs output
+ */
+export const _browserSupportsWebAuthnInternals = {
+  stubThis: (value: boolean) => value,
 }
