@@ -14,7 +14,7 @@ import {
 
 // Add structuredClone polyfill for jsdom
 if (typeof structuredClone === 'undefined') {
-  ; (global as any).structuredClone = (obj: any) => JSON.parse(JSON.stringify(obj))
+  ;(global as any).structuredClone = (obj: any) => JSON.parse(JSON.stringify(obj))
 }
 
 describe('GoTrueClient in browser environment', () => {
@@ -162,7 +162,7 @@ describe('User proxy and deep clone functions in browser', () => {
   it('should throw on property setting to user proxy', () => {
     const proxy = userNotAvailableProxy()
     expect(() => {
-      (proxy as any).email = 'test@example.com'
+      ;(proxy as any).email = 'test@example.com'
     }).toThrow()
   })
 })
@@ -400,9 +400,9 @@ describe('Browser locks functionality', () => {
   it('should use navigator locks when available', () => {
     // Mock navigator.locks
     const mockLock = { name: 'test-lock' }
-    const mockRequest = jest.fn().mockImplementation((_, __, callback) =>
-      Promise.resolve(callback(mockLock))
-    )
+    const mockRequest = jest
+      .fn()
+      .mockImplementation((_, __, callback) => Promise.resolve(callback(mockLock)))
 
     Object.defineProperty(navigator, 'locks', {
       value: { request: mockRequest },
@@ -428,9 +428,9 @@ describe('Browser locks functionality', () => {
 
     // Mock navigator.locks
     const mockLock = { name: 'test-lock' }
-    const mockRequest = jest.fn().mockImplementation((_, __, callback) =>
-      Promise.resolve(callback(mockLock))
-    )
+    const mockRequest = jest
+      .fn()
+      .mockImplementation((_, __, callback) => Promise.resolve(callback(mockLock)))
 
     Object.defineProperty(navigator, 'locks', {
       value: { request: mockRequest },
@@ -465,7 +465,6 @@ describe('Web3 functionality in browser', () => {
 })
 
 describe('GoTrueClient constructor edge cases', () => {
-
   it('should handle userStorage with persistSession', () => {
     const customUserStorage = {
       getItem: jest.fn(),
@@ -486,7 +485,6 @@ describe('GoTrueClient constructor edge cases', () => {
 })
 
 describe('linkIdentity with skipBrowserRedirect false', () => {
-
   it('should linkIdentity with skipBrowserRedirect false', async () => {
     Object.defineProperty(window, 'location', {
       value: {

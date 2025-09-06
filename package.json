@@ -40,15 +40,18 @@
     "@supabase/node-fetch": "^2.6.14"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.35.0",
     "@simplewebauthn/types": "^12.0.0",
+    "@stylistic/eslint-plugin": "^5.3.1",
     "@types/faker": "^5.1.6",
     "@types/jest": "^28.1.6",
     "@types/jsonwebtoken": "^8.5.6",
     "@types/node": "^18.16.19",
     "@types/node-fetch": "^2.6.4",
-    "@typescript-eslint/eslint-plugin": "^5.30.7",
-    "@typescript-eslint/parser": "^5.30.7",
-    "eslint": "^8.20.0",
+    "@typescript-eslint/eslint-plugin": "^8.42.0",
+    "@typescript-eslint/parser": "^8.42.0",
+    "eslint": "^9.35.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-config-standard": "^17.0.0",
     "eslint-plugin-import": "^2.26.0",
@@ -56,6 +59,7 @@
     "eslint-plugin-promise": "^6.0.0",
     "faker": "^5.3.1",
     "genversion": "^3.1.1",
+    "globals": "^16.3.0",
     "jest": "^28.1.3",
     "jest-mock-server": "^0.1.0",
     "jsonwebtoken": "^9.0.0",
@@ -65,6 +69,6 @@
     "semantic-release-plugin-update-version-in-files": "^1.1.0",
     "ts-jest": "^28.0.7",
     "typedoc": "^0.22.16",
-    "typescript": "^4.7.4"
+    "typescript": "^5.9.2"
   }
 }

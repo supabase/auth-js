@@ -35,7 +35,7 @@ export const supportsLocalStorage = () => {
     if (typeof globalThis.localStorage !== 'object') {
       return false
     }
-  } catch (e) {
+  } catch {
     // DOM exception when accessing `localStorage`
     return false
   }
@@ -52,7 +52,7 @@ export const supportsLocalStorage = () => {
 
     localStorageWriteTests.tested = true
     localStorageWriteTests.writable = true
-  } catch (e) {
+  } catch {
     // localStorage can't be written to
     // https://www.chromium.org/for-testers/bug-reporting-guidelines/uncaught-securityerror-failed-to-read-the-localstorage-property-from-window-access-is-denied-for-this-document
 
@@ -77,7 +77,7 @@ export function parseParametersFromURL(href: string) {
       hashSearchParams.forEach((value, key) => {
         result[key] = value
       })
-    } catch (e: any) {
+    } catch {
       // hash is not a query string
     }
   }
@@ -158,11 +158,10 @@ export class Deferred<T = any> {
   public readonly reject!: (reason?: any) => any
 
   public constructor() {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
+    // eslint-disable-next-line @stylistic/no-extra-semi
     ;(this as any).promise = new Deferred.promiseConstructor((res, rej) => {
-      // eslint-disable-next-line @typescript-eslint/no-extra-semi
+      // eslint-disable-next-line @stylistic/no-extra-semi
       ;(this as any).resolve = res
-      // eslint-disable-next-line @typescript-eslint/no-extra-semi
       ;(this as any).reject = rej
     })
   }
@@ -221,7 +220,7 @@ export function retryable<T>(
   isRetryable: (attempt: number, error: any | null, result?: T) => boolean
 ): Promise<T> {
   const promise = new Promise<T>((accept, reject) => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
+    // eslint-disable-next-line @stylistic/no-extra-semi
     ;(async () => {
       for (let attempt = 0; attempt < Infinity; attempt++) {
         try {
@@ -231,7 +230,7 @@ export function retryable<T>(
             accept(result)
             return
           }
-        } catch (e: any) {
+        } catch (e) {
           if (!isRetryable(attempt, e)) {
             reject(e)
             return
@@ -325,7 +324,7 @@ export function parseResponseAPIVersion(response: Response) {
   try {
     const date = new Date(`${apiVersion}T00:00:00.0Z`)
     return date
-  } catch (e: any) {
+  } catch {
     return null
   }
 }
