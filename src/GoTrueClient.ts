@@ -68,9 +68,6 @@ import type {
   AuthChangeEvent,
   AuthenticatorAssuranceLevels,
   AuthFlowType,
-  AuthMFAChallengeResponse,
-  AuthMFAChallengeTOTPResponse,
-  AuthMFAChallengeWebAuthnResponse,
   AuthMFAEnrollPhoneResponse,
   AuthMFAEnrollTOTPResponse,
   AuthMFAEnrollWebAuthnResponse,
@@ -84,7 +81,6 @@ import type {
   AuthTokenResponse,
   AuthTokenResponsePassword,
   CallRefreshTokenResult,
-  ChallengeFactorShape,
   EthereumWallet,
   EthereumWeb3Credentials,
   Factor,
@@ -96,7 +92,6 @@ import type {
   JwtPayload,
   LockFunc,
   MFAChallengeAndVerifyParams,
-  MFAChallengeParams,
   MFAEnrollParams,
   MFAEnrollPhoneParams,
   MFAEnrollTOTPParams,
@@ -126,6 +121,10 @@ import type {
   UserResponse,
   VerifyOtpParams,
   Web3Credentials,
+  MFAChallengeTypeMap,
+  InferMFAChallengeResponse,
+  MFAEnrollTypeMap,
+  InferEnrollResponse,
 } from './lib/types'
 import {
   createSiweMessage,
@@ -2923,17 +2922,9 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#enroll}
    */
-  private async _enroll<T extends MFAEnrollParams>(
+  private async _enroll<T extends MFAEnrollTypeMap[keyof MFAEnrollTypeMap]['params']>(
     params: T
-  ): Promise<
-    T extends MFAEnrollTOTPParams
-      ? AuthMFAEnrollTOTPResponse
-      : T extends MFAEnrollPhoneParams
-      ? AuthMFAEnrollPhoneResponse
-      : T extends MFAEnrollWebAuthnParams
-      ? AuthMFAEnrollWebAuthnResponse
-      : never
-  > {
+  ): Promise<InferEnrollResponse<T>> {
     // TODO: for webauthn, create credentials using credentials.create() and then enroll it
     // For Multi step, allow dev to specify .create(...) options and then pass it to the rest of the steps.
     try {
@@ -3118,15 +3109,9 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#challenge}
    */
-  private async _challenge<F extends ChallengeFactorShape>(
-    params: MFAChallengeParams<F>
-  ): Promise<
-    F extends { type: 'webauthn' }
-      ? AuthMFAChallengeWebAuthnResponse
-      : F extends { type: 'totp' | 'phone' }
-      ? AuthMFAChallengeTOTPResponse
-      : AuthMFAChallengeResponse
-  > {
+  private async _challenge<T extends MFAChallengeTypeMap[keyof MFAChallengeTypeMap]['params']>(
+    params: T
+  ): Promise<InferMFAChallengeResponse<T>> {
     return this._acquireLock(-1, async () => {
       try {
         return await this._useSession(async (result) => {
