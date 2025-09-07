@@ -68,14 +68,13 @@ import type {
   AuthChangeEvent,
   AuthenticatorAssuranceLevels,
   AuthFlowType,
-  AuthMFAEnrollPhoneResponse,
-  AuthMFAEnrollTOTPResponse,
-  AuthMFAEnrollWebAuthnResponse,
   AuthMFAGetAuthenticatorAssuranceLevelResponse,
   AuthMFAListFactorsResponse,
   AuthMFAUnenrollResponse,
   AuthMFAVerifyResponse,
   AuthOtpResponse,
+  AuthRequestResult,
+  AuthRequestResultSafeDestructure,
   AuthResponse,
   AuthResponsePassword,
   AuthTokenResponse,
@@ -86,16 +85,16 @@ import type {
   Factor,
   GoTrueClientOptions,
   GoTrueMFAApi,
+  InferAuthMFAEnrollResponse,
+  InferMFAChallengeResponse,
   InitializeResult,
   JWK,
   JwtHeader,
   JwtPayload,
   LockFunc,
   MFAChallengeAndVerifyParams,
+  MFAChallengeParams,
   MFAEnrollParams,
-  MFAEnrollPhoneParams,
-  MFAEnrollTOTPParams,
-  MFAEnrollWebAuthnParams,
   MFAUnenrollParams,
   MFAVerifyParams,
   OAuthResponse,
@@ -121,12 +120,6 @@ import type {
   UserResponse,
   VerifyOtpParams,
   Web3Credentials,
-  MFAChallengeTypeMap,
-  InferMFAChallengeResponse,
-  MFAEnrollTypeMap,
-  InferEnrollResponse,
-  AuthRequestResult,
-  AuthRequestResultSafeDestructure,
 } from './lib/types'
 import {
   createSiweMessage,
@@ -517,6 +510,7 @@ export default class GoTrueClient {
         let codeChallenge: string | null = null
         let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce') {
+          // eslint-disable-next-line @stylistic/no-extra-semi
           ;[codeChallenge, codeChallengeMethod] = await getCodeChallengeAndMethod(
             this.storage,
             this.storageKey
@@ -705,7 +699,7 @@ export default class GoTrueClient {
       message = credentials.message
       signature = credentials.signature
     } else {
-      const { chain, wallet, statement, options } = credentials
+      const { wallet, statement, options } = credentials
 
       let resolvedWallet: EthereumWallet
 
@@ -838,7 +832,7 @@ export default class GoTrueClient {
       message = credentials.message
       signature = credentials.signature
     } else {
-      const { chain, wallet, statement, options } = credentials
+      const { wallet, statement, options } = credentials
 
       let resolvedWallet: SolanaWallet
 
@@ -1132,6 +1126,7 @@ export default class GoTrueClient {
         let codeChallenge: string | null = null
         let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce') {
+          // eslint-disable-next-line @stylistic/no-extra-semi
           ;[codeChallenge, codeChallengeMethod] = await getCodeChallengeAndMethod(
             this.storage,
             this.storageKey
@@ -1244,6 +1239,7 @@ export default class GoTrueClient {
       let codeChallenge: string | null = null
       let codeChallengeMethod: string | null = null
       if (this.flowType === 'pkce') {
+        // eslint-disable-next-line @stylistic/no-extra-semi
         ;[codeChallenge, codeChallengeMethod] = await getCodeChallengeAndMethod(
           this.storage,
           this.storageKey
@@ -1394,7 +1390,7 @@ export default class GoTrueClient {
           (async () => {
             try {
               await result
-            } catch (e: any) {
+            } catch {
               // we just care if it finished
             }
           })()
@@ -1415,7 +1411,7 @@ export default class GoTrueClient {
             (async () => {
               try {
                 await result
-              } catch (e: any) {
+              } catch {
                 // we just care if it finished
               }
             })()
@@ -1689,6 +1685,7 @@ export default class GoTrueClient {
         let codeChallenge: string | null = null
         let codeChallengeMethod: string | null = null
         if (this.flowType === 'pkce' && attributes.email != null) {
+          // eslint-disable-next-line @stylistic/no-extra-semi
           ;[codeChallenge, codeChallengeMethod] = await getCodeChallengeAndMethod(
             this.storage,
             this.storageKey
@@ -2108,11 +2105,13 @@ export default class GoTrueClient {
       redirectTo?: string
       captchaToken?: string
     } = {}
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   ): Promise<AuthRequestResult<{}>> {
     let codeChallenge: string | null = null
     let codeChallengeMethod: string | null = null
 
     if (this.flowType === 'pkce') {
+      // eslint-disable-next-line @stylistic/no-extra-semi
       ;[codeChallenge, codeChallengeMethod] = await getCodeChallengeAndMethod(
         this.storage,
         this.storageKey,
@@ -2198,6 +2197,7 @@ export default class GoTrueClient {
   /**
    * Unlinks an identity from a user by deleting it. The user will no longer be able to sign in with that identity once it's unlinked.
    */
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   async unlinkIdentity(identity: UserIdentity): Promise<AuthRequestResult<{}>> {
     try {
       return await this._useSession(async (result) => {
@@ -2889,9 +2889,9 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#enroll}
    */
-  private async _enroll<T extends MFAEnrollTypeMap[keyof MFAEnrollTypeMap]['params']>(
+  private async _enroll<T extends MFAEnrollParams>(
     params: T
-  ): Promise<InferEnrollResponse<T>> {
+  ): Promise<InferAuthMFAEnrollResponse<T>> {
     // TODO: for webauthn, create credentials using credentials.create() and then enroll it
     // For Multi step, allow dev to specify .create(...) options and then pass it to the rest of the steps.
     try {
@@ -3076,7 +3076,7 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#challenge}
    */
-  private async _challenge<T extends MFAChallengeTypeMap[keyof MFAChallengeTypeMap]['params']>(
+  private async _challenge<T extends MFAChallengeParams>(
     params: T
   ): Promise<InferMFAChallengeResponse<T>> {
     return this._acquireLock(-1, async () => {
@@ -3176,10 +3176,16 @@ export default class GoTrueClient {
 
     const factors = user?.factors || []
     const totp = factors.filter(
-      (factor) => factor.factor_type === 'totp' && factor.status === 'verified'
+      (f): f is Factor<'totp', 'verified'> => f.factor_type === 'totp' && f.status === 'verified'
     )
+
     const phone = factors.filter(
-      (factor) => factor.factor_type === 'phone' && factor.status === 'verified'
+      (f): f is Factor<'phone', 'verified'> => f.factor_type === 'phone' && f.status === 'verified'
+    )
+
+    const webAuthn = factors.filter(
+      (f): f is Factor<'webauthn', 'verified'> =>
+        f.factor_type === 'phone' && f.status === 'verified'
     )
 
     return {
@@ -3187,6 +3193,7 @@ export default class GoTrueClient {
         all: factors,
         totp,
         phone,
+        webAuthn,
       },
       error: null,
     }

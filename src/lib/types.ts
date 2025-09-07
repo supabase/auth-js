@@ -56,6 +56,57 @@ export type AuthChangeEvent =
  */
 export type LockFunc = <R>(name: string, acquireTimeout: number, fn: () => Promise<R>) => Promise<R>
 
+/**
+ * Resolve mapped types and show the derived keys and their types when hovering in
+ * VS Code, instead of just showing the names those mapped types are defined with.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+type Prettify<T> = T extends Function ? T : { [K in keyof T]: T[K] }
+
+/**
+ * Get the keys of T without any keys of U.
+ */
+type Without<T, U> = {
+  [P in Exclude<keyof T, keyof U>]?: never
+}
+
+/**
+ * Skip evaluating `U` if `T` is `unknown`.
+ */
+type EvalIfNotUnknown<T, U> = unknown extends T ? never : U
+
+/**
+ * Restrict using either exclusively the keys of `T` or exclusively the keys of `U`.
+ *
+ * No unique keys of `T` can be used simultaneously with any unique keys of `U`.
+ *
+ **/
+type XOR<A, B, C = unknown, D = unknown, E = unknown> = Prettify<
+  | (Without<B & C & D & E, A> & A)
+  | (Without<A & C & D & E, B> & B)
+  | EvalIfNotUnknown<C, Without<A & B & D & E, C> & C>
+  | EvalIfNotUnknown<D, Without<A & B & C & E, D> & D>
+  | EvalIfNotUnknown<E, Without<A & B & C & D, E> & E>
+>
+
+export type AuthRequestResult<T> =
+  | {
+      data: T
+      error: null
+    }
+  | {
+      data: null
+      error: AuthError
+    }
+
+export type AuthRequestResultSafeDestructure<T> =
+  | { data: T; error: null }
+  | {
+      data: T extends object ? { [K in keyof T]: null } : null
+      error: AuthError
+    }
+
+// Client Options
 export type GoTrueClientOptions = {
   /* The URL of the GoTrue server. */
   url?: string
@@ -169,6 +220,11 @@ export type UserResponse = AuthRequestResultSafeDestructure<{
   user: User
 }>
 
+export type GenerateLinkResponse = AuthRequestResultSafeDestructure<{
+  properties: GenerateLinkProperties
+  user: User
+}>
+
 export interface Session {
   /**
    * The oauth provider token. If present, this can be used to make external API requests to the oauth provider used.
@@ -237,10 +293,6 @@ export interface UserIdentity {
 
 export type FactorType = 'totp' | 'phone' | 'webauthn'
 
-// Factor shape types for generic constraints
-export type FactorShape = { type: 'totp' } | { type: 'webauthn' }
-export type ChallengeFactorShape = Extract<FactorShape, { type: 'totp' } | { type: 'webauthn' }>
-
 /**
  * A MFA factor.
  *
@@ -248,49 +300,37 @@ export type ChallengeFactorShape = Extract<FactorShape, { type: 'totp' } | { typ
  * @see {@link GoTrueMFAApi#listFactors}
  * @see {@link GoTrueMFAAdminApi#listFactors}
  */
-export type Factor =
+export type Factor<
+  Type extends FactorType = FactorType,
+  Status extends 'verified' | 'unverified' = any
+> =
   | {
-      /** ID of the factor. */
       id: string
-      /** Friendly name of the factor, useful to disambiguate between multiple factors. */
       friendly_name?: string
-      /** Type of factor. */
-      factor_type: 'totp' | 'phone'
-      /** Factor's status. */
-      status: 'verified' | 'unverified'
+      factor_type: Type
+      status: Status
       created_at: string
       updated_at: string
     }
-  | {
-      /** ID of the factor. */
-      id: string
-      /** Friendly name of the factor, useful to disambiguate between multiple factors. */
-      friendly_name?: string
-      /** Type of factor. */
-      factor_type: 'webauthn'
-      /** Factor's status - unverified. */
-      status: 'unverified'
-      created_at: string
-      updated_at: string
-    }
-  | {
-      /** ID of the factor. */
-      id: string
-      /** Friendly name of the factor, useful to disambiguate between multiple factors. */
-      friendly_name?: string
-      /** Type of factor. */
-      factor_type: 'webauthn'
-      /** Factor's status - verified. */
-      status: 'verified'
-      created_at: string
-      updated_at: string
-      /**
-       * WebAuthn Authenticator Attestation GUID.
-       * Only available for verified WebAuthn factors.
-       * Identifies the type/model of the authenticator.
-       */
-      web_authn_aaguid?: string
-    }
+  | (
+      | {
+          id: string
+          friendly_name?: string
+          factor_type: Extract<FactorType, 'webauthn'>
+          status: Status
+          created_at: string
+          updated_at: string
+        }
+      | {
+          id: string
+          friendly_name?: string
+          factor_type: Extract<FactorType, 'webauthn'>
+          status: Status
+          created_at: string
+          updated_at: string
+          web_authn_aaguid?: string
+        }
+    )
 
 export interface UserAppMetadata {
   provider?: string
@@ -823,11 +863,6 @@ export type GenerateLinkParams =
   | GenerateRecoveryLinkParams
   | GenerateEmailChangeLinkParams
 
-export type GenerateLinkResponse = AuthRequestResultSafeDestructure<{
-  properties: GenerateLinkProperties
-  user: User
-}>
-
 /** The properties related to the email link generated  */
 export type GenerateLinkProperties = {
   /**
@@ -921,6 +956,8 @@ export type BaseMFAChallengeParams = {
   factorId: string
 }
 
+export type MFAChallengeTOTPParams = BaseMFAChallengeParams
+
 export type MFAChallengePhoneParams<Channel extends MFATOTPChannel = MFATOTPChannel> = {
   /** Messaging channel to use (e.g. whatsapp or sms). Only relevant for phone factors */
   channel: Channel
@@ -936,6 +973,9 @@ export type MFAChallengeWebAuthnParams = {
   }
 }
 
+export type MFAChallengeParams =
+  | BaseMFAChallengeParams & XOR<MFAChallengePhoneParams, MFAChallengeWebAuthnParams, object>
+
 // Base challenge response data
 export type MFABaseChallengeData<Type extends string> = {
   /** ID of the newly created challenge. */
@@ -946,71 +986,35 @@ export type MFABaseChallengeData<Type extends string> = {
   expires_at: Type extends 'webauthn' ? number | undefined : number
 }
 
-// WebAuthn-specific challenge data
 type MFAWebAuthnChallengeData = MFABaseChallengeData<'webauthn'> &
   (
     | {
-        credential_creation_options: {
-          publicKey: PublicKeyCredentialCreationOptions
-        }
+        credential_creation_options: { publicKey: PublicKeyCredentialCreationOptions }
         credential_request_options?: never
       }
     | {
         credential_creation_options?: never
-        credential_request_options: {
-          publicKey: PublicKeyCredentialRequestOptions
-        }
+        credential_request_options: { publicKey: PublicKeyCredentialRequestOptions }
       }
   )
 
-// All challenge data types as a union
-type MFAChallengeData =
-  | MFAWebAuthnChallengeData
-  | MFABaseChallengeData<'totp'>
-  | MFABaseChallengeData<'phone'>
-
-// Generic challenge response
-export type MFAChallengeResponse<Type extends 'webauthn' | 'totp' | 'phone'> = AuthRequestResult<
-  Extract<MFAChallengeData, { type: Type }>
+export type AuthMFAChallengeResponse<
+  Type extends 'webauthn' | 'totp' | 'phone' = 'totp' | 'phone'
+> = AuthRequestResult<
+  Extract<
+    MFAWebAuthnChallengeData | MFABaseChallengeData<'totp'> | MFABaseChallengeData<'phone'>,
+    { type: Type }
+  >
 >
 
-export type MFAChallengeTypeMap = {
-  webauthn: {
-    params: BaseMFAChallengeParams & MFAChallengeWebAuthnParams
-    response: MFAChallengeResponse<'webauthn'>
-  }
-  phone: {
-    params: BaseMFAChallengeParams & MFAChallengePhoneParams<MFATOTPChannel>
-    response: MFAChallengeResponse<'phone'>
-  }
-  totp: {
-    params: BaseMFAChallengeParams
-    response: MFAChallengeResponse<'totp'>
-  }
-}
+export type InferMFAChallengeResponse<T extends MFAChallengeParams = MFAChallengeParams> =
+  AuthMFAChallengeResponse<
+    'webAuthn' extends keyof T ? 'webauthn' : 'channel' extends keyof T ? 'phone' : 'totp'
+  >
 
-export type InferResponse<T, Map> = Map extends Record<string, { params: any; response: any }>
-  ? T extends Map['totp']['params']
-    ? Map['totp']['response']
-    : T extends Map['phone']['params']
-    ? Map['phone']['response']
-    : T extends Map['webauthn']['params']
-    ? Map['webauthn']['response']
-    : never
-  : never
-
-export type InferMFAChallengeResponse<T> = T extends MFAChallengeTypeMap['webauthn']['params']
-  ? MFAChallengeTypeMap['webauthn']['response']
-  : T extends MFAChallengeTypeMap['phone']['params']
-  ? MFAChallengeTypeMap['phone']['response']
-  : T extends MFAChallengeTypeMap['totp']['params']
-  ? MFAChallengeTypeMap['totp']['response']
-  : never
-
-// Export the specific types for backwards compatibility if needed
-export type MFAChallengeWebAuthnResponse = MFAChallengeResponse<'webauthn'>
-export type MFAChallengeTOTPResponse = MFAChallengeResponse<'totp'>
-export type MFAChallengePhoneResponse = MFAChallengeResponse<'phone'>
+export type MFAChallengeWebAuthnResponse = AuthMFAChallengeResponse<'webauthn'>
+export type MFAChallengeTOTPResponse = AuthMFAChallengeResponse<'totp'>
+export type MFAChallengePhoneResponse = AuthMFAChallengeResponse<'phone'>
 
 export type MFAChallengeAndVerifyParams = {
   /** ID of the factor being verified. Returned in enroll(). */
@@ -1019,24 +1023,7 @@ export type MFAChallengeAndVerifyParams = {
   code: string
 }
 
-export type AuthRequestResult<T> =
-  | {
-      data: T
-      error: null
-    }
-  | {
-      data: null
-      error: AuthError
-    }
-
-export type AuthRequestResultSafeDestructure<T> =
-  | { data: T; error: null }
-  | {
-      data: T extends object ? { [K in keyof T]: null } : null
-      error: AuthError
-    }
-
-export type AuthMFAVerifyResponse = AuthRequestResult<{
+export type MFAVerifyResponse = {
   /** New access token (JWT) after successful verification. */
   access_token: string
   /** Type of token, typically `Bearer`. */
@@ -1047,7 +1034,9 @@ export type AuthMFAVerifyResponse = AuthRequestResult<{
   refresh_token: string
   /** Updated user profile. */
   user: User
-}>
+}
+
+export type AuthMFAVerifyResponse = AuthRequestResult<MFAVerifyResponse>
 
 export type AuthMFAUnenrollResponse = AuthRequestResult<{
   /** ID of the factor that was successfully unenrolled. */
@@ -1058,10 +1047,14 @@ export type AuthMFAListFactorsResponse = AuthRequestResult<{
   /** All available factors (verified and unverified). */
   all: Factor[]
 
-  /** Only verified TOTP factors. (A subset of `all`.) */
-  totp: Factor[]
-  /** Only verified Phone factors. (A subset of `all`.) */
-  phone: Factor[]
+  /** Only TOTP factors. (A subset of `all`.) */
+  totp: Factor<'totp', 'verified'>[]
+
+  /** Only Phone factors. (A subset of `all`.) */
+  phone: Factor<'phone', 'verified'>[]
+
+  /** Only WebAuthn factors. (A subset of `all`.) */
+  webAuthn: Factor<'webauthn', 'verified'>[]
 }>
 
 export type AuthenticatorAssuranceLevels = 'aal1' | 'aal2'
@@ -1101,41 +1094,16 @@ export interface GoTrueMFAApi {
    * Upon verifying a factor, all other sessions are logged out and the current session's authenticator level is promoted to `aal2`.
    *
    */
-  enroll<T extends MFAEnrollParams>(
+  enroll<T extends Prettify<MFAEnrollParams>>(
     params: T
-  ): Promise<
-    T extends MFAEnrollTOTPParams
-      ? AuthMFAEnrollTOTPResponse
-      : T extends MFAEnrollPhoneParams
-      ? AuthMFAEnrollPhoneResponse
-      : T extends MFAEnrollWebAuthnParams
-      ? AuthMFAEnrollWebAuthnResponse
-      : never
-  >
+  ): Promise<Prettify<InferAuthMFAEnrollResponse<T>>>
   /**
    * Prepares a challenge used to verify that a user has access to a MFA
    * factor.
-   *
-   * @typeParam F - The factor type to infer the response type. Pass the enrolled factor to get proper type inference.
-   *
-   * @example
-   * ```typescript
-   * const { data: factor } = await client.mfa.enroll({
-   *   factorType: 'webauthn',
-   *   friendlyName: 'My Security Key'
-   * });
-   *
-   * // Pass the factor type as a generic to get proper type inference
-   * const challenge = await client.mfa.challenge<typeof factor>({
-   *   factorId: factor.id,
-   *   webAuthn: {}
-   * });
-   * // challenge is now correctly typed as AuthMFAChallengeWebAuthnResponse
-   * ```
    */
-  challenge<T extends MFAChallengeTypeMap[keyof MFAChallengeTypeMap]['params']>(
+  challenge<T extends MFAChallengeParams>(
     params: T
-  ): Promise<InferMFAChallengeResponse<T>>
+  ): Promise<Prettify<InferMFAChallengeResponse<T>>>
 
   /**
    * Verifies a code against a challenge. The verification code is
@@ -1293,6 +1261,7 @@ export type SignOut = {
   scope?: 'global' | 'local' | 'others'
 }
 
+// Base enroll params
 export type MFAEnrollBaseParams = {
   /** Human readable name assigned to the factor. */
   friendlyName?: string
@@ -1303,17 +1272,18 @@ export type MFAEnrollTOTPParams = MFAEnrollBaseParams & {
   /** Domain which the user is enrolled with. */
   issuer?: string
 }
+
 export type MFAEnrollPhoneParams = MFAEnrollBaseParams & {
   factorType: 'phone'
   /** Phone number associated with a factor. Number should conform to E.164 format */
   phone: string
 }
+
 export type MFAEnrollWebAuthnParams = MFAEnrollBaseParams & {
   factorType: 'webauthn'
 }
 
-export type MFAEnrollParams = MFAEnrollTOTPParams | MFAEnrollPhoneParams | MFAEnrollWebAuthnParams
-
+// Base enrollment response data
 type MFABaseEnrollData<Type extends string> = {
   /** ID of the factor that was just enrolled (in an unverified state). */
   id: string
@@ -1323,6 +1293,7 @@ type MFABaseEnrollData<Type extends string> = {
   friendly_name?: string
 }
 
+// TOTP-specific enrollment data
 type MFATOTPEnrollData = MFABaseEnrollData<'totp'> & {
   /** TOTP enrollment information. */
   totp: {
@@ -1340,59 +1311,36 @@ type MFATOTPEnrollData = MFABaseEnrollData<'totp'> & {
   }
 }
 
+// Phone-specific enrollment data
 type MFAPhoneEnrollData = MFABaseEnrollData<'phone'> & {
   /** Phone number of the MFA factor in E.164 format. Used to send messages  */
   phone: string
 }
 
-export type MFAWebAuthnEnrollData = MFABaseEnrollData<'webauthn'>
+// WebAuthn enrollment data
+type MFAWebAuthnEnrollData = MFABaseEnrollData<'webauthn'>
 
-type EnrollData = MFATOTPEnrollData | MFAPhoneEnrollData | MFAWebAuthnEnrollData
+// Union of all enrollment data types
+type MFAEnrollData = MFATOTPEnrollData | MFAPhoneEnrollData | MFAWebAuthnEnrollData
 
-export type AuthMFAEnrollResponse<Type extends 'totp' | 'phone' | 'webauthn'> = AuthRequestResult<
-  Extract<EnrollData, { type: Type }>
+// Generic enrollment response
+export type AuthMFAEnrollResponse<
+  Type extends 'totp' | 'phone' | 'webauthn' = 'totp' | 'phone' | 'webauthn'
+> = AuthRequestResult<Extract<MFAEnrollData, { type: Type }>>
+
+export type MFAEnrollParams =
+  | (MFAEnrollBaseParams & MFAEnrollTOTPParams)
+  | (MFAEnrollBaseParams & MFAEnrollPhoneParams)
+  | (MFAEnrollBaseParams & MFAEnrollWebAuthnParams)
+
+export type InferAuthMFAEnrollResponse<T extends MFAEnrollParams> = AuthMFAEnrollResponse<
+  T['factorType']
 >
 
+// Export specific types for backwards compatibility
 export type AuthMFAEnrollTOTPResponse = AuthMFAEnrollResponse<'totp'>
 export type AuthMFAEnrollPhoneResponse = AuthMFAEnrollResponse<'phone'>
 export type AuthMFAEnrollWebAuthnResponse = AuthMFAEnrollResponse<'webauthn'>
-
-export type MFAEnrollTypeMap = {
-  totp: {
-    params: MFAEnrollTOTPParams
-    response: AuthMFAEnrollResponse<'totp'>
-  }
-  phone: {
-    params: MFAEnrollPhoneParams
-    response: AuthMFAEnrollResponse<'phone'>
-  }
-  webauthn: {
-    params: MFAEnrollWebAuthnParams
-    response: AuthMFAEnrollResponse<'webauthn'>
-  }
-}
-
-export type InferEnrollResponse<T> = T extends MFAEnrollTypeMap['totp']['params']
-  ? MFAEnrollTypeMap['totp']['response']
-  : T extends MFAEnrollTypeMap['phone']['params']
-  ? MFAEnrollTypeMap['phone']['response']
-  : T extends MFAEnrollTypeMap['webauthn']['params']
-  ? MFAEnrollTypeMap['webauthn']['response']
-  : never
-
-/** WebAuthn enrollment verification params (for unverified factors) */
-export type MFAVerifyWebAuthnEnrollmentParams = MFAVerifyBaseParams & {
-  /** WebAuthn enrollment parameters */
-  webAuthn: {
-    /** Relying party ID */
-    rpId?: string
-    /** Relying party origins (comma-separated) */
-    rpOrigins?: string[]
-    /** Creation response from the authenticator */
-    creationResponse: Credential
-    assertionResponse?: never
-  }
-}
 
 export type JwtHeader = {
   alg: 'RS256' | 'ES256' | 'HS256'

@@ -69,7 +69,7 @@ export function identifyRegistrationError({
 }: {
   error: Error
   options: CredentialCreationOptions
-}): WebAuthnError | Error {
+}): WebAuthnError {
   const { publicKey } = options
 
   if (!publicKey) {
@@ -190,7 +190,11 @@ export function identifyRegistrationError({
     })
   }
 
-  return error
+  return new WebAuthnError({
+    message: 'a Non-Webauthn related error has occurred',
+    code: 'ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY',
+    cause: error,
+  })
 }
 
 /**
@@ -202,7 +206,7 @@ export function identifyAuthenticationError({
 }: {
   error: Error
   options: CredentialRequestOptions
-}): WebAuthnError | Error {
+}): WebAuthnError {
   const { publicKey } = options
 
   if (!publicKey) {
@@ -256,5 +260,9 @@ export function identifyAuthenticationError({
     })
   }
 
-  return error
+  return new WebAuthnError({
+    message: 'a Non-Webauthn related error has occurred',
+    code: 'ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY',
+    cause: error,
+  })
 }

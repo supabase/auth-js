@@ -68,6 +68,7 @@
     "rimraf": "^3.0.2",
     "semantic-release-plugin-update-version-in-files": "^1.1.0",
     "ts-jest": "^28.0.7",
+    "ts-xor": "^1.3.0",
     "typedoc": "^0.22.16",
     "typescript": "^5.9.2"
   }
