@@ -125,6 +125,8 @@ import type {
   InferMFAChallengeResponse,
   MFAEnrollTypeMap,
   InferEnrollResponse,
+  AuthRequestResult,
+  AuthRequestResultSafeDestructure,
 } from './lib/types'
 import {
   createSiweMessage,
@@ -674,13 +676,9 @@ export default class GoTrueClient {
    * With slight variation on Solana's side.
    * @reference https://eips.ethereum.org/EIPS/eip-4361
    */
-  async signInWithWeb3(credentials: Web3Credentials): Promise<
-    | {
-        data: { session: Session; user: User }
-        error: null
-      }
-    | { data: { session: null; user: null }; error: AuthError }
-  > {
+  async signInWithWeb3(
+    credentials: Web3Credentials
+  ): Promise<AuthRequestResultSafeDestructure<{ session: Session; user: User }>> {
     const { chain } = credentials
 
     switch (chain) {
@@ -1455,18 +1453,9 @@ export default class GoTrueClient {
   private async _useSession<R>(
     fn: (
       result:
-        | {
-            data: {
-              session: Session
-            }
-            error: null
-          }
-        | {
-            data: {
-              session: null
-            }
-            error: AuthError
-          }
+        | AuthRequestResultSafeDestructure<{
+            session: Session
+          }>
         | {
             data: {
               session: null
@@ -1589,7 +1578,7 @@ export default class GoTrueClient {
         return { data: { session: currentSession }, error: null }
       }
 
-      const { session, error } = await this._callRefreshToken(currentSession.refresh_token)
+      const { data: session, error } = await this._callRefreshToken(currentSession.refresh_token)
       if (error) {
         return { data: { session: null }, error }
       }
@@ -1768,7 +1757,7 @@ export default class GoTrueClient {
       }
 
       if (hasExpired) {
-        const { session: refreshedSession, error } = await this._callRefreshToken(
+        const { data: refreshedSession, error } = await this._callRefreshToken(
           currentSession.refresh_token
         )
         if (error) {
@@ -1838,7 +1827,7 @@ export default class GoTrueClient {
           throw new AuthSessionMissingError()
         }
 
-        const { session, error } = await this._callRefreshToken(currentSession.refresh_token)
+        const { data: session, error } = await this._callRefreshToken(currentSession.refresh_token)
         if (error) {
           return { data: { user: null, session: null }, error: error }
         }
@@ -1864,13 +1853,7 @@ export default class GoTrueClient {
   private async _getSessionFromURL(
     params: { [parameter: string]: string },
     callbackUrlType: string
-  ): Promise<
-    | {
-        data: { session: Session; redirectType: string | null }
-        error: null
-      }
-    | { data: { session: null; redirectType: null }; error: AuthError }
-  > {
+  ): Promise<AuthRequestResultSafeDestructure<{ session: Session; redirectType: string | null }>> {
     try {
       if (!isBrowser()) throw new AuthImplicitGrantRedirectError('No browser detected.')
 
@@ -2125,13 +2108,7 @@ export default class GoTrueClient {
       redirectTo?: string
       captchaToken?: string
     } = {}
-  ): Promise<
-    | {
-        data: {}
-        error: null
-      }
-    | { data: null; error: AuthError }
-  > {
+  ): Promise<AuthRequestResult<{}>> {
     let codeChallenge: string | null = null
     let codeChallengeMethod: string | null = null
 
@@ -2166,13 +2143,9 @@ export default class GoTrueClient {
    * Gets all the identities linked to a user.
    */
   async getUserIdentities(): Promise<
-    | {
-        data: {
-          identities: UserIdentity[]
-        }
-        error: null
-      }
-    | { data: null; error: AuthError }
+    AuthRequestResult<{
+      identities: UserIdentity[]
+    }>
   > {
     try {
       const { data, error } = await this.getUser()
@@ -2225,13 +2198,7 @@ export default class GoTrueClient {
   /**
    * Unlinks an identity from a user by deleting it. The user will no longer be able to sign in with that identity once it's unlinked.
    */
-  async unlinkIdentity(identity: UserIdentity): Promise<
-    | {
-        data: {}
-        error: null
-      }
-    | { data: null; error: AuthError }
-  > {
+  async unlinkIdentity(identity: UserIdentity): Promise<AuthRequestResult<{}>> {
     try {
       return await this._useSession(async (result) => {
         const { data, error } = result
@@ -2489,7 +2456,7 @@ export default class GoTrueClient {
       await this._saveSession(data.session)
       await this._notifyAllSubscribers('TOKEN_REFRESHED', data.session)
 
-      const result = { session: data.session, error: null }
+      const result = { data: data.session, error: null }
 
       this.refreshingDeferred.resolve(result)
 
@@ -2498,7 +2465,7 @@ export default class GoTrueClient {
       this._debug(debugName, 'error', error)
 
       if (isAuthError(error)) {
-        const result = { session: null, error }
+        const result = { data: null, error }
 
         if (!isAuthRetryableFetchError(error)) {
           await this._removeSession()
@@ -3338,11 +3305,7 @@ export default class GoTrueClient {
       jwks?: { keys: JWK[] }
     } = {}
   ): Promise<
-    | {
-        data: { claims: JwtPayload; header: JwtHeader; signature: Uint8Array }
-        error: null
-      }
-    | { data: null; error: AuthError }
+    | AuthRequestResult<{ claims: JwtPayload; header: JwtHeader; signature: Uint8Array }>
     | { data: null; error: null }
   > {
     try {

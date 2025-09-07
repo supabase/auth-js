@@ -104,87 +104,39 @@ export type WeakPassword = {
   message: string
 }
 
-export type AuthResponse =
-  | {
-      data: {
-        user: User | null
-        session: Session | null
-      }
-      error: null
-    }
-  | {
-      data: {
-        user: null
-        session: null
-      }
-      error: AuthError
-    }
+export type AuthResponse = AuthRequestResultSafeDestructure<{
+  user: User | null
+  session: Session | null
+  weak_password?: WeakPassword | null
+}>
 
-export type AuthResponsePassword =
-  | {
-      data: {
-        user: User | null
-        session: Session | null
-        weak_password?: WeakPassword | null
-      }
-      error: null
-    }
-  | {
-      data: {
-        user: null
-        session: null
-      }
-      error: AuthError
-    }
+export type AuthResponsePassword = AuthRequestResult<{
+  user: User | null
+  session: Session | null
+  weak_password?: WeakPassword | null
+}>
 
 /**
  * AuthOtpResponse is returned when OTP is used.
  *
  * {@see AuthResponse}
  */
-export type AuthOtpResponse =
-  | {
-      data: { user: null; session: null; messageId?: string | null }
-      error: null
-    }
-  | {
-      data: { user: null; session: null; messageId?: string | null }
-      error: AuthError
-    }
+export type AuthOtpResponse = AuthRequestResultSafeDestructure<{
+  user: User | null
+  session: Session | null
+  messageId?: string | null
+}>
 
-export type AuthTokenResponse =
-  | {
-      data: {
-        user: User
-        session: Session
-      }
-      error: null
-    }
-  | {
-      data: {
-        user: null
-        session: null
-      }
-      error: AuthError
-    }
+export type AuthTokenResponse = AuthRequestResultSafeDestructure<{
+  user: User | null
+  session: Session | null
+}>
 
-export type AuthTokenResponsePassword =
-  | {
-      data: {
-        user: User
-        session: Session
-        weakPassword?: WeakPassword
-      }
-      error: null
-    }
-  | {
-      data: {
-        user: null
-        session: null
-        weakPassword?: null
-      }
-      error: AuthError
-    }
+export type AuthTokenResponsePassword = AuthRequestResultSafeDestructure<{
+  user: User
+  session: Session
+  weakPassword?: WeakPassword
+}>
 
 export type OAuthResponse =
   | {
@@ -202,38 +154,20 @@ export type OAuthResponse =
       error: AuthError
     }
 
-export type SSOResponse =
-  | {
-      data: {
-        /**
-         * URL to open in a browser which will complete the sign-in flow by
-         * taking the user to the identity provider's authentication flow.
-         *
-         * On browsers you can set the URL to `window.location.href` to take
-         * the user to the authentication flow.
-         */
-        url: string
-      }
-      error: null
-    }
-  | {
-      data: null
-      error: AuthError
-    }
+export type SSOResponse = AuthRequestResult<{
+  /**
+   * URL to open in a browser which will complete the sign-in flow by
+   * taking the user to the identity provider's authentication flow.
+   *
+   * On browsers you can set the URL to `window.location.href` to take
+   * the user to the authentication flow.
+   */
+  url: string
+}>
 
-export type UserResponse =
-  | {
-      data: {
-        user: User
-      }
-      error: null
-    }
-  | {
-      data: {
-        user: null
-      }
-      error: AuthError
-    }
+export type UserResponse = AuthRequestResultSafeDestructure<{
+  user: User
+}>
 
 export interface Session {
   /**
@@ -889,21 +823,10 @@ export type GenerateLinkParams =
   | GenerateRecoveryLinkParams
   | GenerateEmailChangeLinkParams
 
-export type GenerateLinkResponse =
-  | {
-      data: {
-        properties: GenerateLinkProperties
-        user: User
-      }
-      error: null
-    }
-  | {
-      data: {
-        properties: null
-        user: null
-      }
-      error: AuthError
-    }
+export type GenerateLinkResponse = AuthRequestResultSafeDestructure<{
+  properties: GenerateLinkProperties
+  user: User
+}>
 
 /** The properties related to the email link generated  */
 export type GenerateLinkProperties = {
@@ -1047,15 +970,9 @@ type MFAChallengeData =
   | MFABaseChallengeData<'phone'>
 
 // Generic challenge response
-export type MFAChallengeResponse<Type extends 'webauthn' | 'totp' | 'phone'> =
-  | {
-      data: Extract<MFAChallengeData, { type: Type }>
-      error: null
-    }
-  | {
-      data: null
-      error: AuthError
-    }
+export type MFAChallengeResponse<Type extends 'webauthn' | 'totp' | 'phone'> = AuthRequestResult<
+  Extract<MFAChallengeData, { type: Type }>
+>
 
 export type MFAChallengeTypeMap = {
   webauthn: {
@@ -1102,81 +1019,72 @@ export type MFAChallengeAndVerifyParams = {
   code: string
 }
 
-export type AuthMFAVerifyResponse =
+export type AuthRequestResult<T> =
   | {
-      data: {
-        /** New access token (JWT) after successful verification. */
-        access_token: string
-
-        /** Type of token, typically `Bearer`. */
-        token_type: string
-
-        /** Number of seconds in which the access token will expire. */
-        expires_in: number
-
-        /** Refresh token you can use to obtain new access tokens when expired. */
-        refresh_token: string
-
-        /** Updated user profile. */
-        user: User
-      }
+      data: T
       error: null
     }
-  | { data: null; error: AuthError }
-
-export type MFAEnrollParams = MFAEnrollTOTPParams | MFAEnrollPhoneParams | MFAEnrollWebAuthnParams
-
-export type AuthMFAUnenrollResponse =
   | {
-      data: {
-        /** ID of the factor that was successfully unenrolled. */
-        id: string
-      }
-      error: null
+      data: null
+      error: AuthError
     }
-  | { data: null; error: AuthError }
 
-export type AuthMFAListFactorsResponse =
+export type AuthRequestResultSafeDestructure<T> =
+  | { data: T; error: null }
   | {
-      data: {
-        /** All available factors (verified and unverified). */
-        all: Factor[]
-
-        /** Only verified TOTP factors. (A subset of `all`.) */
-        totp: Factor[]
-        /** Only verified Phone factors. (A subset of `all`.) */
-        phone: Factor[]
-      }
-      error: null
+      data: T extends object ? { [K in keyof T]: null } : null
+      error: AuthError
     }
-  | { data: null; error: AuthError }
+
+export type AuthMFAVerifyResponse = AuthRequestResult<{
+  /** New access token (JWT) after successful verification. */
+  access_token: string
+  /** Type of token, typically `Bearer`. */
+  token_type: string
+  /** Number of seconds in which the access token will expire. */
+  expires_in: number
+  /** Refresh token you can use to obtain new access tokens when expired. */
+  refresh_token: string
+  /** Updated user profile. */
+  user: User
+}>
+
+export type AuthMFAUnenrollResponse = AuthRequestResult<{
+  /** ID of the factor that was successfully unenrolled. */
+  id: string
+}>
+
+export type AuthMFAListFactorsResponse = AuthRequestResult<{
+  /** All available factors (verified and unverified). */
+  all: Factor[]
+
+  /** Only verified TOTP factors. (A subset of `all`.) */
+  totp: Factor[]
+  /** Only verified Phone factors. (A subset of `all`.) */
+  phone: Factor[]
+}>
 
 export type AuthenticatorAssuranceLevels = 'aal1' | 'aal2'
 
-export type AuthMFAGetAuthenticatorAssuranceLevelResponse =
-  | {
-      data: {
-        /** Current AAL level of the session. */
-        currentLevel: AuthenticatorAssuranceLevels | null
+export type AuthMFAGetAuthenticatorAssuranceLevelResponse = AuthRequestResult<{
+  /** Current AAL level of the session. */
+  currentLevel: AuthenticatorAssuranceLevels | null
 
-        /**
-         * Next possible AAL level for the session. If the next level is higher
-         * than the current one, the user should go through MFA.
-         *
-         * @see {@link GoTrueMFAApi#challenge}
-         */
-        nextLevel: AuthenticatorAssuranceLevels | null
+  /**
+   * Next possible AAL level for the session. If the next level is higher
+   * than the current one, the user should go through MFA.
+   *
+   * @see {@link GoTrueMFAApi#challenge}
+   */
+  nextLevel: AuthenticatorAssuranceLevels | null
 
-        /**
-         * A list of all authentication methods attached to this session. Use
-         * the information here to detect the last time a user verified a
-         * factor, for example if implementing a step-up scenario.
-         */
-        currentAuthenticationMethods: AMREntry[]
-      }
-      error: null
-    }
-  | { data: null; error: AuthError }
+  /**
+   * A list of all authentication methods attached to this session. Use
+   * the information here to detect the last time a user verified a
+   * factor, for example if implementing a step-up scenario.
+   */
+  currentAuthenticationMethods: AMREntry[]
+}>
 
 /**
  * Contains the full multi-factor authentication API.
@@ -1276,15 +1184,10 @@ export interface GoTrueMFAApi {
 /**
  * @expermental
  */
-export type AuthMFAAdminDeleteFactorResponse =
-  | {
-      data: {
-        /** ID of the factor that was successfully deleted. */
-        id: string
-      }
-      error: null
-    }
-  | { data: null; error: AuthError }
+export type AuthMFAAdminDeleteFactorResponse = AuthRequestResult<{
+  /** ID of the factor that was successfully deleted. */
+  id: string
+}>
 
 /**
  * @expermental
@@ -1300,15 +1203,10 @@ export type AuthMFAAdminDeleteFactorParams = {
 /**
  * @expermental
  */
-export type AuthMFAAdminListFactorsResponse =
-  | {
-      data: {
-        /** All factors attached to the user. */
-        factors: Factor[]
-      }
-      error: null
-    }
-  | { data: null; error: AuthError }
+export type AuthMFAAdminListFactorsResponse = AuthRequestResult<{
+  /** All factors attached to the user. */
+  factors: Factor[]
+}>
 
 /**
  * @expermental
@@ -1365,15 +1263,7 @@ export type SupportedStorage = PromisifyMethods<
 
 export type InitializeResult = { error: AuthError | null }
 
-export type CallRefreshTokenResult =
-  | {
-      session: Session
-      error: null
-    }
-  | {
-      session: null
-      error: AuthError
-    }
+export type CallRefreshTokenResult = AuthRequestResult<Session>
 
 export type Pagination = {
   [key: string]: any
@@ -1422,6 +1312,8 @@ export type MFAEnrollWebAuthnParams = MFAEnrollBaseParams & {
   factorType: 'webauthn'
 }
 
+export type MFAEnrollParams = MFAEnrollTOTPParams | MFAEnrollPhoneParams | MFAEnrollWebAuthnParams
+
 type MFABaseEnrollData<Type extends string> = {
   /** ID of the factor that was just enrolled (in an unverified state). */
   id: string
@@ -1457,12 +1349,9 @@ export type MFAWebAuthnEnrollData = MFABaseEnrollData<'webauthn'>
 
 type EnrollData = MFATOTPEnrollData | MFAPhoneEnrollData | MFAWebAuthnEnrollData
 
-export type AuthMFAEnrollResponse<Type extends 'totp' | 'phone' | 'webauthn'> =
-  | {
-      data: Extract<EnrollData, { type: Type }>
-      error: null
-    }
-  | { data: null; error: AuthError }
+export type AuthMFAEnrollResponse<Type extends 'totp' | 'phone' | 'webauthn'> = AuthRequestResult<
+  Extract<EnrollData, { type: Type }>
+>
 
 export type AuthMFAEnrollTOTPResponse = AuthMFAEnrollResponse<'totp'>
 export type AuthMFAEnrollPhoneResponse = AuthMFAEnrollResponse<'phone'>
