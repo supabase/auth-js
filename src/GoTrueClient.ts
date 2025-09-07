@@ -61,6 +61,7 @@ import {
   prepareCredentialRequestOptionsForBrowser,
   prepareRegistrationResponseForServer,
   RegistrationResponseJSON,
+  WebAuthnApi,
 } from './lib/webauthn'
 import { bytesToBase64URL, stringToUint8Array } from './lib/base64url'
 import type {
@@ -174,6 +175,10 @@ export default class GoTrueClient {
    * Namespace for the MFA methods.
    */
   mfa: GoTrueMFAApi
+  /**
+   * Namespace for the WebAuthn methods.
+   */
+  webauthn: WebAuthnApi
   /**
    * The storage key used to identify the values saved in localStorage
    */
@@ -298,6 +303,8 @@ export default class GoTrueClient {
       challengeAndVerify: this._challengeAndVerify.bind(this),
       getAuthenticatorAssuranceLevel: this._getAuthenticatorAssuranceLevel.bind(this),
     }
+
+    this.webauthn = new WebAuthnApi(this)
 
     if (this.persistSession) {
       if (settings.storage) {
