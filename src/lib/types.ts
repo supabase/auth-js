@@ -974,7 +974,8 @@ export type MFAChallengeWebAuthnParams = {
 }
 
 export type MFAChallengeParams =
-  | BaseMFAChallengeParams & XOR<MFAChallengePhoneParams, MFAChallengeWebAuthnParams, {}>
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  BaseMFAChallengeParams & XOR<MFAChallengePhoneParams, MFAChallengeWebAuthnParams, {}>
 
 // Base challenge response data
 export type MFABaseChallengeData<Type extends string> = {
