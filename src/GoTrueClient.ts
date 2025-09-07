@@ -62,7 +62,6 @@ import {
   prepareRegistrationResponseForServer,
   RegistrationResponseJSON,
 } from './lib/webauthn'
-
 import { bytesToBase64URL, stringToUint8Array } from './lib/base64url'
 import type {
   AuthChangeEvent,

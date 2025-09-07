@@ -5,7 +5,7 @@ import type {
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
   AuthenticatorAttachment,
-} from '@simplewebauthn/types'
+} from './webauthn.dom'
 
 import { WebAuthnError, isWebAuthnError } from './webauthn.errors'
 

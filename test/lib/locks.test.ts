@@ -28,7 +28,6 @@ describe('navigatorLock', () => {
   })
 
   it('should handle immediate acquisition failure', async () => {
-    // eslint-disable-next-line @stylistic/no-extra-semi
     ;(globalThis.navigator.locks.request as jest.Mock).mockImplementation((_, __, callback) =>
       Promise.resolve(callback(null))
     )

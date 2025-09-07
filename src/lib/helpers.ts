@@ -158,9 +158,7 @@ export class Deferred<T = any> {
   public readonly reject!: (reason?: any) => any
 
   public constructor() {
-    // eslint-disable-next-line @stylistic/no-extra-semi
     ;(this as any).promise = new Deferred.promiseConstructor((res, rej) => {
-      // eslint-disable-next-line @stylistic/no-extra-semi
       ;(this as any).resolve = res
       ;(this as any).reject = rej
     })
@@ -220,7 +218,6 @@ export function retryable<T>(
   isRetryable: (attempt: number, error: any | null, result?: T) => boolean
 ): Promise<T> {
   const promise = new Promise<T>((accept, reject) => {
-    // eslint-disable-next-line @stylistic/no-extra-semi
     ;(async () => {
       for (let attempt = 0; attempt < Infinity; attempt++) {
         try {

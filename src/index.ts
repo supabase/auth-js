@@ -23,4 +23,5 @@ export {
   isWebAuthnError,
   WebAuthnAbortService,
   webAuthnAbortService,
+  browserSupportsWebAuthn,
 } from './lib/webauthn'

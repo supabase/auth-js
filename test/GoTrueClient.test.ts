@@ -338,7 +338,7 @@ describe('GoTrueClient', () => {
       expect(error).toBeNull()
       expect(data.session).not.toBeNull()
 
-      const [{ session: session1, error: error1 }, { session: session2, error: error2 }] =
+      const [{ data: session1, error: error1 }, { data: session2, error: error2 }] =
         await Promise.all([
           // @ts-expect-error 'Allow access to private _callRefreshToken()'
           authWithSession._callRefreshToken(data.session?.refresh_token),
@@ -376,7 +376,7 @@ describe('GoTrueClient', () => {
       expect(error).toBeNull()
       expect(data.session).not.toBeNull()
 
-      const [{ session: session1, error: error1 }, { session: session2, error: error2 }] =
+      const [{ data: session1, error: error1 }, { data: session2, error: error2 }] =
         await Promise.all([
           // @ts-expect-error 'Allow access to private _callRefreshToken()'
           authWithSession._callRefreshToken(data.session?.refresh_token),
