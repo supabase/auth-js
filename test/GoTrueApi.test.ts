@@ -264,6 +264,40 @@ describe('GoTrueAdminApi', () => {
       expect(updatedUser.user).toHaveProperty('email_confirmed_at')
       expect(updatedUser.user?.email_confirmed_at).toBeTruthy()
     })
+
+    test('modify banned_until using updateUserById()', async () => {
+      const { email } = mockUserCredentials()
+      const { error: createError, data: createdUser } = await createNewUserWithEmail({ email })
+
+      expect(createError).toBeNull()
+      expect(createdUser.user).not.toBeUndefined()
+
+      const uid = createdUser.user?.id || ''
+
+      // Set banned_until to a future timestamp
+      const futureTimestamp = '9999-12-31T23:59:59.999Z'
+      const attributes = { banned_until: futureTimestamp }
+
+      const { error: updatedError, data: updatedUser } = await serviceRoleApiClient.updateUserById(
+        uid,
+        attributes
+      )
+
+      expect(updatedError).toBeNull()
+      expect(updatedUser.user).not.toBeUndefined()
+      expect(updatedUser.user?.banned_until).toEqual(futureTimestamp)
+
+      // Test unbanning by setting banned_until to null
+      const unbanAttributes = { banned_until: null }
+      const { error: unbanError, data: unbannedUser } = await serviceRoleApiClient.updateUserById(
+        uid,
+        unbanAttributes
+      )
+
+      expect(unbanError).toBeNull()
+      expect(unbannedUser.user).not.toBeUndefined()
+      expect(unbannedUser.user?.banned_until).toBeNull()
+    })
   })
 
   describe('User deletes', () => {
