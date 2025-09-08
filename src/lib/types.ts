@@ -363,6 +363,7 @@ export interface User {
   is_sso_user?: boolean
   factors?: Factor[]
   deleted_at?: string
+  banned_until?: string
 }
 
 export interface UserAttributes {
@@ -470,6 +471,9 @@ export interface AdminUserAttributes extends Omit<UserAttributes, 'data'> {
    * Allows you to overwrite the default `id` set for the user.
    */
   id?: string
+
+
+  banned_until?: string | null
 }
 
 export interface Subscription {
