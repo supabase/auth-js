@@ -246,11 +246,6 @@ const AMRMethods = [
   'anonymous',
   'sso/saml',
   'magiclink',
-  'email/signup',
-  'email_change',
-  'token_refresh',
-  'recovery',
-  'invite',
   'web3'
 ] as const
 
