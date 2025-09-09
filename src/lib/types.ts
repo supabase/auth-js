@@ -954,7 +954,9 @@ type MFAChallengeAndVerifyPhoneParams = Prettify<
   MFAChallengeAndVerifyBaseParams & MFAChallengeAndVerifyPhoneParamFields
 >
 
-export type MFAChallengeAndVerifyParams = MFAChallengeAndVerifyTOTPParams | MFAChallengeAndVerifyPhoneParams
+export type MFAChallengeAndVerifyParams =
+  | MFAChallengeAndVerifyTOTPParams
+  | MFAChallengeAndVerifyPhoneParams
 
 export type AuthMFAVerifyResponse = RequestResult<{
   /** New access token (JWT) after successful verification. */
@@ -1211,20 +1213,18 @@ export type SignOut = {
 type MFAEnrollParamsBase<T extends FactorType> = {
   /** The type of factor being enrolled. */
   factorType: T
+  /** Human readable name assigned to the factor. */
+  friendlyName?: string
 }
 
 type MFAEnrollTOTPParamFields = {
   /** Domain which the user is enrolled with. */
   issuer?: string
-  /** Human readable name assigned to the factor. */
-  friendlyName?: string
 }
 
 export type MFAEnrollTOTPParams = Prettify<MFAEnrollParamsBase<'totp'> & MFAEnrollTOTPParamFields>
 
 type MFAEnrollPhoneParamFields = {
-  /** Human readable name assigned to the factor. */
-  friendlyName?: string
   /** Phone number associated with a factor. Number should conform to E.164 format */
   phone: string
 }
@@ -1273,6 +1273,8 @@ type AuthMFAEnrollPhoneResponseFields = {
 export type AuthMFAEnrollPhoneResponse = RequestResult<
   Prettify<AuthMFAEnrollResponseBase<'phone'> & AuthMFAEnrollPhoneResponseFields>
 >
+
+
 
 export type JwtHeader = {
   alg: 'RS256' | 'ES256' | 'HS256'
