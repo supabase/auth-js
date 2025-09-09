@@ -899,7 +899,7 @@ export type MFAUnenrollParams = {
   factorId: string
 }
 
-type MFAVerifyBaseParams = {
+type MFAVerifyParamsBase = {
   /** ID of the factor being verified. Returned in enroll(). */
   factorId: string
   /** ID of the challenge being verified. Returned in challenge(). */
@@ -911,11 +911,11 @@ type MFAVerifyTOTPParamFields = {
   code: string
 }
 
-export type MFAVerifyTOTPParams = Prettify<MFAVerifyBaseParams & MFAVerifyTOTPParamFields>
+export type MFAVerifyTOTPParams = Prettify<MFAVerifyParamsBase & MFAVerifyTOTPParamFields>
 
 type MFAVerifyPhoneParamFields = MFAVerifyTOTPParamFields
 
-export type MFAVerifyPhoneParams = Prettify<MFAVerifyBaseParams & MFAVerifyPhoneParamFields>
+export type MFAVerifyPhoneParams = Prettify<MFAVerifyParamsBase & MFAVerifyPhoneParamFields>
 
 export type MFAVerifyParams = MFAVerifyTOTPParams | MFAVerifyPhoneParams
 
@@ -940,18 +940,18 @@ export type MFAChallengePhoneParams = Prettify<
 
 export type MFAChallengeParams = MFAChallengeTOTPParams | MFAChallengePhoneParams
 
-type MFAChallengeAndVerifyBaseParams = Omit<MFAVerifyBaseParams, 'challengeId'>
+type MFAChallengeAndVerifyParamsBase = Omit<MFAVerifyParamsBase, 'challengeId'>
 
 type MFAChallengeAndVerifyTOTPParamFields = MFAVerifyTOTPParamFields
 
 type MFAChallengeAndVerifyTOTPParams = Prettify<
-  MFAChallengeAndVerifyBaseParams & MFAChallengeAndVerifyTOTPParamFields
+  MFAChallengeAndVerifyParamsBase & MFAChallengeAndVerifyTOTPParamFields
 >
 
 type MFAChallengeAndVerifyPhoneParamFields = MFAVerifyPhoneParamFields
 
 type MFAChallengeAndVerifyPhoneParams = Prettify<
-  MFAChallengeAndVerifyBaseParams & MFAChallengeAndVerifyPhoneParamFields
+  MFAChallengeAndVerifyParamsBase & MFAChallengeAndVerifyPhoneParamFields
 >
 
 export type MFAChallengeAndVerifyParams =
