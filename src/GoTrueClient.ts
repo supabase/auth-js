@@ -1964,7 +1964,7 @@ export default class GoTrueClient {
         expires_in: expiresIn,
         expires_at: expiresAt,
         refresh_token,
-        token_type,
+        token_type: token_type as 'bearer',
         user: data.user,
       }
 

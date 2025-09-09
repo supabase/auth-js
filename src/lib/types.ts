@@ -227,13 +227,34 @@ export interface Session {
    * A timestamp of when the token will expire. Returned when a login is confirmed.
    */
   expires_at?: number
-  token_type: string
+  token_type: 'bearer'
 
   /**
    * When using a separate user storage, accessing properties of this object will throw an error.
    */
   user: User
 }
+
+const AMRMethods = [
+  'password',
+  'otp',
+  'oauth',
+  'totp',
+  'mfa/totp',
+  'mfa/phone',
+  'mfa/webauthn',
+  'anonymous',
+  'sso/saml',
+  'magiclink',
+  'email/signup',
+  'email_change',
+  'token_refresh',
+  'recovery',
+  'invite',
+  'web3'
+] as const
+
+export type AMRMethod = typeof AMRMethods[number] | (string & {})
 
 /**
  * An authentication methord reference (AMR) entry.
@@ -245,7 +266,7 @@ export interface Session {
  */
 export interface AMREntry {
   /** Authentication method name. */
-  method: 'password' | 'otp' | 'oauth' | 'mfa/totp' | (string & {})
+  method: AMRMethod
 
   /**
    * Timestamp when the method was successfully used. Represents number of
@@ -933,14 +954,20 @@ type MFAChallengeAndVerifyTOTPParams = Prettify<
   MFAChallengeAndVerifyBaseParams & MFAChallengeAndVerifyTOTPParamFields
 >
 
-export type MFAChallengeAndVerifyParams = MFAChallengeAndVerifyTOTPParams
+type MFAChallengeAndVerifyPhoneParamFields = MFAVerifyPhoneParamFields
+
+type MFAChallengeAndVerifyPhoneParams = Prettify<
+  MFAChallengeAndVerifyBaseParams & MFAChallengeAndVerifyPhoneParamFields
+>
+
+export type MFAChallengeAndVerifyParams = MFAChallengeAndVerifyTOTPParams | MFAChallengeAndVerifyPhoneParams
 
 export type AuthMFAVerifyResponse = RequestResult<{
   /** New access token (JWT) after successful verification. */
   access_token: string
 
-  /** Type of token, typically `Bearer`. */
-  token_type: string
+  /** Type of token, always `bearer`. */
+  token_type: 'bearer'
 
   /** Number of seconds in which the access token will expire. */
   expires_in: number
