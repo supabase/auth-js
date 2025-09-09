@@ -4,6 +4,7 @@ import { AuthError, AuthUnknownError, isAuthError } from './errors'
 import {
   AuthMFAEnrollWebAuthnResponse,
   AuthMFAVerifyResponse,
+  RequestResult,
   BaseMFAChallengeParams,
   MFAChallengeWebAuthnParams,
   MFAEnrollWebAuthnParams,
@@ -298,16 +299,7 @@ export class WebAuthnApi {
     rpId?: string
     rpOrigins?: string[]
     signal?: AbortSignal
-  }) => Promise<
-    | {
-        data: MFAVerifyResponse
-        error: null
-      }
-    | {
-        data: null
-        error: AuthError | WebAuthnError
-      }
-  >
+  }) => Promise<RequestResult<MFAVerifyResponse, WebAuthnError | AuthError>>
 
   constructor(private client: GoTrueClient) {
     // Bind all methods so they can be destructured
@@ -606,16 +598,7 @@ export class WebAuthnApi {
     rpId?: string
     rpOrigins?: string[]
     signal?: AbortSignal
-  }): Promise<
-    | {
-        data: MFAVerifyResponse
-        error: null
-      }
-    | {
-        data: null
-        error: AuthError | WebAuthnError
-      }
-  > {
+  }): Promise<RequestResult<MFAVerifyResponse, WebAuthnError | AuthError>> {
     if (!rpId) {
       return {
         data: null,

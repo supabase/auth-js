@@ -68,13 +68,16 @@ import type {
   AuthChangeEvent,
   AuthenticatorAssuranceLevels,
   AuthFlowType,
+  AuthMFAEnrollPhoneResponse,
+  AuthMFAEnrollTOTPResponse,
+  AuthMFAEnrollWebAuthnResponse,
   AuthMFAGetAuthenticatorAssuranceLevelResponse,
   AuthMFAListFactorsResponse,
   AuthMFAUnenrollResponse,
   AuthMFAVerifyResponse,
   AuthOtpResponse,
-  AuthRequestResult,
-  AuthRequestResultSafeDestructure,
+  RequestResult,
+  RequestResultSafeDestructure,
   AuthResponse,
   AuthResponsePassword,
   AuthTokenResponse,
@@ -95,9 +98,13 @@ import type {
   MFAChallengeAndVerifyParams,
   MFAChallengeParams,
   MFAEnrollParams,
+  MFAEnrollPhoneParams,
+  MFAEnrollTOTPParams,
+  MFAEnrollWebAuthnParams,
   MFAUnenrollParams,
   MFAVerifyParams,
   OAuthResponse,
+  Prettify,
   Provider,
   ResendParams,
   Session,
@@ -678,7 +685,7 @@ export default class GoTrueClient {
    */
   async signInWithWeb3(
     credentials: Web3Credentials
-  ): Promise<AuthRequestResultSafeDestructure<{ session: Session; user: User }>> {
+  ): Promise<RequestResultSafeDestructure<{ session: Session; user: User }>> {
     const { chain } = credentials
 
     switch (chain) {
@@ -1455,7 +1462,7 @@ export default class GoTrueClient {
   private async _useSession<R>(
     fn: (
       result:
-        | AuthRequestResultSafeDestructure<{
+        | RequestResultSafeDestructure<{
             session: Session
           }>
         | {
@@ -1856,7 +1863,7 @@ export default class GoTrueClient {
   private async _getSessionFromURL(
     params: { [parameter: string]: string },
     callbackUrlType: string
-  ): Promise<AuthRequestResultSafeDestructure<{ session: Session; redirectType: string | null }>> {
+  ): Promise<RequestResultSafeDestructure<{ session: Session; redirectType: string | null }>> {
     try {
       if (!isBrowser()) throw new AuthImplicitGrantRedirectError('No browser detected.')
 
@@ -2112,7 +2119,7 @@ export default class GoTrueClient {
       captchaToken?: string
     } = {}
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  ): Promise<AuthRequestResult<{}>> {
+  ): Promise<RequestResult<{}>> {
     let codeChallenge: string | null = null
     let codeChallengeMethod: string | null = null
 
@@ -2148,7 +2155,7 @@ export default class GoTrueClient {
    * Gets all the identities linked to a user.
    */
   async getUserIdentities(): Promise<
-    AuthRequestResult<{
+    RequestResult<{
       identities: UserIdentity[]
     }>
   > {
@@ -2204,7 +2211,7 @@ export default class GoTrueClient {
    * Unlinks an identity from a user by deleting it. The user will no longer be able to sign in with that identity once it's unlinked.
    */
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  async unlinkIdentity(identity: UserIdentity): Promise<AuthRequestResult<{}>> {
+  async unlinkIdentity(identity: UserIdentity): Promise<RequestResult<{}>> {
     try {
       return await this._useSession(async (result) => {
         const { data, error } = result
@@ -2895,11 +2902,18 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#enroll}
    */
+  private async _enroll<T extends MFAEnrollTOTPParams>(
+    params: T
+  ): Promise<Prettify<AuthMFAEnrollTOTPResponse>>
+  private async _enroll<T extends MFAEnrollPhoneParams>(
+    params: T
+  ): Promise<Prettify<AuthMFAEnrollPhoneResponse>>
+  private async _enroll<T extends Prettify<MFAEnrollWebAuthnParams>>(
+    params: T
+  ): Promise<Prettify<AuthMFAEnrollWebAuthnResponse>>
   private async _enroll<T extends MFAEnrollParams>(
     params: T
   ): Promise<InferAuthMFAEnrollResponse<T>> {
-    // TODO: for webauthn, create credentials using credentials.create() and then enroll it
-    // For Multi step, allow dev to specify .create(...) options and then pass it to the rest of the steps.
     try {
       return await this._useSession(async (result) => {
         const { data: sessionData, error: sessionError } = result
@@ -3318,7 +3332,7 @@ export default class GoTrueClient {
       jwks?: { keys: JWK[] }
     } = {}
   ): Promise<
-    | AuthRequestResult<{ claims: JwtPayload; header: JwtHeader; signature: Uint8Array }>
+    | RequestResult<{ claims: JwtPayload; header: JwtHeader; signature: Uint8Array }>
     | { data: null; error: null }
   > {
     try {

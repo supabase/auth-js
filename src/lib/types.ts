@@ -61,14 +61,12 @@ export type LockFunc = <R>(name: string, acquireTimeout: number, fn: () => Promi
  * VS Code, instead of just showing the names those mapped types are defined with.
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-type Prettify<T> = T extends Function ? T : { [K in keyof T]: T[K] }
+export type Prettify<T> = T extends Function ? T : { [K in keyof T]: T[K] }
 
 /**
  * Get the keys of T without any keys of U.
  */
-type Without<T, U> = {
-  [P in Exclude<keyof T, keyof U>]?: never
-}
+type Without<T, U> = { [P in Exclude<keyof T, keyof U>]?: never }
 
 /**
  * Skip evaluating `U` if `T` is `unknown`.
@@ -81,25 +79,19 @@ type EvalIfNotUnknown<T, U> = unknown extends T ? never : U
  * No unique keys of `T` can be used simultaneously with any unique keys of `U`.
  *
  **/
-type XOR<A, B, C = unknown, D = unknown, E = unknown> = Prettify<
-  | (Without<B & C & D & E, A> & A)
-  | (Without<A & C & D & E, B> & B)
-  | EvalIfNotUnknown<C, Without<A & B & D & E, C> & C>
-  | EvalIfNotUnknown<D, Without<A & B & C & E, D> & D>
-  | EvalIfNotUnknown<E, Without<A & B & C & D, E> & E>
->
+type XOR<T, U> = T | U extends object ? (Without<T, U> & U) | (Without<U, T> & T) : T | U
 
-export type AuthRequestResult<T> =
+export type RequestResult<T, ErrorType extends Error = AuthError> =
   | {
       data: T
       error: null
     }
   | {
       data: null
-      error: AuthError
+      error: Error extends AuthError ? AuthError : ErrorType
     }
 
-export type AuthRequestResultSafeDestructure<T> =
+export type RequestResultSafeDestructure<T> =
   | { data: T; error: null }
   | {
       data: T extends object ? { [K in keyof T]: null } : null
@@ -155,13 +147,13 @@ export type WeakPassword = {
   message: string
 }
 
-export type AuthResponse = AuthRequestResultSafeDestructure<{
+export type AuthResponse = RequestResultSafeDestructure<{
   user: User | null
   session: Session | null
   weak_password?: WeakPassword | null
 }>
 
-export type AuthResponsePassword = AuthRequestResult<{
+export type AuthResponsePassword = RequestResult<{
   user: User | null
   session: Session | null
   weak_password?: WeakPassword | null
@@ -172,18 +164,18 @@ export type AuthResponsePassword = AuthRequestResult<{
  *
  * {@see AuthResponse}
  */
-export type AuthOtpResponse = AuthRequestResultSafeDestructure<{
+export type AuthOtpResponse = RequestResultSafeDestructure<{
   user: User | null
   session: Session | null
   messageId?: string | null
 }>
 
-export type AuthTokenResponse = AuthRequestResultSafeDestructure<{
+export type AuthTokenResponse = RequestResultSafeDestructure<{
   user: User | null
   session: Session | null
 }>
 
-export type AuthTokenResponsePassword = AuthRequestResultSafeDestructure<{
+export type AuthTokenResponsePassword = RequestResultSafeDestructure<{
   user: User
   session: Session
   weakPassword?: WeakPassword
@@ -205,7 +197,7 @@ export type OAuthResponse =
       error: AuthError
     }
 
-export type SSOResponse = AuthRequestResult<{
+export type SSOResponse = RequestResult<{
   /**
    * URL to open in a browser which will complete the sign-in flow by
    * taking the user to the identity provider's authentication flow.
@@ -216,11 +208,11 @@ export type SSOResponse = AuthRequestResult<{
   url: string
 }>
 
-export type UserResponse = AuthRequestResultSafeDestructure<{
+export type UserResponse = RequestResultSafeDestructure<{
   user: User
 }>
 
-export type GenerateLinkResponse = AuthRequestResultSafeDestructure<{
+export type GenerateLinkResponse = RequestResultSafeDestructure<{
   properties: GenerateLinkProperties
   user: User
 }>
@@ -975,7 +967,7 @@ export type MFAChallengeWebAuthnParams = {
 
 export type MFAChallengeParams =
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  BaseMFAChallengeParams & XOR<MFAChallengePhoneParams, MFAChallengeWebAuthnParams, {}>
+  BaseMFAChallengeParams & XOR<MFAChallengePhoneParams, XOR<MFAChallengeWebAuthnParams, {}>>
 
 // Base challenge response data
 export type MFABaseChallengeData<Type extends string> = {
@@ -1001,7 +993,7 @@ type MFAWebAuthnChallengeData = MFABaseChallengeData<'webauthn'> &
 
 export type AuthMFAChallengeResponse<
   Type extends 'webauthn' | 'totp' | 'phone' = 'totp' | 'phone'
-> = AuthRequestResult<
+> = RequestResult<
   Extract<
     MFAWebAuthnChallengeData | MFABaseChallengeData<'totp'> | MFABaseChallengeData<'phone'>,
     { type: Type }
@@ -1037,14 +1029,14 @@ export type MFAVerifyResponse = {
   user: User
 }
 
-export type AuthMFAVerifyResponse = AuthRequestResult<MFAVerifyResponse>
+export type AuthMFAVerifyResponse = RequestResult<MFAVerifyResponse>
 
-export type AuthMFAUnenrollResponse = AuthRequestResult<{
+export type AuthMFAUnenrollResponse = RequestResult<{
   /** ID of the factor that was successfully unenrolled. */
   id: string
 }>
 
-export type AuthMFAListFactorsResponse = AuthRequestResult<{
+export type AuthMFAListFactorsResponse = RequestResult<{
   /** All available factors (verified and unverified). */
   all: Factor[]
 
@@ -1060,7 +1052,7 @@ export type AuthMFAListFactorsResponse = AuthRequestResult<{
 
 export type AuthenticatorAssuranceLevels = 'aal1' | 'aal2'
 
-export type AuthMFAGetAuthenticatorAssuranceLevelResponse = AuthRequestResult<{
+export type AuthMFAGetAuthenticatorAssuranceLevelResponse = RequestResult<{
   /** Current AAL level of the session. */
   currentLevel: AuthenticatorAssuranceLevels | null
 
@@ -1095,9 +1087,11 @@ export interface GoTrueMFAApi {
    * Upon verifying a factor, all other sessions are logged out and the current session's authenticator level is promoted to `aal2`.
    *
    */
-  enroll<T extends Prettify<MFAEnrollParams>>(
+  enroll<T extends MFAEnrollTOTPParams>(params: T): Promise<Prettify<AuthMFAEnrollTOTPResponse>>
+  enroll<T extends MFAEnrollPhoneParams>(params: T): Promise<Prettify<AuthMFAEnrollPhoneResponse>>
+  enroll<T extends Prettify<MFAEnrollWebAuthnParams>>(
     params: T
-  ): Promise<Prettify<InferAuthMFAEnrollResponse<T>>>
+  ): Promise<Prettify<AuthMFAEnrollWebAuthnResponse>>
   /**
    * Prepares a challenge used to verify that a user has access to a MFA
    * factor.
@@ -1153,7 +1147,7 @@ export interface GoTrueMFAApi {
 /**
  * @expermental
  */
-export type AuthMFAAdminDeleteFactorResponse = AuthRequestResult<{
+export type AuthMFAAdminDeleteFactorResponse = RequestResult<{
   /** ID of the factor that was successfully deleted. */
   id: string
 }>
@@ -1172,7 +1166,7 @@ export type AuthMFAAdminDeleteFactorParams = {
 /**
  * @expermental
  */
-export type AuthMFAAdminListFactorsResponse = AuthRequestResult<{
+export type AuthMFAAdminListFactorsResponse = RequestResult<{
   /** All factors attached to the user. */
   factors: Factor[]
 }>
@@ -1232,7 +1226,7 @@ export type SupportedStorage = PromisifyMethods<
 
 export type InitializeResult = { error: AuthError | null }
 
-export type CallRefreshTokenResult = AuthRequestResult<Session>
+export type CallRefreshTokenResult = RequestResult<Session>
 
 export type Pagination = {
   [key: string]: any
@@ -1327,12 +1321,12 @@ type MFAEnrollData = MFATOTPEnrollData | MFAPhoneEnrollData | MFAWebAuthnEnrollD
 // Generic enrollment response
 export type AuthMFAEnrollResponse<
   Type extends 'totp' | 'phone' | 'webauthn' = 'totp' | 'phone' | 'webauthn'
-> = AuthRequestResult<Extract<MFAEnrollData, { type: Type }>>
+> = RequestResult<Prettify<Extract<MFAEnrollData, { type: Type }>>>
 
-export type MFAEnrollParams =
-  | (MFAEnrollBaseParams & MFAEnrollTOTPParams)
-  | (MFAEnrollBaseParams & MFAEnrollPhoneParams)
-  | (MFAEnrollBaseParams & MFAEnrollWebAuthnParams)
+export type MFAEnrollParams = XOR<
+  MFAEnrollBaseParams & MFAEnrollTOTPParams,
+  XOR<MFAEnrollBaseParams & MFAEnrollPhoneParams, MFAEnrollBaseParams & MFAEnrollWebAuthnParams>
+>
 
 export type InferAuthMFAEnrollResponse<T extends MFAEnrollParams> = AuthMFAEnrollResponse<
   T['factorType']
