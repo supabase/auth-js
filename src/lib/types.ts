@@ -242,11 +242,10 @@ const AMRMethods = [
   'totp',
   'mfa/totp',
   'mfa/phone',
-  'mfa/webauthn',
   'anonymous',
   'sso/saml',
   'magiclink',
-  'web3'
+  'web3',
 ] as const
 
 export type AMRMethod = typeof AMRMethods[number] | (string & {})
