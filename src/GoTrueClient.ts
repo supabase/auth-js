@@ -113,6 +113,7 @@ import type {
   Web3Credentials,
   EthereumWeb3Credentials,
   EthereumWallet,
+  FactorType,
 } from './lib/types'
 import { stringToUint8Array, bytesToBase64URL } from './lib/base64url'
 import {
@@ -1578,7 +1579,7 @@ export default class GoTrueClient {
         return { data: { session: currentSession }, error: null }
       }
 
-      const { session, error } = await this._callRefreshToken(currentSession.refresh_token)
+      const { data: session, error } = await this._callRefreshToken(currentSession.refresh_token)
       if (error) {
         return { data: { session: null }, error }
       }
@@ -1757,7 +1758,7 @@ export default class GoTrueClient {
       }
 
       if (hasExpired) {
-        const { session: refreshedSession, error } = await this._callRefreshToken(
+        const { data: refreshedSession, error } = await this._callRefreshToken(
           currentSession.refresh_token
         )
         if (error) {
@@ -1827,7 +1828,7 @@ export default class GoTrueClient {
           throw new AuthSessionMissingError()
         }
 
-        const { session, error } = await this._callRefreshToken(currentSession.refresh_token)
+        const { data: session, error } = await this._callRefreshToken(currentSession.refresh_token)
         if (error) {
           return { data: { user: null, session: null }, error: error }
         }
@@ -2478,7 +2479,7 @@ export default class GoTrueClient {
       await this._saveSession(data.session)
       await this._notifyAllSubscribers('TOKEN_REFRESHED', data.session)
 
-      const result = { session: data.session, error: null }
+      const result = { data: data.session, error: null }
 
       this.refreshingDeferred.resolve(result)
 
@@ -2487,7 +2488,7 @@ export default class GoTrueClient {
       this._debug(debugName, 'error', error)
 
       if (isAuthError(error)) {
-        const result = { session: null, error }
+        const result = { data: null, error }
 
         if (!isAuthRetryableFetchError(error)) {
           await this._removeSession()
@@ -2997,7 +2998,9 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#challenge}
    */
-  private async _challenge(params: MFAChallengeParams): Promise<AuthMFAChallengeResponse> {
+  private async _challenge<T extends FactorType>(
+    params: MFAChallengeParams
+  ): Promise<AuthMFAChallengeResponse<T>> {
     return this._acquireLock(-1, async () => {
       try {
         return await this._useSession(async (result) => {
@@ -3011,7 +3014,7 @@ export default class GoTrueClient {
             'POST',
             `${this.url}/factors/${params.factorId}/challenge`,
             {
-              body: { channel: params.channel },
+              body: 'channel' in params ? { channel: params.channel } : {},
               headers: this.headers,
               jwt: sessionData?.session?.access_token,
             }
@@ -3064,10 +3067,12 @@ export default class GoTrueClient {
 
     const factors = user?.factors || []
     const totp = factors.filter(
-      (factor) => factor.factor_type === 'totp' && factor.status === 'verified'
+      (factor): factor is Factor<'totp', 'verified'> =>
+        factor.factor_type === 'totp' && factor.status === 'verified'
     )
     const phone = factors.filter(
-      (factor) => factor.factor_type === 'phone' && factor.status === 'verified'
+      (factor): factor is Factor<'phone', 'verified'> =>
+        factor.factor_type === 'phone' && factor.status === 'verified'
     )
 
     return {
