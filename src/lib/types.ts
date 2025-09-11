@@ -1,9 +1,12 @@
-import { EIP1193Provider } from './web3/ethereum'
 import { AuthError } from './errors'
 import { Fetch } from './fetch'
+import { EIP1193Provider, EthereumSignInInput, Hex } from './web3/ethereum'
 import type { SolanaSignInInput, SolanaSignInOutput } from './web3/solana'
-import { EthereumSignInInput, Hex } from './web3/ethereum'
-import { ServerCredentialCreationOptions, ServerCredentialRequestOptions } from './webauthn'
+import {
+  ServerCredentialCreationOptions,
+  ServerCredentialRequestOptions,
+  WebAuthnApi,
+} from './webauthn'
 import {
   AuthenticationCredential,
   PublicKeyCredentialCreationOptionsFuture,
@@ -906,29 +909,20 @@ type MFAVerifyWebauthnParamFieldsBase = {
   rpOrigins?: string[]
 }
 
-type MFAVerifyWebauthnRegistrationParamFields = {
-  /** Operation type */
-  type: 'create'
-  /** Creation response from the authenticator (for enrollment/unverified factors) */
-  credentialResponse: RegistrationCredential
-}
-
-type MFAVerifyWebauthnAuthenticationParamFields = {
-  /** Operation type */
-  type: 'request'
-  /** Creation response from the authenticator (for enrollment/unverified factors) */
-  credentialResponse: AuthenticationCredential
-}
-
-export type MFAVerifyWebauthnParamFields =
-  | MFAVerifyWebauthnRegistrationParamFields
-  | MFAVerifyWebauthnAuthenticationParamFields
-
-export type MFAVerifyWebauthnParams = Prettify<
-  MFAVerifyParamsBase & {
-    webauthn: Prettify<MFAVerifyWebauthnParamFieldsBase & MFAVerifyWebauthnParamFields>
+type MFAVerifyWebauthnCredentialParamFields<T extends 'create' | 'request' = 'create' | 'request'> =
+  {
+    /** Operation type */
+    type: T
+    /** Creation response from the authenticator (for enrollment/unverified factors) */
+    credential_response: T extends 'create' ? RegistrationCredential : AuthenticationCredential
   }
->
+
+export type MFAVerifyWebauthnParamFields<T extends 'create' | 'request' = 'create' | 'request'> = {
+  webauthn: MFAVerifyWebauthnParamFieldsBase & MFAVerifyWebauthnCredentialParamFields<T>
+}
+
+export type MFAVerifyWebauthnParams<T extends 'create' | 'request' = 'create' | 'request'> =
+  Prettify<MFAVerifyParamsBase & MFAVerifyWebauthnParamFields<T>>
 
 export type MFAVerifyParams = MFAVerifyTOTPParams | MFAVerifyPhoneParams | MFAVerifyWebauthnParams
 
@@ -1185,6 +1179,9 @@ export interface GoTrueMFAApi {
    *
    */
   getAuthenticatorAssuranceLevel(): Promise<AuthMFAGetAuthenticatorAssuranceLevelResponse>
+
+  // namespace for the webauthn methods
+  webauthn: WebAuthnApi
 }
 
 /**

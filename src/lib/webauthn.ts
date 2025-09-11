@@ -18,6 +18,7 @@ import type {
   AuthenticatorAttachment,
   PublicKeyCredentialCreationOptionsFuture,
   PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialFuture,
   PublicKeyCredentialRequestOptionsFuture,
   PublicKeyCredentialRequestOptionsJSON,
   RegistrationCredential,
@@ -94,13 +95,30 @@ export type ServerCredentialRequestOptions = PublicKeyCredentialRequestOptionsJS
  * Convert base64url encoded strings in WebAuthn credential creation options to ArrayBuffers
  * as required by the WebAuthn browser API
  */
-export function prepareCredentialCreationOptionsForBrowser(
+export function deserializeCredentialCreationOptions(
   options: ServerCredentialCreationOptions
 ): PublicKeyCredentialCreationOptionsFuture {
   if (!options) {
     throw new Error('Credential creation options are required')
   }
 
+  // Check if the native parseCreationOptionsFromJSON method is available
+  if (
+    typeof PublicKeyCredential !== 'undefined' &&
+    'parseCreationOptionsFromJSON' in PublicKeyCredential &&
+    typeof (PublicKeyCredential as unknown as PublicKeyCredentialFuture)
+      .parseCreationOptionsFromJSON === 'function'
+  ) {
+    // Use the native WebAuthn Level 3 method
+    return (
+      PublicKeyCredential as unknown as PublicKeyCredentialFuture
+    ).parseCreationOptionsFromJSON(
+      /** we assert the options here as typescript still doesn't know about future webauthn types */
+      options as any
+    ) as PublicKeyCredentialCreationOptionsFuture
+  }
+
+  // Fallback to manual parsing for browsers that don't support the native method
   // Destructure to separate fields that need transformation
   const { challenge: challengeStr, user: userOpts, excludeCredentials, ...restOptions } = options
 
@@ -143,13 +161,27 @@ export function prepareCredentialCreationOptionsForBrowser(
  * Convert base64url encoded strings in WebAuthn credential request options to ArrayBuffers
  * as required by the WebAuthn browser API
  */
-export function prepareCredentialRequestOptionsForBrowser(
+export function deserializeCredentialRequestOptions(
   options: ServerCredentialRequestOptions
 ): PublicKeyCredentialRequestOptionsFuture {
   if (!options) {
     throw new Error('Credential request options are required')
   }
 
+  // Check if the native parseRequestOptionsFromJSON method is available
+  if (
+    typeof PublicKeyCredential !== 'undefined' &&
+    'parseRequestOptionsFromJSON' in PublicKeyCredential &&
+    typeof (PublicKeyCredential as unknown as PublicKeyCredentialFuture)
+      .parseRequestOptionsFromJSON === 'function'
+  ) {
+    // Use the native WebAuthn Level 3 method
+    return (
+      PublicKeyCredential as unknown as PublicKeyCredentialFuture
+    ).parseRequestOptionsFromJSON(options) as PublicKeyCredentialRequestOptionsFuture
+  }
+
+  // Fallback to manual parsing for browsers that don't support the native method
   // Destructure to separate fields that need transformation
   const { challenge: challengeStr, allowCredentials, ...restOptions } = options
 
@@ -166,7 +198,7 @@ export function prepareCredentialRequestOptionsForBrowser(
   if (allowCredentials && allowCredentials.length > 0) {
     result.allowCredentials = new Array(allowCredentials.length)
 
-    for (let i = 0; i < allowCredentials.length, i++; ) {
+    for (let i = 0; i < allowCredentials.length; i++) {
       const cred = allowCredentials[i]
       result.allowCredentials[i] = {
         ...cred,
@@ -190,11 +222,14 @@ export type ServerCredentialResponse = RegistrationResponseJSON | Authentication
 /**
  * Convert a registration/enrollment credential response to server format
  */
-export function prepareRegistrationResponseForServer(
-  credential: PublicKeyCredential & { response: AuthenticatorAttestationResponse }
+export function serializeCredentialCreationResponse(
+  credential: RegistrationCredential
 ): RegistrationResponseJSON {
-  // Access authenticatorAttachment via type assertion to handle TypeScript version differences
-  // @simplewebauthn/types includes this property but base TypeScript 4.7.4 doesn't
+  // Check if the credential instance has the toJSON method
+  if ('toJSON' in credential && typeof credential.toJSON === 'function') {
+    // Use the native WebAuthn Level 3 method
+    return (credential as RegistrationCredential).toJSON()
+  }
   const credentialWithAttachment = credential as PublicKeyCredential & {
     response: AuthenticatorAttestationResponse
     authenticatorAttachment?: string | null
@@ -219,9 +254,16 @@ export function prepareRegistrationResponseForServer(
 /**
  * Convert an authentication/verification credential response to server format
  */
-export function prepareAuthenticationResponseForServer(
-  credential: PublicKeyCredential & { response: AuthenticatorAssertionResponse }
+export function serializeCredentialRequestResponse(
+  credential: AuthenticationCredential
 ): AuthenticationResponseJSON {
+  // Check if the credential instance has the toJSON method
+  if ('toJSON' in credential && typeof credential.toJSON === 'function') {
+    // Use the native WebAuthn Level 3 method
+    return (credential as AuthenticationCredential).toJSON()
+  }
+
+  // Fallback to manual conversion for browsers that don't support toJSON
   // Access authenticatorAttachment via type assertion to handle TypeScript version differences
   // @simplewebauthn/types includes this property but base TypeScript 4.7.4 doesn't
   const credentialWithAttachment = credential as PublicKeyCredential & {
@@ -362,6 +404,59 @@ export async function getCredential(
   }
 }
 
+/**
+ * Merges WebAuthn credential creation options with overrides
+ * @param baseOptions - The base options from the server
+ * @param overrides - Optional overrides to apply
+ * @param friendlyName - Optional friendly name for the credential
+ * @returns Merged credential creation options
+ */
+export function mergeCredentialCreationOptions(
+  baseOptions: PublicKeyCredentialCreationOptionsFuture,
+  overrides?: PublicKeyCredentialCreationOptionsFuture,
+  friendlyName?: string
+): PublicKeyCredentialCreationOptionsFuture {
+  return {
+    ...baseOptions,
+    authenticatorSelection: {
+      authenticatorAttachment: 'cross-platform',
+      requireResidentKey: false,
+      userVerification: 'required',
+      ...overrides?.authenticatorSelection,
+    },
+    user: {
+      ...baseOptions.user,
+      name: baseOptions.user.name || friendlyName || 'user',
+      ...overrides?.user,
+    },
+    hints: overrides?.hints ?? ['security-key'],
+    extensions: {
+      credProps: true,
+      ...overrides?.extensions,
+    },
+    ...overrides,
+  }
+}
+
+/**
+ * Merges WebAuthn credential request options with overrides
+ * @param baseOptions - The base options from the server
+ * @param overrides - Optional overrides to apply
+ * @returns Merged credential request options
+ */
+export function mergeCredentialRequestOptions(
+  baseOptions: PublicKeyCredentialRequestOptionsFuture,
+  overrides?: PublicKeyCredentialRequestOptionsFuture
+): PublicKeyCredentialRequestOptionsFuture {
+  return {
+    ...baseOptions,
+    allowCredentials: baseOptions.allowCredentials,
+    userVerification: overrides?.userVerification ?? 'required',
+    hints: overrides?.hints ?? ['security-key'],
+    ...overrides,
+  }
+}
+
 export class WebAuthnApi {
   public enroll: typeof WebAuthnApi.prototype._enroll
   public challenge: typeof WebAuthnApi.prototype._challenge
@@ -393,14 +488,36 @@ export class WebAuthnApi {
    * Combines server challenge with browser credential operations
    * @param params - Challenge parameters including factorId
    */
-  public async _challenge({
-    factorId,
-    webauthn,
-    friendlyName,
-    signal,
-  }: MFAChallengeWebauthnParams & { friendlyName?: string; signal?: AbortSignal }): Promise<
+  /**
+   * Challenge for WebAuthn credential creation or authentication
+   * Combines server challenge with browser credential operations
+   * @param params - Challenge parameters including factorId
+   * @param overrides - Allows you to override the parameters passed to navigator.credentials.{get|create} {@see PublicKeyCredentialCreationOptionsFuture} {@see PublicKeyCredentialRequestOptionsFuture}
+   */
+  public async _challenge(
+    {
+      factorId,
+      webauthn,
+      friendlyName,
+      signal,
+    }: MFAChallengeWebauthnParams & { friendlyName?: string; signal?: AbortSignal },
+    overrides?:
+      | {
+          create?: PublicKeyCredentialCreationOptionsFuture
+          request?: never
+        }
+      | {
+          create?: never
+          request?: PublicKeyCredentialRequestOptionsFuture
+        }
+  ): Promise<
     RequestResult<
-      { factorId: string; challengeId: string } & { webauthn: MFAVerifyWebauthnParamFields },
+      { factorId: string; challengeId: string } & {
+        webauthn: StrictOmit<
+          MFAVerifyWebauthnParamFields<'create' | 'request'>['webauthn'],
+          'rpId' | 'rpOrigins'
+        >
+      },
       WebAuthnError | AuthError
     >
   > {
@@ -419,24 +536,14 @@ export class WebAuthnApi {
 
       switch (challengeResponse.webauthn.type) {
         case 'create': {
+          const options = mergeCredentialCreationOptions(
+            challengeResponse.webauthn.credential_options.publicKey,
+            overrides?.create,
+            friendlyName
+          )
+
           const { data, error } = await createCredential({
-            ...challengeResponse.webauthn.credential_options,
-            publicKey: {
-              ...challengeResponse.webauthn.credential_options.publicKey,
-              authenticatorSelection: {
-                authenticatorAttachment: 'cross-platform',
-                requireResidentKey: false,
-                userVerification: 'required',
-              },
-              user: {
-                ...challengeResponse.webauthn.credential_options.publicKey.user,
-                name:
-                  challengeResponse.webauthn.credential_options.publicKey.user.name ||
-                  friendlyName ||
-                  'user',
-              },
-              hints: ['security-key'],
-            },
+            publicKey: options,
             signal: abortSignal,
           })
 
@@ -447,7 +554,7 @@ export class WebAuthnApi {
                 challengeId: challengeResponse.id,
                 webauthn: {
                   type: challengeResponse.webauthn.type,
-                  credentialResponse: data,
+                  credential_response: data,
                 },
               },
               error: null,
@@ -457,17 +564,17 @@ export class WebAuthnApi {
         }
 
         case 'request': {
+          const options = mergeCredentialRequestOptions(
+            challengeResponse.webauthn.credential_options.publicKey,
+            overrides?.request
+          )
+
           const { data, error } = await getCredential({
             ...challengeResponse.webauthn.credential_options,
-            publicKey: {
-              ...challengeResponse.webauthn.credential_options.publicKey,
-              allowCredentials:
-                challengeResponse.webauthn.credential_options.publicKey.allowCredentials,
-              userVerification: 'required',
-              hints: ['security-key'],
-            },
+            publicKey: options,
             signal: abortSignal,
           })
+
           if (data) {
             return {
               data: {
@@ -475,7 +582,7 @@ export class WebAuthnApi {
                 challengeId: challengeResponse.id,
                 webauthn: {
                   type: challengeResponse.webauthn.type,
-                  credentialResponse: data,
+                  credential_response: data,
                 },
               },
               error: null,
@@ -499,41 +606,45 @@ export class WebAuthnApi {
    * Verify a WebAuthn credential with the server
    * @param params - Verification parameters including credential
    */
-  public async _verify({
+  public async _verify<T extends 'create' | 'request'>({
     challengeId,
     factorId,
     webauthn,
   }: {
     challengeId: string
     factorId: string
-    webauthn: MFAVerifyWebauthnParams['webauthn']
+    webauthn: MFAVerifyWebauthnParams<T>['webauthn']
   }): Promise<AuthMFAVerifyResponse> {
     return this.client.mfa.verify({
       factorId,
       challengeId,
-      webauthn,
+      webauthn: webauthn,
     })
   }
 
   /**
    * Complete WebAuthn authentication flow
    * @param params - Authentication parameters including factorId
+   * @param overrides - Allows you to override the parameters passed to navigator.credentials.get {@see PublicKeyCredentialRequestOptionsFuture}
    */
-  public async _authenticate({
-    factorId,
-    webauthn: {
-      rpId = typeof window !== 'undefined' ? window.location.hostname : undefined,
-      rpOrigins = typeof window !== 'undefined' ? [window.location.origin] : undefined,
-      signal,
+  public async _authenticate(
+    {
+      factorId,
+      webauthn: {
+        rpId = typeof window !== 'undefined' ? window.location.hostname : undefined,
+        rpOrigins = typeof window !== 'undefined' ? [window.location.origin] : undefined,
+        signal,
+      },
+    }: {
+      factorId: string
+      webauthn: {
+        rpId?: string
+        rpOrigins?: string[]
+        signal?: AbortSignal
+      }
     },
-  }: {
-    factorId: string
-    webauthn: {
-      rpId?: string
-      rpOrigins?: string[]
-      signal?: AbortSignal
-    }
-  }): Promise<RequestResult<AuthMFAVerifyResponseData, WebAuthnError | AuthError>> {
+    overrides?: PublicKeyCredentialRequestOptionsFuture
+  ): Promise<RequestResult<AuthMFAVerifyResponseData, WebAuthnError | AuthError>> {
     if (!rpId) {
       return {
         data: null,
@@ -549,24 +660,17 @@ export class WebAuthnApi {
       }
 
       // Get challenge and credential
-      const { data: challengeResponse, error: challengeError } = await this.challenge({
-        factorId,
-        webauthn: { rpId, rpOrigins },
-        signal,
-      })
+      const { data: challengeResponse, error: challengeError } = await this.challenge(
+        {
+          factorId,
+          webauthn: { rpId, rpOrigins },
+          signal,
+        },
+        { request: overrides }
+      )
 
       if (!challengeResponse) {
         return { data: null, error: challengeError }
-      }
-
-      if (challengeResponse?.webauthn.type !== 'request') {
-        // This should never hit
-        return {
-          data: null,
-          error: new AuthError(
-            `factorId ${factorId} is not registered, use the '.register()' function instead`
-          ),
-        }
       }
 
       const { webauthn } = challengeResponse
@@ -579,7 +683,7 @@ export class WebAuthnApi {
           type: webauthn.type,
           rpId,
           rpOrigins,
-          credentialResponse: webauthn.credentialResponse,
+          credential_response: webauthn.credential_response,
         },
       })
     } catch (error) {
@@ -595,19 +699,22 @@ export class WebAuthnApi {
 
   /**
    * Complete WebAuthn registration flow
-   * @param params - Registration parameters including friendlyName
+   * @param overrides - Allows you to override the parameters passed to navigator.credentials.create {@see PublicKeyCredentialCreationOptionsFuture}
    */
-  public async _register({
-    friendlyName,
-    rpId = typeof window !== 'undefined' ? window.location.hostname : undefined,
-    rpOrigins = typeof window !== 'undefined' ? [window.location.origin] : undefined,
-    signal,
-  }: {
-    friendlyName: string
-    rpId?: string
-    rpOrigins?: string[]
-    signal?: AbortSignal
-  }): Promise<RequestResult<AuthMFAVerifyResponseData, WebAuthnError | AuthError>> {
+  public async _register(
+    {
+      friendlyName,
+      rpId = typeof window !== 'undefined' ? window.location.hostname : undefined,
+      rpOrigins = typeof window !== 'undefined' ? [window.location.origin] : undefined,
+      signal,
+    }: {
+      friendlyName: string
+      rpId?: string
+      rpOrigins?: string[]
+      signal?: AbortSignal
+    },
+    overrides?: PublicKeyCredentialCreationOptionsFuture
+  ): Promise<RequestResult<AuthMFAVerifyResponseData, WebAuthnError | AuthError>> {
     if (!rpId) {
       return {
         data: null,
@@ -628,29 +735,35 @@ export class WebAuthnApi {
       })
 
       if (!factor) {
+        await this.client.mfa
+          .listFactors()
+          .then((factors) =>
+            factors.data?.all.find(
+              (v) =>
+                v.factor_type === 'webauthn' &&
+                v.friendly_name === friendlyName &&
+                v.status !== 'unverified'
+            )
+          )
+          .then((factor) => (factor ? this.client.mfa.unenroll({ factorId: factor?.id }) : void 0))
         return { data: null, error: enrollError }
       }
 
       // Get challenge and create credential
-      const { data: challengeResponse, error: challengeError } = await this._challenge({
-        factorId: factor.id,
-        friendlyName: factor.friendly_name,
-        webauthn: { rpId, rpOrigins },
-        signal,
-      })
+      const { data: challengeResponse, error: challengeError } = await this._challenge(
+        {
+          factorId: factor.id,
+          friendlyName: factor.friendly_name,
+          webauthn: { rpId, rpOrigins },
+          signal,
+        },
+        {
+          create: overrides,
+        }
+      )
 
       if (!challengeResponse) {
         return { data: null, error: challengeError }
-      }
-
-      if (challengeResponse?.webauthn.type !== 'create') {
-        // This should never hit
-        return {
-          data: null,
-          error: new AuthError(
-            `factorId ${factor.id} is already registered, use the '.authenticate()' function instead`
-          ),
-        }
       }
 
       return this._verify({
@@ -660,7 +773,7 @@ export class WebAuthnApi {
           rpId,
           rpOrigins,
           type: challengeResponse.webauthn.type,
-          credentialResponse: challengeResponse.webauthn.credentialResponse,
+          credential_response: challengeResponse.webauthn.credential_response,
         },
       })
     } catch (error) {

@@ -80,7 +80,8 @@ export interface PublicKeyCredentialUserEntity {
 /**
  * The value returned from navigator.credentials.create()
  */
-export interface RegistrationCredential extends PublicKeyCredentialFuture {
+export interface RegistrationCredential
+  extends PublicKeyCredentialFuture<RegistrationResponseJSON> {
   response: AuthenticatorAttestationResponseFuture
 }
 
@@ -102,7 +103,8 @@ export interface RegistrationResponseJSON {
 /**
  * The value returned from navigator.credentials.get()
  */
-export interface AuthenticationCredential extends PublicKeyCredentialFuture {
+export interface AuthenticationCredential
+  extends PublicKeyCredentialFuture<AuthenticationResponseJSON> {
   response: AuthenticatorAssertionResponse
 }
 
@@ -223,6 +225,7 @@ export interface PublicKeyCredentialRequestOptionsFuture
   extends StrictOmit<PublicKeyCredentialRequestOptions, 'allowCredentials'> {
   allowCredentials?: PublicKeyCredentialDescriptorFuture[]
   hints?: PublicKeyCredentialHint[]
+  attestation?: AttestationConveyancePreference
 }
 
 /** */
@@ -231,20 +234,22 @@ export type PublicKeyCredentialJSON = RegistrationResponseJSON | AuthenticationR
 /**
  * A super class of TypeScript's `PublicKeyCredential` that knows about upcoming WebAuthn features
  */
-export interface PublicKeyCredentialFuture extends PublicKeyCredential {
+export interface PublicKeyCredentialFuture<
+  T extends PublicKeyCredentialJSON = PublicKeyCredentialJSON
+> extends PublicKeyCredential {
   type: PublicKeyCredentialType
   // See https://github.com/w3c/webauthn/issues/1745
   isConditionalMediationAvailable?(): Promise<boolean>
   // See https://w3c.github.io/webauthn/#sctn-parseCreationOptionsFromJSON
-  parseCreationOptionsFromJSON?(
+  parseCreationOptionsFromJSON(
     options: PublicKeyCredentialCreationOptionsJSON
-  ): PublicKeyCredentialCreationOptions
+  ): PublicKeyCredentialCreationOptionsFuture
   // See https://w3c.github.io/webauthn/#sctn-parseRequestOptionsFromJSON
-  parseRequestOptionsFromJSON?(
+  parseRequestOptionsFromJSON(
     options: PublicKeyCredentialRequestOptionsJSON
-  ): PublicKeyCredentialRequestOptions
+  ): PublicKeyCredentialRequestOptionsFuture
   // See https://w3c.github.io/webauthn/#dom-publickeycredential-tojson
-  toJSON(): PublicKeyCredentialJSON
+  toJSON(): T
 }
 
 /**

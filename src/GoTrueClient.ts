@@ -139,10 +139,17 @@ import {
   toHex,
 } from './lib/web3/ethereum'
 import {
-  prepareCredentialCreationOptionsForBrowser,
-  prepareCredentialRequestOptionsForBrowser,
+  deserializeCredentialCreationOptions,
+  deserializeCredentialRequestOptions,
+  serializeCredentialCreationResponse,
+  serializeCredentialRequestResponse,
+  WebAuthnApi,
 } from './lib/webauthn'
-import { PublicKeyCredentialJSON } from './lib/webauthn.dom'
+import {
+  AuthenticationCredential,
+  PublicKeyCredentialJSON,
+  RegistrationCredential,
+} from './lib/webauthn.dom'
 
 polyfillGlobalThis() // Make "globalThis" available
 
@@ -312,6 +319,7 @@ export default class GoTrueClient {
       listFactors: this._listFactors.bind(this),
       challengeAndVerify: this._challengeAndVerify.bind(this),
       getAuthenticatorAssuranceLevel: this._getAuthenticatorAssuranceLevel.bind(this),
+      webauthn: new WebAuthnApi(this),
     }
 
     if (this.persistSession) {
@@ -2980,7 +2988,9 @@ export default class GoTrueClient {
    */
   private async _verify(params: MFAVerifyTOTPParams): Promise<AuthMFAVerifyResponse>
   private async _verify(params: MFAVerifyPhoneParams): Promise<AuthMFAVerifyResponse>
-  private async _verify(params: MFAVerifyWebauthnParams): Promise<AuthMFAVerifyResponse>
+  private async _verify<T extends 'create' | 'request'>(
+    params: MFAVerifyWebauthnParams<T>
+  ): Promise<AuthMFAVerifyResponse>
   private async _verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse> {
     return this._acquireLock(-1, async () => {
       try {
@@ -2990,24 +3000,39 @@ export default class GoTrueClient {
             return { data: null, error: sessionError }
           }
 
-          const body:
+          const body: StrictOmit<
             | Exclude<MFAVerifyParams, MFAVerifyWebauthnParams>
-            /** We exclude out the webauthn params from here because we're going to need to serialize them in the response */
-            | (StrictOmit<MFAVerifyWebauthnParams, 'webauthn'> & {
-                webauthn:
-                  | StrictOmit<MFAVerifyWebauthnParamFields, 'credentialResponse'> & {
-                      credentialResponse: PublicKeyCredentialJSON
-                    }
-              }) = {
-            challengeId: params.challengeId,
-            factorId: params.factorId,
+            /** Exclude out the webauthn params from here because we're going to need to serialize them in the response */
+            | Prettify<
+                StrictOmit<MFAVerifyWebauthnParams, 'webauthn'> & {
+                  webauthn: Prettify<
+                    | StrictOmit<
+                        MFAVerifyWebauthnParamFields['webauthn'],
+                        'credential_response'
+                      > & {
+                        credential_response: PublicKeyCredentialJSON
+                      }
+                  >
+                }
+              >,
+            /*  Exclude challengeId because the backend expects snake_case, and exclude factorId since it's passed in the path params */
+            'challengeId' | 'factorId'
+          > & {
+            challenge_id: string
+          } = {
+            challenge_id: params.challengeId,
             ...('webauthn' in params
               ? {
-                  rpId: params.webauthn.rpId,
-                  ...(params.webauthn.rpOrigins && { rpOrigins: params.webauthn.rpOrigins }),
                   webauthn: {
-                    type: params.webauthn.type,
-                    credentialResponse: params.webauthn.credentialResponse.toJSON(),
+                    ...params.webauthn,
+                    credential_response:
+                      params.webauthn.type === 'create'
+                        ? serializeCredentialCreationResponse(
+                            params.webauthn.credential_response as RegistrationCredential
+                          )
+                        : serializeCredentialRequestResponse(
+                            params.webauthn.credential_response as AuthenticationCredential
+                          ),
                   },
                 }
               : { code: params.code }),
@@ -3098,7 +3123,7 @@ export default class GoTrueClient {
                     ...data.webauthn,
                     credential_options: {
                       ...data.webauthn.credential_options,
-                      publicKey: prepareCredentialCreationOptionsForBrowser(
+                      publicKey: deserializeCredentialCreationOptions(
                         data.webauthn.credential_options.publicKey
                       ),
                     },
@@ -3114,7 +3139,7 @@ export default class GoTrueClient {
                     ...data.webauthn,
                     credential_options: {
                       ...data.webauthn.credential_options,
-                      publicKey: prepareCredentialRequestOptionsForBrowser(
+                      publicKey: deserializeCredentialRequestOptions(
                         data.webauthn.credential_options.publicKey
                       ),
                     },
