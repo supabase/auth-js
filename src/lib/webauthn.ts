@@ -400,7 +400,7 @@ export class WebAuthnApi {
     signal,
   }: MFAChallengeWebauthnParams & { friendlyName?: string; signal?: AbortSignal }): Promise<
     RequestResult<
-      { challengeId: string } & { webauthn: MFAVerifyWebauthnParamFields },
+      { factorId: string; challengeId: string } & { webauthn: MFAVerifyWebauthnParamFields },
       WebAuthnError | AuthError
     >
   > {
@@ -443,6 +443,7 @@ export class WebAuthnApi {
           if (data) {
             return {
               data: {
+                factorId,
                 challengeId: challengeResponse.id,
                 webauthn: {
                   type: challengeResponse.webauthn.type,
@@ -470,6 +471,7 @@ export class WebAuthnApi {
           if (data) {
             return {
               data: {
+                factorId,
                 challengeId: challengeResponse.id,
                 webauthn: {
                   type: challengeResponse.webauthn.type,
