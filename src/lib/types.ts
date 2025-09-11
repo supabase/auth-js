@@ -3,6 +3,13 @@ import { AuthError } from './errors'
 import { Fetch } from './fetch'
 import type { SolanaSignInInput, SolanaSignInOutput } from './web3/solana'
 import { EthereumSignInInput, Hex } from './web3/ethereum'
+import { ServerCredentialCreationOptions, ServerCredentialRequestOptions } from './webauthn'
+import {
+  AuthenticationCredential,
+  PublicKeyCredentialCreationOptionsFuture,
+  PublicKeyCredentialRequestOptionsFuture,
+  RegistrationCredential,
+} from './webauthn.dom'
 
 /** One of the providers supported by GoTrue. */
 export type Provider =
@@ -112,6 +119,19 @@ export type WeakPassword = {
  * VS Code, instead of just showing the names those mapped types are defined with.
  */
 export type Prettify<T> = T extends Function ? T : { [K in keyof T]: T[K] }
+
+/**
+ * A type utility that doesn't allow extra properties
+ */
+export type Exact<TExpected, TActual extends TExpected> = TExpected extends TActual
+  ? TExpected
+  : never
+
+/**
+ * A stricter version of TypeScript's Omit that only allows omitting keys that actually exist
+ * This prevents typos and ensures type safety at compile time
+ */
+export type StrictOmit<T, K extends keyof T> = Omit<T, K>
 
 /**
  * a shared result type that encapsulates errors instead of throwing them, allows you to optionally specify the ErrorType
@@ -242,6 +262,7 @@ const AMRMethods = [
   'totp',
   'mfa/totp',
   'mfa/phone',
+  'mfa/webauthn',
   'anonymous',
   'sso/saml',
   'magiclink',
@@ -282,7 +303,7 @@ export interface UserIdentity {
   updated_at?: string
 }
 
-const FactorTypes = ['totp', 'phone'] as const
+const FactorTypes = ['totp', 'phone', 'webauthn'] as const
 /**
  * Type of factor. `totp` and `phone` supported with this version
  */
@@ -359,7 +380,7 @@ export interface User {
   identities?: UserIdentity[]
   is_anonymous?: boolean
   is_sso_user?: boolean
-  factors?: Factor<FactorType>[]
+  factors?: (Factor<FactorType, 'verified'> | Factor<FactorType, 'unverified'>)[]
   deleted_at?: string
 }
 
@@ -892,7 +913,7 @@ export type GenerateLinkType =
   | 'email_change_current'
   | 'email_change_new'
 
-export type MFAEnrollParams = MFAEnrollTOTPParams | MFAEnrollPhoneParams
+export type MFAEnrollParams = MFAEnrollTOTPParams | MFAEnrollPhoneParams | MFAEnrollWebauthnParams
 
 export type MFAUnenrollParams = {
   /** ID of the factor being unenrolled. */
@@ -917,7 +938,36 @@ type MFAVerifyPhoneParamFields = MFAVerifyTOTPParamFields
 
 export type MFAVerifyPhoneParams = Prettify<MFAVerifyParamsBase & MFAVerifyPhoneParamFields>
 
-export type MFAVerifyParams = MFAVerifyTOTPParams | MFAVerifyPhoneParams
+type MFAVerifyWebauthnParamFieldsBase = {
+  /** Relying party ID */
+  rpId: string
+  /** Relying party origins */
+  rpOrigins?: string[]
+}
+
+export type MFAVerifyWebauthnRegistrationParamFields = {
+  /** Operation type */
+  type: 'create'
+  /** Creation response from the authenticator (for enrollment/unverified factors) */
+  credentialResponse: RegistrationCredential
+}
+
+export type MFAVerifyWebauthnAuthenticationParamFields = {
+  /** Operation type */
+  type: 'request'
+  /** Creation response from the authenticator (for enrollment/unverified factors) */
+  credentialResponse: AuthenticationCredential
+}
+
+type MFAVerifyWebauthnParamFields = {
+  webAuthn:
+    | Prettify<(MFAVerifyWebauthnParamFieldsBase & MFAVerifyWebauthnRegistrationParamFields)>
+    | Prettify<(MFAVerifyWebauthnParamFieldsBase & MFAVerifyWebauthnAuthenticationParamFields)>
+}
+
+export type MFAVerifyWebauthnParams = Prettify<MFAVerifyParamsBase & MFAVerifyWebauthnParamFields>
+
+export type MFAVerifyParams = MFAVerifyTOTPParams | MFAVerifyPhoneParams | MFAVerifyWebauthnParams
 
 type MFAChallengeParamsBase = {
   /** ID of the factor to be challenged. Returned in enroll(). */
@@ -938,7 +988,24 @@ export type MFAChallengePhoneParams = Prettify<
   MFAChallengeParamsBase & MFAChallengePhoneParamFields
 >
 
-export type MFAChallengeParams = MFAChallengeTOTPParams | MFAChallengePhoneParams
+/** WebAuthn parameters for WebAuthn factor challenge */
+type MFAChallengeWebauthnParamFields = {
+  webAuthn: {
+    /** Relying party ID */
+    rpId: string
+    /** Relying party origins*/
+    rpOrigins?: string[]
+  }
+}
+
+export type MFAChallengeWebauthnParams = Prettify<
+  MFAChallengeParamsBase & MFAChallengeWebauthnParamFields
+>
+
+export type MFAChallengeParams =
+  | MFAChallengeTOTPParams
+  | MFAChallengePhoneParams
+  | MFAChallengeWebauthnParams
 
 type MFAChallengeAndVerifyParamsBase = Omit<MFAVerifyParamsBase, 'challengeId'>
 
@@ -948,17 +1015,9 @@ type MFAChallengeAndVerifyTOTPParams = Prettify<
   MFAChallengeAndVerifyParamsBase & MFAChallengeAndVerifyTOTPParamFields
 >
 
-type MFAChallengeAndVerifyPhoneParamFields = MFAVerifyPhoneParamFields
+export type MFAChallengeAndVerifyParams = MFAChallengeAndVerifyTOTPParams
 
-type MFAChallengeAndVerifyPhoneParams = Prettify<
-  MFAChallengeAndVerifyParamsBase & MFAChallengeAndVerifyPhoneParamFields
->
-
-export type MFAChallengeAndVerifyParams =
-  | MFAChallengeAndVerifyTOTPParams
-  | MFAChallengeAndVerifyPhoneParams
-
-export type AuthMFAVerifyResponse = RequestResult<{
+export type AuthMFAVerifyResponseData = {
   /** New access token (JWT) after successful verification. */
   access_token: string
 
@@ -973,16 +1032,21 @@ export type AuthMFAVerifyResponse = RequestResult<{
 
   /** Updated user profile. */
   user: User
-}>
+}
 
-export type AuthMFAEnrollResponse = AuthMFAEnrollTOTPResponse | AuthMFAEnrollPhoneResponse
+export type AuthMFAVerifyResponse = RequestResult<AuthMFAVerifyResponseData>
+
+export type AuthMFAEnrollResponse =
+  | AuthMFAEnrollTOTPResponse
+  | AuthMFAEnrollPhoneResponse
+  | AuthMFAEnrollWebauthnResponse
 
 export type AuthMFAUnenrollResponse = RequestResult<{
   /** ID of the factor that was successfully unenrolled. */
   id: string
 }>
 
-export type AuthMFAChallengeResponse<T extends FactorType> = RequestResult<{
+type AuthMFAChallengeResponseBase<T extends FactorType> = {
   /** ID of the newly created challenge. */
   id: string
 
@@ -991,7 +1055,65 @@ export type AuthMFAChallengeResponse<T extends FactorType> = RequestResult<{
 
   /** Timestamp in UNIX seconds when this challenge will no longer be usable. */
   expires_at: number
-}>
+}
+
+type AuthMFAChallengeTOTPResponseFields = {
+  /** no extra fields for now, kept for consistency and for possible future changes  */
+}
+
+export type AuthMFAChallengeTOTPResponse = RequestResult<
+  Prettify<AuthMFAChallengeResponseBase<'totp'> & AuthMFAChallengeTOTPResponseFields>
+>
+
+type AuthMFAChallengePhoneResponseFields = {
+  /** no extra fields for now, kept for consistency and for possible future changes  */
+}
+
+export type AuthMFAChallengePhoneResponse = RequestResult<
+  Prettify<AuthMFAChallengeResponseBase<'phone'> & AuthMFAChallengePhoneResponseFields>
+>
+
+type AuthMFAChallengeWebauthnResponseFields = {
+  webauthn:
+    | {
+        type: 'create'
+        credential_options: { publicKey: PublicKeyCredentialCreationOptionsFuture }
+      }
+    | {
+        type: 'request'
+        credential_options: { publicKey: PublicKeyCredentialRequestOptionsFuture }
+      }
+}
+
+type AuthMFAChallengeWebauthnServerResponseFields = {
+  webauthn:
+    | {
+        type: 'create'
+        credential_options: { publicKey: ServerCredentialCreationOptions }
+      }
+    | {
+        type: 'request'
+        credential_options: { publicKey: ServerCredentialRequestOptions }
+      }
+}
+
+export type AuthMFAChallengeWebauthnResponseData = Prettify<
+  AuthMFAChallengeResponseBase<'webauthn'> & AuthMFAChallengeWebauthnResponseFields
+>
+
+export type AuthMFAChallengeWebauthnResponse = RequestResult<AuthMFAChallengeWebauthnResponseData>
+
+export type AuthMFAChallengeWebauthnServerResponseData = Prettify<
+  AuthMFAChallengeResponseBase<'webauthn'> & AuthMFAChallengeWebauthnServerResponseFields
+>
+
+export type AuthMFAChallengeWebauthnServerResponse =
+  RequestResult<AuthMFAChallengeWebauthnServerResponseData>
+
+export type AuthMFAChallengeResponse =
+  | AuthMFAChallengeTOTPResponse
+  | AuthMFAChallengePhoneResponse
+  | AuthMFAChallengeWebauthnResponse
 
 export type AuthMFAListFactorsResponse = RequestResult<{
   /** All available factors (verified and unverified). */
@@ -1001,6 +1123,8 @@ export type AuthMFAListFactorsResponse = RequestResult<{
   totp: Prettify<Factor<'totp', 'verified'>>[]
   /** Only verified Phone factors. (A subset of `all`.) */
   phone: Prettify<Factor<'phone', 'verified'>>[]
+  /** Only verified WebAuthn factors. (A subset of `all`.) */
+  webauthn: Prettify<Factor<'webauthn', 'verified'>>[]
 }>
 
 export type AuthenticatorAssuranceLevels = 'aal1' | 'aal2'
@@ -1041,17 +1165,17 @@ export interface GoTrueMFAApi {
    */
   enroll(params: MFAEnrollTOTPParams): Promise<AuthMFAEnrollTOTPResponse>
   enroll(params: MFAEnrollPhoneParams): Promise<AuthMFAEnrollPhoneResponse>
+  enroll(params: MFAEnrollWebauthnParams): Promise<AuthMFAEnrollWebauthnResponse>
   enroll(params: MFAEnrollParams): Promise<AuthMFAEnrollResponse>
 
   /**
    * Prepares a challenge used to verify that a user has access to a MFA
    * factor.
    */
-  challenge(params: MFAChallengeTOTPParams): Promise<Prettify<AuthMFAChallengeResponse<'totp'>>>
-  challenge(params: MFAChallengePhoneParams): Promise<Prettify<AuthMFAChallengeResponse<'phone'>>>
-  challenge(
-    params: MFAChallengeParams
-  ): Promise<Prettify<AuthMFAChallengeResponse<'totp' | 'phone'>>>
+  challenge(params: MFAChallengeTOTPParams): Promise<Prettify<AuthMFAChallengeTOTPResponse>>
+  challenge(params: MFAChallengePhoneParams): Promise<Prettify<AuthMFAChallengePhoneResponse>>
+  challenge(params: MFAChallengeWebauthnParams): Promise<Prettify<AuthMFAChallengeWebauthnResponse>>
+  challenge(params: MFAChallengeParams): Promise<AuthMFAChallengeResponse>
 
   /**
    * Verifies a code against a challenge. The verification code is
@@ -1059,6 +1183,7 @@ export interface GoTrueMFAApi {
    */
   verify(params: MFAVerifyTOTPParams): Promise<AuthMFAVerifyResponse>
   verify(params: MFAVerifyPhoneParams): Promise<AuthMFAVerifyResponse>
+  verify(params: MFAVerifyWebauthnParams): Promise<AuthMFAVerifyResponse>
   verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse>
 
   /**
@@ -1232,6 +1357,14 @@ export type MFAEnrollPhoneParams = Prettify<
   MFAEnrollParamsBase<'phone'> & MFAEnrollPhoneParamFields
 >
 
+type MFAEnrollWebauthnFields = {
+  /** no extra fields for now, kept for consistency and for possible future changes  */
+}
+
+export type MFAEnrollWebauthnParams = Prettify<
+  MFAEnrollParamsBase<'webauthn'> & MFAEnrollWebauthnFields
+>
+
 type AuthMFAEnrollResponseBase<T extends FactorType> = {
   /** ID of the factor that was just enrolled (in an unverified state). */
   id: string
@@ -1270,11 +1403,18 @@ type AuthMFAEnrollPhoneResponseFields = {
   /** Phone number of the MFA factor in E.164 format. Used to send messages  */
   phone: string
 }
+
 export type AuthMFAEnrollPhoneResponse = RequestResult<
   Prettify<AuthMFAEnrollResponseBase<'phone'> & AuthMFAEnrollPhoneResponseFields>
 >
 
+type AuthMFAEnrollWebauthnFields = {
+  /** no extra fields for now, kept for consistency and for possible future changes  */
+}
 
+export type AuthMFAEnrollWebauthnResponse = RequestResult<
+  Prettify<AuthMFAEnrollResponseBase<'webauthn'> & AuthMFAEnrollWebauthnFields>
+>
 
 export type JwtHeader = {
   alg: 'RS256' | 'ES256' | 'HS256'
