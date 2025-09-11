@@ -920,17 +920,15 @@ type MFAVerifyWebauthnAuthenticationParamFields = {
   credentialResponse: AuthenticationCredential
 }
 
-export type MFAVerifyWebauthnParamFields<T extends 'create' | 'request' = 'create' | 'request'> =
-  T extends 'create'
-    ? MFAVerifyWebauthnRegistrationParamFields
-    : MFAVerifyWebauthnAuthenticationParamFields
+export type MFAVerifyWebauthnParamFields =
+  | MFAVerifyWebauthnRegistrationParamFields
+  | MFAVerifyWebauthnAuthenticationParamFields
 
-export type MFAVerifyWebauthnParams<T extends 'create' | 'request' = 'create' | 'request'> =
-  Prettify<
-    MFAVerifyParamsBase & {
-      webauthn: Prettify<MFAVerifyWebauthnParamFieldsBase & MFAVerifyWebauthnParamFields<T>>
-    }
-  >
+export type MFAVerifyWebauthnParams = Prettify<
+  MFAVerifyParamsBase & {
+    webauthn: Prettify<MFAVerifyWebauthnParamFieldsBase & MFAVerifyWebauthnParamFields>
+  }
+>
 
 export type MFAVerifyParams = MFAVerifyTOTPParams | MFAVerifyPhoneParams | MFAVerifyWebauthnParams
 

@@ -124,7 +124,7 @@ export function prepareCredentialCreationOptionsForBrowser(
   if (excludeCredentials && excludeCredentials.length > 0) {
     result.excludeCredentials = new Array(excludeCredentials.length)
 
-    for (let i = 0; i < excludeCredentials.length, i++; ) {
+    for (let i = 0; i < excludeCredentials.length; i++) {
       const cred = excludeCredentials[i]
       result.excludeCredentials[i] = {
         ...cred,
@@ -557,7 +557,8 @@ export class WebAuthnApi {
         return { data: null, error: challengeError }
       }
 
-      if (challengeResponse?.webauthn.type === 'create') {
+      if (challengeResponse?.webauthn.type !== 'request') {
+        // This should never hit
         return {
           data: null,
           error: new AuthError(
@@ -640,7 +641,7 @@ export class WebAuthnApi {
         return { data: null, error: challengeError }
       }
 
-      if (challengeResponse?.webauthn.type === 'create') {
+      if (challengeResponse?.webauthn.type !== 'create') {
         // This should never hit
         return {
           data: null,
@@ -657,8 +658,7 @@ export class WebAuthnApi {
           rpId,
           rpOrigins,
           type: challengeResponse.webauthn.type,
-          credentialResponse: challengeResponse.webauthn
-            .credentialResponse as AuthenticationCredential,
+          credentialResponse: challengeResponse.webauthn.credentialResponse,
         },
       })
     } catch (error) {
