@@ -519,65 +519,26 @@ export type SignInAnonymouslyCredentials = {
   }
 }
 
-export type SignUpWithPasswordCredentials =
-  | {
-      /** The user's email address. */
-      email: string
-      /** The user's password. */
-      password: string
-      options?: {
-        /** The redirect url embedded in the email link */
-        emailRedirectTo?: string
-        /**
-         * A custom data object to store the user's metadata. This maps to the `auth.users.raw_user_meta_data` column.
-         *
-         * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
-         */
-        data?: object
-        /** Verification token received when the user completes the captcha on the site. */
-        captchaToken?: string
-      }
+export type SignUpWithPasswordCredentials = Prettify<
+  PasswordCredentialsBase & {
+    options?: {
+      emailRedirectTo?: string // only for email
+      data?: object
+      captchaToken?: string
+      channel?: 'sms' | 'whatsapp' // only for phone
     }
-  | {
-      /** The user's phone number. */
-      phone: string
-      /** The user's password. */
-      password: string
-      options?: {
-        /**
-         * A custom data object to store the user's metadata. This maps to the `auth.users.raw_user_meta_data` column.
-         *
-         * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
-         */
-        data?: object
-        /** Verification token received when the user completes the captcha on the site. Requires a configured WhatsApp sender on Twilio */
-        captchaToken?: string
-        /** Messaging channel to use (e.g. whatsapp or sms) */
-        channel?: 'sms' | 'whatsapp'
-      }
-    }
+  }
+>
 
-export type SignInWithPasswordCredentials =
-  | {
-      /** The user's email address. */
-      email: string
-      /** The user's password. */
-      password: string
-      options?: {
-        /** Verification token received when the user completes the captcha on the site. */
-        captchaToken?: string
-      }
-    }
-  | {
-      /** The user's phone number. */
-      phone: string
-      /** The user's password. */
-      password: string
-      options?: {
-        /** Verification token received when the user completes the captcha on the site. */
-        captchaToken?: string
-      }
-    }
+type PasswordCredentialsBase =
+  | { email: string; password: string }
+  | { phone: string; password: string }
+
+export type SignInWithPasswordCredentials = PasswordCredentialsBase & {
+  options?: {
+    captchaToken?: string
+  }
+}
 
 export type SignInWithPasswordlessCredentials =
   | {
