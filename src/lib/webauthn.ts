@@ -519,14 +519,14 @@ export class WebAuthnApi {
    */
   public async _authenticate({
     factorId,
-    webAuthn: {
+    webauthn: {
       rpId = typeof window !== 'undefined' ? window.location.hostname : undefined,
       rpOrigins = typeof window !== 'undefined' ? [window.location.origin] : undefined,
       signal,
     },
   }: {
     factorId: string
-    webAuthn: {
+    webauthn: {
       rpId?: string
       rpOrigins?: string[]
       signal?: AbortSignal

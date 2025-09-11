@@ -2994,7 +2994,7 @@ export default class GoTrueClient {
             | Exclude<MFAVerifyParams, MFAVerifyWebauthnParams>
             /** We exclude out the webauthn params from here because we're going to need to serialize them in the response */
             | (StrictOmit<MFAVerifyWebauthnParams, 'webauthn'> & {
-                webAuthn:
+                webauthn:
                   | StrictOmit<MFAVerifyWebauthnParamFields, 'credentialResponse'> & {
                       credentialResponse: PublicKeyCredentialJSON
                     }
@@ -3005,7 +3005,7 @@ export default class GoTrueClient {
               ? {
                   rpId: params.webauthn.rpId,
                   ...(params.webauthn.rpOrigins && { rpOrigins: params.webauthn.rpOrigins }),
-                  webAuthn: {
+                  webauthn: {
                     type: params.webauthn.type,
                     credentialResponse: params.webauthn.credentialResponse.toJSON(),
                   },
