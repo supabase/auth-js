@@ -906,27 +906,31 @@ type MFAVerifyWebauthnParamFieldsBase = {
   rpOrigins?: string[]
 }
 
-export type MFAVerifyWebauthnRegistrationParamFields = {
+type MFAVerifyWebauthnRegistrationParamFields = {
   /** Operation type */
   type: 'create'
   /** Creation response from the authenticator (for enrollment/unverified factors) */
   credentialResponse: RegistrationCredential
 }
 
-export type MFAVerifyWebauthnAuthenticationParamFields = {
+type MFAVerifyWebauthnAuthenticationParamFields = {
   /** Operation type */
   type: 'request'
   /** Creation response from the authenticator (for enrollment/unverified factors) */
   credentialResponse: AuthenticationCredential
 }
 
-type MFAVerifyWebauthnParamFields = {
-  webAuthn:
-    | Prettify<(MFAVerifyWebauthnParamFieldsBase & MFAVerifyWebauthnRegistrationParamFields)>
-    | Prettify<(MFAVerifyWebauthnParamFieldsBase & MFAVerifyWebauthnAuthenticationParamFields)>
-}
+export type MFAVerifyWebauthnParamFields<T extends 'create' | 'request' = 'create' | 'request'> =
+  T extends 'create'
+    ? MFAVerifyWebauthnRegistrationParamFields
+    : MFAVerifyWebauthnAuthenticationParamFields
 
-export type MFAVerifyWebauthnParams = Prettify<MFAVerifyParamsBase & MFAVerifyWebauthnParamFields>
+export type MFAVerifyWebauthnParams<T extends 'create' | 'request' = 'create' | 'request'> =
+  Prettify<
+    MFAVerifyParamsBase & {
+      webauthn: Prettify<MFAVerifyWebauthnParamFieldsBase & MFAVerifyWebauthnParamFields<T>>
+    }
+  >
 
 export type MFAVerifyParams = MFAVerifyTOTPParams | MFAVerifyPhoneParams | MFAVerifyWebauthnParams
 
@@ -951,7 +955,7 @@ export type MFAChallengePhoneParams = Prettify<
 
 /** WebAuthn parameters for WebAuthn factor challenge */
 type MFAChallengeWebauthnParamFields = {
-  webAuthn: {
+  webauthn: {
     /** Relying party ID */
     rpId: string
     /** Relying party origins*/
@@ -1046,7 +1050,11 @@ type AuthMFAChallengeWebauthnResponseFields = {
       }
 }
 
-type AuthMFAChallengeWebauthnServerResponseFields = {
+export type AuthMFAChallengeWebauthnResponse = RequestResult<
+  Prettify<AuthMFAChallengeResponseBase<'webauthn'> & AuthMFAChallengeWebauthnResponseFields>
+>
+
+type AuthMFAChallengeWebauthnResponseFieldsJSON = {
   webauthn:
     | {
         type: 'create'
@@ -1058,18 +1066,12 @@ type AuthMFAChallengeWebauthnServerResponseFields = {
       }
 }
 
-export type AuthMFAChallengeWebauthnResponseData = Prettify<
-  AuthMFAChallengeResponseBase<'webauthn'> & AuthMFAChallengeWebauthnResponseFields
->
-
-export type AuthMFAChallengeWebauthnResponse = RequestResult<AuthMFAChallengeWebauthnResponseData>
-
-export type AuthMFAChallengeWebauthnServerResponseData = Prettify<
-  AuthMFAChallengeResponseBase<'webauthn'> & AuthMFAChallengeWebauthnServerResponseFields
+export type AuthMFAChallengeWebauthnResponseDataJSON = Prettify<
+  AuthMFAChallengeResponseBase<'webauthn'> & AuthMFAChallengeWebauthnResponseFieldsJSON
 >
 
 export type AuthMFAChallengeWebauthnServerResponse =
-  RequestResult<AuthMFAChallengeWebauthnServerResponseData>
+  RequestResult<AuthMFAChallengeWebauthnResponseDataJSON>
 
 export type AuthMFAChallengeResponse =
   | AuthMFAChallengeTOTPResponse
@@ -1143,6 +1145,7 @@ export interface GoTrueMFAApi {
    * Verifies a code against a challenge. The verification code is
    * provided by the user by entering a code seen in their authenticator app.
    */
+
   verify(params: MFAVerifyTOTPParams): Promise<AuthMFAVerifyResponse>
   verify(params: MFAVerifyPhoneParams): Promise<AuthMFAVerifyResponse>
   verify(params: MFAVerifyWebauthnParams): Promise<AuthMFAVerifyResponse>

@@ -2,46 +2,39 @@ import GoTrueClient from '../GoTrueClient'
 import { base64UrlToUint8Array, bytesToBase64URL } from './base64url'
 import { AuthError, AuthUnknownError, isAuthError } from './errors'
 import {
-  AuthMFAChallengeWebauthnResponse,
-  AuthMFAChallengeWebauthnResponseData,
   AuthMFAEnrollWebauthnResponse,
   AuthMFAVerifyResponse,
   AuthMFAVerifyResponseData,
-  MFAChallengeParams,
   MFAChallengeWebauthnParams,
   MFAEnrollWebauthnParams,
-  MFAVerifyParams,
-  MFAVerifyWebauthnAuthenticationParamFields,
+  MFAVerifyWebauthnParamFields,
   MFAVerifyWebauthnParams,
-  MFAVerifyWebauthnRegistrationParamFields,
-  Prettify,
   RequestResult,
   StrictOmit,
 } from './types'
 import type {
-  PublicKeyCredentialCreationOptionsJSON,
-  PublicKeyCredentialRequestOptionsJSON,
-  RegistrationResponseJSON,
+  AuthenticationCredential,
   AuthenticationResponseJSON,
   AuthenticatorAttachment,
-  PublicKeyCredentialHint,
-  AuthenticatorTransportFuture,
-  PublicKeyCredentialDescriptorFuture,
-  PublicKeyCredentialRequestOptionsFuture,
   PublicKeyCredentialCreationOptionsFuture,
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsFuture,
+  PublicKeyCredentialRequestOptionsJSON,
   RegistrationCredential,
-  AuthenticationCredential,
+  RegistrationResponseJSON,
 } from './webauthn.dom'
 
 import {
-  WebAuthnError,
-  isWebAuthnError,
-  identifyRegistrationError,
   identifyAuthenticationError,
+  identifyRegistrationError,
+  isWebAuthnError,
+  WebAuthnError,
   WebAuthnUnknownError,
 } from './webauthn.errors'
 
 export { WebAuthnError, isWebAuthnError, identifyRegistrationError, identifyAuthenticationError }
+// Re-export the JSON types for use in other files
+export type { RegistrationResponseJSON, AuthenticationResponseJSON }
 
 /**
  * WebAuthn abort service to manage ceremony cancellation
@@ -193,9 +186,6 @@ export function prepareCredentialRequestOptionsForBrowser(
  * Can be either a registration or authentication response
  */
 export type ServerCredentialResponse = RegistrationResponseJSON | AuthenticationResponseJSON
-
-// Re-export the JSON types for use in other files
-export type { RegistrationResponseJSON, AuthenticationResponseJSON }
 
 /**
  * Convert a registration/enrollment credential response to server format
@@ -373,38 +363,11 @@ export async function getCredential(
 }
 
 export class WebAuthnApi {
-  public enroll: (
-    params: Omit<MFAEnrollWebauthnParams, 'factorType'>
-  ) => Promise<AuthMFAEnrollWebauthnResponse>
-  public challenge: (
-    params: MFAChallengeWebauthnParams & { friendlyName?: string; signal?: AbortSignal }
-  ) => Promise<
-    RequestResult<
-      {
-        challengeId: string
-        webAuthn: StrictOmit<MFAVerifyWebauthnParams['webAuthn'], 'rpId' | 'rpOrigins'>
-      },
-      WebAuthnError | AuthError
-    >
-  >
-  public verify: (params: {
-    challengeId: string
-    factorId: string
-    credential: PublicKeyCredential
-    webAuthn?: Partial<MFAVerifyWebauthnParams['webAuthn']>
-  }) => Promise<AuthMFAVerifyResponse>
-  public authenticate: (params?: {
-    factorId?: string
-    rpId?: string
-    rpOrigins?: string[]
-    signal?: AbortSignal
-  }) => Promise<AuthMFAVerifyResponse>
-  public register: (params: {
-    friendlyName: string
-    rpId?: string
-    rpOrigins?: string[]
-    signal?: AbortSignal
-  }) => Promise<RequestResult<AuthMFAVerifyResponse, WebAuthnError | AuthError>>
+  public enroll: typeof WebAuthnApi.prototype._enroll
+  public challenge: typeof WebAuthnApi.prototype._challenge
+  public verify: typeof WebAuthnApi.prototype._verify
+  public authenticate: typeof WebAuthnApi.prototype._authenticate
+  public register: typeof WebAuthnApi.prototype._register
 
   constructor(private client: GoTrueClient) {
     // Bind all methods so they can be destructured
@@ -425,7 +388,6 @@ export class WebAuthnApi {
     return this.client.mfa.enroll({ ...params, factorType: 'webauthn' })
   }
 
-  
   /**
    * Challenge for WebAuthn credential creation or authentication
    * Combines server challenge with browser credential operations
@@ -433,19 +395,12 @@ export class WebAuthnApi {
    */
   public async _challenge({
     factorId,
-    webAuthn,
+    webauthn,
     friendlyName,
     signal,
   }: MFAChallengeWebauthnParams & { friendlyName?: string; signal?: AbortSignal }): Promise<
     RequestResult<
-      | {
-          challengeId: string
-          webAuthn: MFAVerifyWebauthnRegistrationParamFields
-        }
-      | {
-          challengeId: string
-          webAuthn: MFAVerifyWebauthnAuthenticationParamFields
-        },
+      { challengeId: string } & { webauthn: MFAVerifyWebauthnParamFields },
       WebAuthnError | AuthError
     >
   > {
@@ -453,7 +408,7 @@ export class WebAuthnApi {
       // Get challenge from server using the client's MFA methods
       const { data: challengeResponse, error: challengeError } = await this.client.mfa.challenge({
         factorId,
-        webAuthn,
+        webauthn,
       })
 
       if (!challengeResponse) {
@@ -462,22 +417,23 @@ export class WebAuthnApi {
 
       const abortSignal = signal ?? webAuthnAbortService.createNewAbortSignal()
 
-      const { webauthn } = challengeResponse
-
-      switch (webauthn.type) {
+      switch (challengeResponse.webauthn.type) {
         case 'create': {
           const { data, error } = await createCredential({
-            ...webauthn.credential_options,
+            ...challengeResponse.webauthn.credential_options,
             publicKey: {
-              ...webauthn.credential_options.publicKey,
+              ...challengeResponse.webauthn.credential_options.publicKey,
               authenticatorSelection: {
                 authenticatorAttachment: 'cross-platform',
                 requireResidentKey: false,
                 userVerification: 'required',
               },
               user: {
-                ...webauthn.credential_options.publicKey.user,
-                name: webauthn.credential_options.publicKey.user.name || friendlyName || 'user',
+                ...challengeResponse.webauthn.credential_options.publicKey.user,
+                name:
+                  challengeResponse.webauthn.credential_options.publicKey.user.name ||
+                  friendlyName ||
+                  'user',
               },
               hints: ['security-key'],
             },
@@ -488,8 +444,8 @@ export class WebAuthnApi {
             return {
               data: {
                 challengeId: challengeResponse.id,
-                webAuthn: {
-                  type: webauthn.type,
+                webauthn: {
+                  type: challengeResponse.webauthn.type,
                   credentialResponse: data,
                 },
               },
@@ -499,12 +455,13 @@ export class WebAuthnApi {
           return { data: null, error }
         }
 
-        case 'request':
+        case 'request': {
           const { data, error } = await getCredential({
-            ...webauthn.credential_options,
+            ...challengeResponse.webauthn.credential_options,
             publicKey: {
-              ...webauthn.credential_options.publicKey,
-              allowCredentials: webauthn.credential_options.publicKey.allowCredentials,
+              ...challengeResponse.webauthn.credential_options.publicKey,
+              allowCredentials:
+                challengeResponse.webauthn.credential_options.publicKey.allowCredentials,
               userVerification: 'required',
               hints: ['security-key'],
             },
@@ -514,8 +471,8 @@ export class WebAuthnApi {
             return {
               data: {
                 challengeId: challengeResponse.id,
-                webAuthn: {
-                  type: webauthn.type,
+                webauthn: {
+                  type: challengeResponse.webauthn.type,
                   credentialResponse: data,
                 },
               },
@@ -523,6 +480,7 @@ export class WebAuthnApi {
             }
           }
           return { data: null, error }
+        }
       }
     } catch (error) {
       if (isAuthError(error)) {
@@ -542,16 +500,16 @@ export class WebAuthnApi {
   public async _verify({
     challengeId,
     factorId,
-    webAuthn,
+    webauthn,
   }: {
     challengeId: string
     factorId: string
-    webAuthn: MFAVerifyWebauthnParams['webAuthn']
+    webauthn: MFAVerifyWebauthnParams['webauthn']
   }): Promise<AuthMFAVerifyResponse> {
     return this.client.mfa.verify({
       factorId,
       challengeId,
-      webAuthn,
+      webauthn,
     })
   }
 
@@ -591,7 +549,7 @@ export class WebAuthnApi {
       // Get challenge and credential
       const { data: challengeResponse, error: challengeError } = await this.challenge({
         factorId,
-        webAuthn: { rpId, rpOrigins },
+        webauthn: { rpId, rpOrigins },
         signal,
       })
 
@@ -599,17 +557,26 @@ export class WebAuthnApi {
         return { data: null, error: challengeError }
       }
 
-      const { webAuthn } = challengeResponse
+      if (challengeResponse?.webauthn.type === 'create') {
+        return {
+          data: null,
+          error: new AuthError(
+            `factorId ${factorId} is not registered, use the '.register()' function instead`
+          ),
+        }
+      }
+
+      const { webauthn } = challengeResponse
 
       // Verify credential
       return this._verify({
         factorId,
         challengeId: challengeResponse.challengeId,
-        webAuthn: {
-          type: webAuthn.type,
+        webauthn: {
+          type: webauthn.type,
           rpId,
           rpOrigins,
-          credentialResponse: webAuthn.credentialResponse,
+          credentialResponse: webauthn.credentialResponse,
         },
       })
     } catch (error) {
@@ -665,7 +632,7 @@ export class WebAuthnApi {
       const { data: challengeResponse, error: challengeError } = await this._challenge({
         factorId: factor.id,
         friendlyName: factor.friendly_name,
-        webAuthn: { rpId, rpOrigins },
+        webauthn: { rpId, rpOrigins },
         signal,
       })
 
@@ -673,29 +640,24 @@ export class WebAuthnApi {
         return { data: null, error: challengeError }
       }
 
-      // Verify credential
-      if (challengeResponse.webAuthn.type === 'create') {
-        return this._verify({
-          factorId: factor.id,
-          challengeId: challengeResponse.challengeId,
-          webAuthn: {
-            rpId,
-            rpOrigins,
-            type: 'create',
-            credentialResponse: challengeResponse.webAuthn
-              .credentialResponse as RegistrationCredential,
-          },
-        })
+      if (challengeResponse?.webauthn.type === 'create') {
+        // This should never hit
+        return {
+          data: null,
+          error: new AuthError(
+            `factorId ${factor.id} is already registered, use the '.authenticate()' function instead`
+          ),
+        }
       }
 
       return this._verify({
         factorId: factor.id,
         challengeId: challengeResponse.challengeId,
-        webAuthn: {
+        webauthn: {
           rpId,
           rpOrigins,
-          type: 'request',
-          credentialResponse: challengeResponse.webAuthn
+          type: challengeResponse.webauthn.type,
+          credentialResponse: challengeResponse.webauthn
             .credentialResponse as AuthenticationCredential,
         },
       })

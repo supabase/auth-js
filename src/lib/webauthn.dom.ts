@@ -1,6 +1,6 @@
 // from https://github.com/MasterKale/SimpleWebAuthn/blob/master/packages/browser/src/types/index.ts
 
-import { StrictOmit } from "./types"
+import { StrictOmit } from './types'
 
 /**
  * A variant of PublicKeyCredentialCreationOptions suitable for JSON transmission to the browser to
@@ -62,19 +62,19 @@ export interface PublicKeyCredentialUserEntity {
    * A unique identifier for the user account.
    * Maximum 64 bytes. Should not contain PII.
    */
-  id: BufferSource; // ArrayBuffer | TypedArray | DataView
-  
+  id: BufferSource // ArrayBuffer | TypedArray | DataView
+
   /**
    * A human-readable identifier for the account.
    * Typically an email, username, or phone number.
    */
-  name: string;
-  
+  name: string
+
   /**
    * A human-friendly display name for the user.
    * Example: "John Doe"
    */
-  displayName: string;
+  displayName: string
 }
 
 /**
@@ -209,22 +209,20 @@ export interface PublicKeyCredentialDescriptorFuture
 /**
  * Enhanced PublicKeyCredentialCreationOptions that knows about the latest features
  */
-export interface PublicKeyCredentialCreationOptionsFuture 
+export interface PublicKeyCredentialCreationOptionsFuture
   extends StrictOmit<PublicKeyCredentialCreationOptions, 'excludeCredentials' | 'user'> {
   excludeCredentials?: PublicKeyCredentialDescriptorFuture[]
   user: PublicKeyCredentialUserEntity
   hints?: PublicKeyCredentialHint[]
-  authenticatorSelection?: AuthenticatorSelectionCriteria;
+  authenticatorSelection?: AuthenticatorSelectionCriteria
   pubKeyCredParams: PublicKeyCredentialParameters[]
   rp: PublicKeyCredentialRpEntity
-
 }
 
-export interface PublicKeyCredentialRequestOptionsFuture 
+export interface PublicKeyCredentialRequestOptionsFuture
   extends StrictOmit<PublicKeyCredentialRequestOptions, 'allowCredentials'> {
   allowCredentials?: PublicKeyCredentialDescriptorFuture[]
   hints?: PublicKeyCredentialHint[]
-  
 }
 
 /** */

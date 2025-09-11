@@ -2,7 +2,10 @@
 
 import { StrictOmit } from './types'
 import { isValidDomain } from './webauthn'
-import { PublicKeyCredentialCreationOptionsFuture, PublicKeyCredentialRequestOptionsFuture } from './webauthn.dom'
+import {
+  PublicKeyCredentialCreationOptionsFuture,
+  PublicKeyCredentialRequestOptionsFuture,
+} from './webauthn.dom'
 
 /**
  * A custom Error used to return a more nuanced error detailing _why_ one of the eight documented
@@ -85,8 +88,8 @@ export function identifyRegistrationError({
 }: {
   error: Error
   options: StrictOmit<CredentialCreationOptions, 'publicKey'> & {
-      publicKey: PublicKeyCredentialCreationOptionsFuture
-    }
+    publicKey: PublicKeyCredentialCreationOptionsFuture
+  }
 }): WebAuthnError {
   const { publicKey } = options
 

@@ -81,7 +81,6 @@ import type {
   CallRefreshTokenResult,
   EthereumWallet,
   EthereumWeb3Credentials,
-  Exact,
   Factor,
   GoTrueClientOptions,
   GoTrueMFAApi,
@@ -101,9 +100,10 @@ import type {
   MFAEnrollWebauthnParams,
   MFAUnenrollParams,
   MFAVerifyParams,
-  MFAVerifyWebauthnAuthenticationParamFields,
+  MFAVerifyPhoneParams,
+  MFAVerifyTOTPParams,
+  MFAVerifyWebauthnParamFields,
   MFAVerifyWebauthnParams,
-  MFAVerifyWebauthnRegistrationParamFields,
   OAuthResponse,
   Prettify,
   Provider,
@@ -139,16 +139,10 @@ import {
   toHex,
 } from './lib/web3/ethereum'
 import {
-  createCredential,
-  getCredential,
   prepareCredentialCreationOptionsForBrowser,
   prepareCredentialRequestOptionsForBrowser,
 } from './lib/webauthn'
-import {
-  AuthenticationCredential,
-  PublicKeyCredentialJSON,
-  RegistrationCredential,
-} from './lib/webauthn.dom'
+import { PublicKeyCredentialJSON } from './lib/webauthn.dom'
 
 polyfillGlobalThis() // Make "globalThis" available
 
@@ -2984,6 +2978,9 @@ export default class GoTrueClient {
   /**
    * {@see GoTrueMFAApi#verify}
    */
+  private async _verify(params: MFAVerifyTOTPParams): Promise<AuthMFAVerifyResponse>
+  private async _verify(params: MFAVerifyPhoneParams): Promise<AuthMFAVerifyResponse>
+  private async _verify(params: MFAVerifyWebauthnParams): Promise<AuthMFAVerifyResponse>
   private async _verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse> {
     return this._acquireLock(-1, async () => {
       try {
@@ -2996,25 +2993,21 @@ export default class GoTrueClient {
           const body:
             | Exclude<MFAVerifyParams, MFAVerifyWebauthnParams>
             /** We exclude out the webauthn params from here because we're going to need to serialize them in the response */
-            | (StrictOmit<MFAVerifyWebauthnParams, 'webAuthn'> & {
+            | (StrictOmit<MFAVerifyWebauthnParams, 'webauthn'> & {
                 webAuthn:
-                  | StrictOmit<
-                      | MFAVerifyWebauthnRegistrationParamFields
-                      | MFAVerifyWebauthnAuthenticationParamFields,
-                      'credentialResponse'
-                    > & {
+                  | StrictOmit<MFAVerifyWebauthnParamFields, 'credentialResponse'> & {
                       credentialResponse: PublicKeyCredentialJSON
                     }
               }) = {
             challengeId: params.challengeId,
             factorId: params.factorId,
-            ...('webAuthn' in params
+            ...('webauthn' in params
               ? {
-                  rpId: params.webAuthn.rpId,
-                  ...(params.webAuthn.rpOrigins && { rpOrigins: params.webAuthn.rpOrigins }),
+                  rpId: params.webauthn.rpId,
+                  ...(params.webauthn.rpOrigins && { rpOrigins: params.webauthn.rpOrigins }),
                   webAuthn: {
-                    type: params.webAuthn.type,
-                    credentialResponse: params.webAuthn.credentialResponse.toJSON(),
+                    type: params.webauthn.type,
+                    credentialResponse: params.webauthn.credentialResponse.toJSON(),
                   },
                 }
               : { code: params.code }),
