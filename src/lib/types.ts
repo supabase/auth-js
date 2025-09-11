@@ -1115,17 +1115,18 @@ export type AuthMFAChallengeResponse =
   | AuthMFAChallengePhoneResponse
   | AuthMFAChallengeWebauthnResponse
 
-export type AuthMFAListFactorsResponse = RequestResult<{
-  /** All available factors (verified and unverified). */
-  all: Prettify<Factor>[]
+/** response of ListFactors, which should contain all the types of factors that are available, this ensures we always include all */
+export type AuthMFAListFactorsResponse<T extends typeof FactorTypes = typeof FactorTypes> =
+  RequestResult<
+    {
+      /** All available factors (verified and unverified). */
+      all: Prettify<Factor>[]
 
-  /** Only verified TOTP factors. (A subset of `all`.) */
-  totp: Prettify<Factor<'totp', 'verified'>>[]
-  /** Only verified Phone factors. (A subset of `all`.) */
-  phone: Prettify<Factor<'phone', 'verified'>>[]
-  /** Only verified WebAuthn factors. (A subset of `all`.) */
-  webauthn: Prettify<Factor<'webauthn', 'verified'>>[]
-}>
+      // Dynamically create a property for each factor type with only verified factors
+    } & {
+      [K in T[number]]: Prettify<Factor<K, 'verified'>>[]
+    }
+  >
 
 export type AuthenticatorAssuranceLevels = 'aal1' | 'aal2'
 
