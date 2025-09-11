@@ -357,7 +357,7 @@ export interface User {
   identities?: UserIdentity[]
   is_anonymous?: boolean
   is_sso_user?: boolean
-  factors?: Factor[]
+  factors?: Prettify<Factor>[]
   deleted_at?: string
 }
 
@@ -979,17 +979,17 @@ export type MFABaseChallengeData<Type extends string> = {
   expires_at: Type extends 'webauthn' ? number | undefined : number
 }
 
-type MFAWebAuthnChallengeData = MFABaseChallengeData<'webauthn'> &
-  (
+type MFAWebAuthnChallengeData = MFABaseChallengeData<'webauthn'> & {
+  webauthn: 
     | {
-        credential_creation_options: { publicKey: PublicKeyCredentialCreationOptions }
-        credential_request_options?: never
+        type: 'CREATE'
+        credential_options: { publicKey: PublicKeyCredentialCreationOptions }
       }
     | {
-        credential_creation_options?: never
-        credential_request_options: { publicKey: PublicKeyCredentialRequestOptions }
+        type: 'REQUEST'
+        credential_options: { publicKey: PublicKeyCredentialRequestOptions }
       }
-  )
+}
 
 export type AuthMFAChallengeResponse<
   Type extends 'webauthn' | 'totp' | 'phone' = 'totp' | 'phone'
@@ -1012,9 +1012,25 @@ export type MFAChallengePhoneResponse = AuthMFAChallengeResponse<'phone'>
 export type MFAChallengeAndVerifyParams = {
   /** ID of the factor being verified. Returned in enroll(). */
   factorId: string
-  /** Verification code provided by the user. */
-  code: string
-}
+} & (
+  | {
+      /** Verification code provided by the user (for TOTP/Phone factors). */
+      code: string
+      webAuthn?: never
+    }
+  | {
+      code?: never
+      /** WebAuthn parameters for challenge and verification */
+      webAuthn: {
+        /** Relying party ID */
+        rpId: string
+        /** Relying party origins */
+        rpOrigins?: string[]
+        /** Assertion response from WebAuthn API */
+        assertionResponse: PublicKeyCredential
+      }
+    }
+)
 
 export type MFAVerifyResponse = {
   /** New access token (JWT) after successful verification. */

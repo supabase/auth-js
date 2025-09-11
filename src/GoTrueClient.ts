@@ -3167,18 +3167,42 @@ export default class GoTrueClient {
     // both _challenge and _verify independently acquire the lock, so no need
     // to acquire it here
 
-    const { data: challengeData, error: challengeError } = await this._challenge({
-      factorId: params.factorId,
-    })
+    // Prepare challenge params based on whether it's WebAuthn or code-based
+    const challengeParams: MFAChallengeParams = 'webAuthn' in params && params.webAuthn
+      ? {
+          factorId: params.factorId,
+          webAuthn: {
+            rpId: params.webAuthn.rpId,
+            rpOrigins: params.webAuthn.rpOrigins,
+          },
+        }
+      : {
+          factorId: params.factorId,
+        }
+
+    const { data: challengeData, error: challengeError } = await this._challenge(challengeParams)
     if (challengeError) {
       return { data: null, error: challengeError }
     }
 
-    return await this._verify({
-      factorId: params.factorId,
-      challengeId: challengeData.id,
-      code: params.code,
-    })
+    // Prepare verify params based on whether it's WebAuthn or code-based
+    const verifyParams: MFAVerifyParams = 'webAuthn' in params && params.webAuthn
+      ? {
+          factorId: params.factorId,
+          challengeId: challengeData.id,
+          webAuthn: {
+            rpId: params.webAuthn.rpId,
+            rpOrigins: params.webAuthn.rpOrigins,
+            assertionResponse: params.webAuthn.assertionResponse,
+          },
+        }
+      : {
+          factorId: params.factorId,
+          challengeId: challengeData.id,
+          code: params.code!,
+        }
+
+    return await this._verify(verifyParams)
   }
 
   /**
