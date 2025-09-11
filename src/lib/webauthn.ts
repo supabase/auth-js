@@ -392,13 +392,20 @@ export class WebAuthnApi {
    * Challenge for WebAuthn credential creation or authentication
    * Combines server challenge with browser credential operations
    * @param params - Challenge parameters including factorId
+   * @param overrides - Allows you to override the parameters passed to the credential creation process {@see PublicKeyCredentialCreationOptionsFuture}
    */
-  public async _challenge({
-    factorId,
-    webauthn,
-    friendlyName,
-    signal,
-  }: MFAChallengeWebauthnParams & { friendlyName?: string; signal?: AbortSignal }): Promise<
+  public async _challenge(
+    {
+      factorId,
+      webauthn,
+      friendlyName,
+      signal,
+    }: MFAChallengeWebauthnParams & { friendlyName?: string; signal?: AbortSignal },
+    overrides?: {
+      create: PublicKeyCredentialCreationOptionsFuture
+      request: PublicKeyCredentialRequestOptionsFuture
+    }
+  ): Promise<
     RequestResult<
       { factorId: string; challengeId: string } & { webauthn: MFAVerifyWebauthnParamFields },
       WebAuthnError | AuthError
@@ -420,13 +427,13 @@ export class WebAuthnApi {
       switch (challengeResponse.webauthn.type) {
         case 'create': {
           const { data, error } = await createCredential({
-            ...challengeResponse.webauthn.credential_options,
             publicKey: {
               ...challengeResponse.webauthn.credential_options.publicKey,
               authenticatorSelection: {
                 authenticatorAttachment: 'cross-platform',
                 requireResidentKey: false,
                 userVerification: 'required',
+                ...overrides?.create?.authenticatorSelection,
               },
               user: {
                 ...challengeResponse.webauthn.credential_options.publicKey.user,
@@ -434,8 +441,14 @@ export class WebAuthnApi {
                   challengeResponse.webauthn.credential_options.publicKey.user.name ||
                   friendlyName ||
                   'user',
+                ...overrides?.create?.user,
               },
-              hints: ['security-key'],
+              hints: overrides?.create?.hints ?? ['security-key'],
+              extensions: {
+                credProps: true,
+                ...overrides?.create?.extensions,
+              },
+              ...overrides?.create,
             },
             signal: abortSignal,
           })
@@ -447,7 +460,7 @@ export class WebAuthnApi {
                 challengeId: challengeResponse.id,
                 webauthn: {
                   type: challengeResponse.webauthn.type,
-                  credentialResponse: data,
+                  credential_response: data,
                 },
               },
               error: null,
@@ -463,11 +476,13 @@ export class WebAuthnApi {
               ...challengeResponse.webauthn.credential_options.publicKey,
               allowCredentials:
                 challengeResponse.webauthn.credential_options.publicKey.allowCredentials,
-              userVerification: 'required',
-              hints: ['security-key'],
+              userVerification: overrides?.request?.userVerification ?? 'required',
+              hints: overrides?.request?.hints ?? ['security-key'],
+              ...overrides?.request,
             },
             signal: abortSignal,
           })
+
           if (data) {
             return {
               data: {
@@ -475,7 +490,7 @@ export class WebAuthnApi {
                 challengeId: challengeResponse.id,
                 webauthn: {
                   type: challengeResponse.webauthn.type,
-                  credentialResponse: data,
+                  credential_response: data,
                 },
               },
               error: null,
@@ -579,7 +594,7 @@ export class WebAuthnApi {
           type: webauthn.type,
           rpId,
           rpOrigins,
-          credentialResponse: webauthn.credentialResponse,
+          credential_response: webauthn.credential_response,
         },
       })
     } catch (error) {
@@ -596,18 +611,23 @@ export class WebAuthnApi {
   /**
    * Complete WebAuthn registration flow
    * @param params - Registration parameters including friendlyName
+   * @param publicKeyParams - Allows you to override the parameters passed to the credential creation process {@see PublicKeyCredentialCreationOptionsFuture}
+
    */
-  public async _register({
-    friendlyName,
-    rpId = typeof window !== 'undefined' ? window.location.hostname : undefined,
-    rpOrigins = typeof window !== 'undefined' ? [window.location.origin] : undefined,
-    signal,
-  }: {
-    friendlyName: string
-    rpId?: string
-    rpOrigins?: string[]
-    signal?: AbortSignal
-  }): Promise<RequestResult<AuthMFAVerifyResponseData, WebAuthnError | AuthError>> {
+  public async _register(
+    {
+      friendlyName,
+      rpId = typeof window !== 'undefined' ? window.location.hostname : undefined,
+      rpOrigins = typeof window !== 'undefined' ? [window.location.origin] : undefined,
+      signal,
+    }: {
+      friendlyName: string
+      rpId?: string
+      rpOrigins?: string[]
+      signal?: AbortSignal
+    },
+    publicKeyParams: PublicKeyCredentialCreationOptionsFuture
+  ): Promise<RequestResult<AuthMFAVerifyResponseData, WebAuthnError | AuthError>> {
     if (!rpId) {
       return {
         data: null,
@@ -632,12 +652,15 @@ export class WebAuthnApi {
       }
 
       // Get challenge and create credential
-      const { data: challengeResponse, error: challengeError } = await this._challenge({
-        factorId: factor.id,
-        friendlyName: factor.friendly_name,
-        webauthn: { rpId, rpOrigins },
-        signal,
-      })
+      const { data: challengeResponse, error: challengeError } = await this._challenge(
+        {
+          factorId: factor.id,
+          friendlyName: factor.friendly_name,
+          webauthn: { rpId, rpOrigins },
+          signal,
+        },
+        publicKeyParams
+      )
 
       if (!challengeResponse) {
         return { data: null, error: challengeError }
@@ -660,7 +683,7 @@ export class WebAuthnApi {
           rpId,
           rpOrigins,
           type: challengeResponse.webauthn.type,
-          credentialResponse: challengeResponse.webauthn.credentialResponse,
+          credential_response: challengeResponse.webauthn.credential_response,
         },
       })
     } catch (error) {

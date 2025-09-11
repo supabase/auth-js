@@ -910,14 +910,14 @@ type MFAVerifyWebauthnRegistrationParamFields = {
   /** Operation type */
   type: 'create'
   /** Creation response from the authenticator (for enrollment/unverified factors) */
-  credentialResponse: RegistrationCredential
+  credential_response: RegistrationCredential
 }
 
 type MFAVerifyWebauthnAuthenticationParamFields = {
   /** Operation type */
   type: 'request'
   /** Creation response from the authenticator (for enrollment/unverified factors) */
-  credentialResponse: AuthenticationCredential
+  credential_response: AuthenticationCredential
 }
 
 export type MFAVerifyWebauthnParamFields =

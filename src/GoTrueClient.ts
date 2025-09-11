@@ -3007,7 +3007,7 @@ export default class GoTrueClient {
                   ...(params.webauthn.rpOrigins && { rpOrigins: params.webauthn.rpOrigins }),
                   webauthn: {
                     type: params.webauthn.type,
-                    credentialResponse: params.webauthn.credentialResponse.toJSON(),
+                    credentialResponse: params.webauthn.credential_response.toJSON(),
                   },
                 }
               : { code: params.code }),
