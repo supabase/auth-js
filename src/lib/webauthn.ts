@@ -41,6 +41,7 @@ export type { RegistrationResponseJSON, AuthenticationResponseJSON }
  * WebAuthn abort service to manage ceremony cancellation.
  * Ensures only one WebAuthn ceremony is active at a time to prevent "operation already in progress" errors.
  *
+ * @experimental This class is experimental and may change in future releases
  * @see {@link https://w3c.github.io/webauthn/#sctn-automation-webdriver-capability W3C WebAuthn Spec - Aborting Ceremonies}
  */
 export class WebAuthnAbortService {
@@ -85,6 +86,8 @@ export class WebAuthnAbortService {
 /**
  * Singleton instance to ensure only one WebAuthn ceremony is active at a time.
  * This prevents "operation already in progress" errors when retrying WebAuthn operations.
+ *
+ * @experimental This instance is experimental and may change in future releases
  */
 export const webAuthnAbortService = new WebAuthnAbortService()
 
@@ -518,6 +521,7 @@ export function mergeCredentialRequestOptions(
  * WebAuthn API wrapper for Supabase Auth.
  * Provides methods for enrolling, challenging, verifying, authenticating, and registering WebAuthn credentials.
  *
+ * @experimental This API is experimental and may change in future releases
  * @see {@link https://w3c.github.io/webauthn/ W3C WebAuthn Specification}
  * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API MDN - Web Authentication API}
  */
@@ -541,6 +545,7 @@ export class WebAuthnApi {
    * Enroll a new WebAuthn factor.
    * Creates an unverified WebAuthn factor that must be verified with a credential.
    *
+   * @experimental This method is experimental and may change in future releases
    * @param {Omit<MFAEnrollWebauthnParams, 'factorType'>} params - Enrollment parameters (friendlyName required)
    * @returns {Promise<AuthMFAEnrollWebauthnResponse>} Enrolled factor details or error
    * @see {@link https://w3c.github.io/webauthn/#sctn-registering-a-new-credential W3C WebAuthn Spec - Registering a New Credential}
@@ -556,6 +561,7 @@ export class WebAuthnApi {
    * Combines server challenge with browser credential operations.
    * Handles both registration (create) and authentication (request) flows.
    *
+   * @experimental This method is experimental and may change in future releases
    * @param {MFAChallengeWebauthnParams & { friendlyName?: string; signal?: AbortSignal }} params - Challenge parameters including factorId
    * @param {Object} overrides - Allows you to override the parameters passed to navigator.credentials
    * @param {PublicKeyCredentialCreationOptionsFuture} overrides.create - Override options for credential creation
@@ -676,6 +682,7 @@ export class WebAuthnApi {
    * Verify a WebAuthn credential with the server.
    * Completes the WebAuthn ceremony by sending the credential to the server for verification.
    *
+   * @experimental This method is experimental and may change in future releases
    * @param {Object} params - Verification parameters
    * @param {string} params.challengeId - ID of the challenge being verified
    * @param {string} params.factorId - ID of the WebAuthn factor
@@ -703,6 +710,7 @@ export class WebAuthnApi {
    * Complete WebAuthn authentication flow.
    * Performs challenge and verification in a single operation for existing credentials.
    *
+   * @experimental This method is experimental and may change in future releases
    * @param {Object} params - Authentication parameters
    * @param {string} params.factorId - ID of the WebAuthn factor to authenticate with
    * @param {Object} params.webauthn - WebAuthn configuration
@@ -788,6 +796,7 @@ export class WebAuthnApi {
    * Complete WebAuthn registration flow.
    * Performs enrollment, challenge, and verification in a single operation for new credentials.
    *
+   * @experimental This method is experimental and may change in future releases
    * @param {Object} params - Registration parameters
    * @param {string} params.friendlyName - User-friendly name for the credential
    * @param {string} params.rpId - Relying Party ID (defaults to current hostname)
