@@ -47,6 +47,10 @@ export class WebAuthnError extends Error {
   }
 }
 
+/**
+ * Error class for unknown WebAuthn errors.
+ * Wraps unexpected errors that don't match known WebAuthn error conditions.
+ */
 export class WebAuthnUnknownError extends WebAuthnError {
   originalError: unknown
 
@@ -61,10 +65,20 @@ export class WebAuthnUnknownError extends WebAuthnError {
   }
 }
 
+/**
+ * Type guard to check if an error is a WebAuthnError.
+ * @param {unknown} error - The error to check
+ * @returns {boolean} True if the error is a WebAuthnError
+ */
 export function isWebAuthnError(error: unknown): error is WebAuthnError {
   return typeof error === 'object' && error !== null && '__isWebAuthnError' in error
 }
 
+/**
+ * Error codes for WebAuthn operations.
+ * These codes provide specific information about why a WebAuthn ceremony failed.
+ * @see {@link https://w3c.github.io/webauthn/#sctn-defined-errors W3C WebAuthn Spec - Defined Errors}
+ */
 export type WebAuthnErrorCode =
   | 'ERROR_CEREMONY_ABORTED'
   | 'ERROR_INVALID_DOMAIN'
@@ -80,7 +94,13 @@ export type WebAuthnErrorCode =
   | 'ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY'
 
 /**
- * Attempt to intuit _why_ an error was raised after calling `navigator.credentials.create()`
+ * Attempt to intuit _why_ an error was raised after calling `navigator.credentials.create()`.
+ * Maps browser errors to specific WebAuthn error codes for better debugging.
+ * @param {Object} params - Error identification parameters
+ * @param {Error} params.error - The error thrown by the browser
+ * @param {CredentialCreationOptions} params.options - The options passed to credentials.create()
+ * @returns {WebAuthnError} A WebAuthnError with a specific error code
+ * @see {@link https://w3c.github.io/webauthn/#sctn-createCredential W3C WebAuthn Spec - Create Credential}
  */
 export function identifyRegistrationError({
   error,
@@ -219,7 +239,13 @@ export function identifyRegistrationError({
 }
 
 /**
- * Attempt to intuit _why_ an error was raised after calling `navigator.credentials.get()`
+ * Attempt to intuit _why_ an error was raised after calling `navigator.credentials.get()`.
+ * Maps browser errors to specific WebAuthn error codes for better debugging.
+ * @param {Object} params - Error identification parameters
+ * @param {Error} params.error - The error thrown by the browser
+ * @param {CredentialRequestOptions} params.options - The options passed to credentials.get()
+ * @returns {WebAuthnError} A WebAuthnError with a specific error code
+ * @see {@link https://w3c.github.io/webauthn/#sctn-getAssertion W3C WebAuthn Spec - Get Assertion}
  */
 export function identifyAuthenticationError({
   error,

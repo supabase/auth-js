@@ -124,15 +124,9 @@ export type WeakPassword = {
 export type Prettify<T> = T extends Function ? T : { [K in keyof T]: T[K] }
 
 /**
- * A type utility that doesn't allow extra properties
- */
-export type Exact<TExpected, TActual extends TExpected> = TExpected extends TActual
-  ? TExpected
-  : never
-
-/**
- * A stricter version of TypeScript's Omit that only allows omitting keys that actually exist
- * This prevents typos and ensures type safety at compile time
+ * A stricter version of TypeScript's Omit that only allows omitting keys that actually exist.
+ * This prevents typos and ensures type safety at compile time.
+ * Unlike regular Omit, this will error if you try to omit a non-existent key.
  */
 export type StrictOmit<T, K extends keyof T> = Omit<T, K>
 
@@ -917,10 +911,21 @@ type MFAVerifyWebauthnCredentialParamFields<T extends 'create' | 'request' = 'cr
     credential_response: T extends 'create' ? RegistrationCredential : AuthenticationCredential
   }
 
+/**
+ * WebAuthn-specific fields for MFA verification.
+ * Supports both credential creation (registration) and request (authentication) flows.
+ * @template T - Type of WebAuthn operation: 'create' for registration, 'request' for authentication
+ */
 export type MFAVerifyWebauthnParamFields<T extends 'create' | 'request' = 'create' | 'request'> = {
   webauthn: MFAVerifyWebauthnParamFieldsBase & MFAVerifyWebauthnCredentialParamFields<T>
 }
 
+/**
+ * Parameters for WebAuthn MFA verification.
+ * Used to verify WebAuthn credentials after challenge.
+ * @template T - Type of WebAuthn operation: 'create' for registration, 'request' for authentication
+ * @see {@link https://w3c.github.io/webauthn/#sctn-verifying-assertion W3C WebAuthn Spec - Verifying an Authentication Assertion}
+ */
 export type MFAVerifyWebauthnParams<T extends 'create' | 'request' = 'create' | 'request'> =
   Prettify<MFAVerifyParamsBase & MFAVerifyWebauthnParamFields<T>>
 
@@ -955,6 +960,11 @@ type MFAChallengeWebauthnParamFields = {
   }
 }
 
+/**
+ * Parameters for initiating a WebAuthn MFA challenge.
+ * Includes Relying Party information needed for WebAuthn ceremonies.
+ * @see {@link https://w3c.github.io/webauthn/#sctn-rp-operations W3C WebAuthn Spec - Relying Party Operations}
+ */
 export type MFAChallengeWebauthnParams = Prettify<
   MFAChallengeParamsBase & MFAChallengeWebauthnParamFields
 >
@@ -974,6 +984,10 @@ type MFAChallengeAndVerifyTOTPParams = Prettify<
 
 export type MFAChallengeAndVerifyParams = MFAChallengeAndVerifyTOTPParams
 
+/**
+ * Data returned after successful MFA verification.
+ * Contains new session tokens and updated user information.
+ */
 export type AuthMFAVerifyResponseData = {
   /** New access token (JWT) after successful verification. */
   access_token: string
@@ -991,6 +1005,10 @@ export type AuthMFAVerifyResponseData = {
   user: User
 }
 
+/**
+ * Response type for MFA verification operations.
+ * Returns session tokens on successful verification.
+ */
 export type AuthMFAVerifyResponse = RequestResult<AuthMFAVerifyResponseData>
 
 export type AuthMFAEnrollResponse =
@@ -1042,6 +1060,11 @@ type AuthMFAChallengeWebauthnResponseFields = {
       }
 }
 
+/**
+ * Response type for WebAuthn MFA challenge.
+ * Contains credential creation or request options from the server.
+ * @see {@link https://w3c.github.io/webauthn/#sctn-credential-creation W3C WebAuthn Spec - Credential Creation}
+ */
 export type AuthMFAChallengeWebauthnResponse = RequestResult<
   Prettify<AuthMFAChallengeResponseBase<'webauthn'> & AuthMFAChallengeWebauthnResponseFields>
 >
@@ -1058,10 +1081,18 @@ type AuthMFAChallengeWebauthnResponseFieldsJSON = {
       }
 }
 
+/**
+ * JSON-serializable version of WebAuthn challenge response.
+ * Used for server communication with base64url-encoded binary fields.
+ */
 export type AuthMFAChallengeWebauthnResponseDataJSON = Prettify<
   AuthMFAChallengeResponseBase<'webauthn'> & AuthMFAChallengeWebauthnResponseFieldsJSON
 >
 
+/**
+ * Server response type for WebAuthn MFA challenge.
+ * Contains JSON-formatted WebAuthn options ready for browser API.
+ */
 export type AuthMFAChallengeWebauthnServerResponse =
   RequestResult<AuthMFAChallengeWebauthnResponseDataJSON>
 
@@ -1321,6 +1352,11 @@ type MFAEnrollWebauthnFields = {
   /** no extra fields for now, kept for consistency and for possible future changes  */
 }
 
+/**
+ * Parameters for enrolling a WebAuthn factor.
+ * Creates an unverified WebAuthn factor that must be verified with a credential.
+ * @see {@link https://w3c.github.io/webauthn/#sctn-registering-a-new-credential W3C WebAuthn Spec - Registering a New Credential}
+ */
 export type MFAEnrollWebauthnParams = Prettify<
   MFAEnrollParamsBase<'webauthn'> & MFAEnrollWebauthnFields
 >
@@ -1372,6 +1408,11 @@ type AuthMFAEnrollWebauthnFields = {
   /** no extra fields for now, kept for consistency and for possible future changes  */
 }
 
+/**
+ * Response type for WebAuthn factor enrollment.
+ * Returns the enrolled factor ID and metadata.
+ * @see {@link https://w3c.github.io/webauthn/#sctn-registering-a-new-credential W3C WebAuthn Spec - Registering a New Credential}
+ */
 export type AuthMFAEnrollWebauthnResponse = RequestResult<
   Prettify<AuthMFAEnrollResponseBase<'webauthn'> & AuthMFAEnrollWebauthnFields>
 >

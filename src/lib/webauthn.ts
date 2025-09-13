@@ -38,7 +38,10 @@ export { WebAuthnError, isWebAuthnError, identifyRegistrationError, identifyAuth
 export type { RegistrationResponseJSON, AuthenticationResponseJSON }
 
 /**
- * WebAuthn abort service to manage ceremony cancellation
+ * WebAuthn abort service to manage ceremony cancellation.
+ * Ensures only one WebAuthn ceremony is active at a time to prevent "operation already in progress" errors.
+ *
+ * @see {@link https://w3c.github.io/webauthn/#sctn-automation-webdriver-capability W3C WebAuthn Spec - Aborting Ceremonies}
  */
 export class WebAuthnAbortService {
   private controller: AbortController | undefined
@@ -46,6 +49,9 @@ export class WebAuthnAbortService {
   /**
    * Create an abort signal for a new WebAuthn operation.
    * Automatically cancels any existing operation.
+   *
+   * @returns {AbortSignal} Signal to pass to navigator.credentials.create() or .get()
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal MDN - AbortSignal}
    */
   createNewAbortSignal(): AbortSignal {
     // Abort any existing calls to navigator.credentials.create() or navigator.credentials.get()
@@ -61,7 +67,10 @@ export class WebAuthnAbortService {
   }
 
   /**
-   * Manually cancel the current WebAuthn operation
+   * Manually cancel the current WebAuthn operation.
+   * Useful for cleaning up when user cancels or navigates away.
+   *
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/AbortController/abort MDN - AbortController.abort}
    */
   cancelCeremony(): void {
     if (this.controller) {
@@ -80,20 +89,25 @@ export class WebAuthnAbortService {
 export const webAuthnAbortService = new WebAuthnAbortService()
 
 /**
- * Server response format for WebAuthn credential creation options
- * Uses SimpleWebAuthn's JSON format with base64url-encoded binary fields
+ * Server response format for WebAuthn credential creation options.
+ * Uses W3C standard JSON format with base64url-encoded binary fields.
  */
 export type ServerCredentialCreationOptions = PublicKeyCredentialCreationOptionsJSON
 
 /**
- * Server response format for WebAuthn credential request options
- * Uses SimpleWebAuthn's JSON format with base64url-encoded binary fields
+ * Server response format for WebAuthn credential request options.
+ * Uses W3C standard JSON format with base64url-encoded binary fields.
  */
 export type ServerCredentialRequestOptions = PublicKeyCredentialRequestOptionsJSON
 
 /**
  * Convert base64url encoded strings in WebAuthn credential creation options to ArrayBuffers
- * as required by the WebAuthn browser API
+ * as required by the WebAuthn browser API.
+ * Supports both native WebAuthn Level 3 parseCreationOptionsFromJSON and manual fallback.
+ *
+ * @param {ServerCredentialCreationOptions} options - JSON options from server with base64url encoded fields
+ * @returns {PublicKeyCredentialCreationOptionsFuture} Options ready for navigator.credentials.create()
+ * @see {@link https://w3c.github.io/webauthn/#sctn-parseCreationOptionsFromJSON W3C WebAuthn Spec - parseCreationOptionsFromJSON}
  */
 export function deserializeCredentialCreationOptions(
   options: ServerCredentialCreationOptions
@@ -159,7 +173,12 @@ export function deserializeCredentialCreationOptions(
 
 /**
  * Convert base64url encoded strings in WebAuthn credential request options to ArrayBuffers
- * as required by the WebAuthn browser API
+ * as required by the WebAuthn browser API.
+ * Supports both native WebAuthn Level 3 parseRequestOptionsFromJSON and manual fallback.
+ *
+ * @param {ServerCredentialRequestOptions} options - JSON options from server with base64url encoded fields
+ * @returns {PublicKeyCredentialRequestOptionsFuture} Options ready for navigator.credentials.get()
+ * @see {@link https://w3c.github.io/webauthn/#sctn-parseRequestOptionsFromJSON W3C WebAuthn Spec - parseRequestOptionsFromJSON}
  */
 export function deserializeCredentialRequestOptions(
   options: ServerCredentialRequestOptions
@@ -220,7 +239,13 @@ export function deserializeCredentialRequestOptions(
 export type ServerCredentialResponse = RegistrationResponseJSON | AuthenticationResponseJSON
 
 /**
- * Convert a registration/enrollment credential response to server format
+ * Convert a registration/enrollment credential response to server format.
+ * Serializes binary fields to base64url for JSON transmission.
+ * Supports both native WebAuthn Level 3 toJSON and manual fallback.
+ *
+ * @param {RegistrationCredential} credential - Credential from navigator.credentials.create()
+ * @returns {RegistrationResponseJSON} JSON-serializable credential for server
+ * @see {@link https://w3c.github.io/webauthn/#dom-publickeycredential-tojson W3C WebAuthn Spec - toJSON}
  */
 export function serializeCredentialCreationResponse(
   credential: RegistrationCredential
@@ -252,7 +277,13 @@ export function serializeCredentialCreationResponse(
 }
 
 /**
- * Convert an authentication/verification credential response to server format
+ * Convert an authentication/verification credential response to server format.
+ * Serializes binary fields to base64url for JSON transmission.
+ * Supports both native WebAuthn Level 3 toJSON and manual fallback.
+ *
+ * @param {AuthenticationCredential} credential - Credential from navigator.credentials.get()
+ * @returns {AuthenticationResponseJSON} JSON-serializable credential for server
+ * @see {@link https://w3c.github.io/webauthn/#dom-publickeycredential-tojson W3C WebAuthn Spec - toJSON}
  */
 export function serializeCredentialRequestResponse(
   credential: AuthenticationCredential
@@ -276,7 +307,7 @@ export function serializeCredentialRequestResponse(
 
   return {
     id: credential.id,
-    rawId: credential.id, // SimpleWebAuthn expects base64url id here
+    rawId: credential.id, // W3C spec expects rawId to match id for JSON format
     response: {
       authenticatorData: bytesToBase64URL(new Uint8Array(assertionResponse.authenticatorData)),
       clientDataJSON: bytesToBase64URL(new Uint8Array(assertionResponse.clientDataJSON)),
@@ -295,12 +326,17 @@ export function serializeCredentialRequestResponse(
 }
 
 /**
- * A simple test to determine if a hostname is a properly-formatted domain name
+ * A simple test to determine if a hostname is a properly-formatted domain name.
+ * Considers localhost valid for development environments.
  *
  * A "valid domain" is defined here: https://url.spec.whatwg.org/#valid-domain
  *
  * Regex sourced from here:
  * https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch08s15.html
+ *
+ * @param {string} hostname - The hostname to validate
+ * @returns {boolean} True if valid domain or localhost
+ * @see {@link https://url.spec.whatwg.org/#valid-domain WHATWG URL Spec - Valid Domain}
  */
 export function isValidDomain(hostname: string): boolean {
   return (
@@ -310,8 +346,11 @@ export function isValidDomain(hostname: string): boolean {
 }
 
 /**
- * Determine if the browser is capable of Webauthn
- * Referenced from @link https://github.com/MasterKale/SimpleWebAuthn/blob/master/packages/browser/src/helpers/browserSupportsWebAuthn.ts#L4
+ * Determine if the browser is capable of WebAuthn.
+ * Checks for necessary Web APIs: PublicKeyCredential and Credential Management.
+ *
+ * @returns {boolean} True if browser supports WebAuthn
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredential#browser_compatibility MDN - PublicKeyCredential Browser Compatibility}
  */
 function browserSupportsWebAuthn(): boolean {
   return !!(
@@ -331,7 +370,13 @@ export const _browserSupportsWebAuthnInternals = {
 }
 
 /**
- * Create a WebAuthn credential using the browser's credentials API
+ * Create a WebAuthn credential using the browser's credentials API.
+ * Wraps navigator.credentials.create() with error handling.
+ *
+ * @param {CredentialCreationOptions} options - Options including publicKey parameters
+ * @returns {Promise<RequestResult<RegistrationCredential, WebAuthnError>>} Created credential or error
+ * @see {@link https://w3c.github.io/webauthn/#sctn-createCredential W3C WebAuthn Spec - Create Credential}
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer/create MDN - credentials.create}
  */
 export async function createCredential(
   options: StrictOmit<CredentialCreationOptions, 'publicKey'> & {
@@ -368,7 +413,13 @@ export async function createCredential(
 }
 
 /**
- * Get a WebAuthn credential using the browser's credentials API
+ * Get a WebAuthn credential using the browser's credentials API.
+ * Wraps navigator.credentials.get() with error handling.
+ *
+ * @param {CredentialRequestOptions} options - Options including publicKey parameters
+ * @returns {Promise<RequestResult<AuthenticationCredential, WebAuthnError>>} Retrieved credential or error
+ * @see {@link https://w3c.github.io/webauthn/#sctn-getAssertion W3C WebAuthn Spec - Get Assertion}
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer/get MDN - credentials.get}
  */
 export async function getCredential(
   options: StrictOmit<CredentialRequestOptions, 'publicKey'> & {
@@ -405,15 +456,18 @@ export async function getCredential(
 }
 
 /**
- * Merges WebAuthn credential creation options with overrides
- * @param baseOptions - The base options from the server
- * @param overrides - Optional overrides to apply
- * @param friendlyName - Optional friendly name for the credential
- * @returns Merged credential creation options
+ * Merges WebAuthn credential creation options with overrides.
+ * Sets sensible defaults for authenticator selection and extensions.
+ *
+ * @param {PublicKeyCredentialCreationOptionsFuture} baseOptions - The base options from the server
+ * @param {PublicKeyCredentialCreationOptionsFuture} overrides - Optional overrides to apply
+ * @param {string} friendlyName - Optional friendly name for the credential
+ * @returns {PublicKeyCredentialCreationOptionsFuture} Merged credential creation options
+ * @see {@link https://w3c.github.io/webauthn/#dictdef-authenticatorselectioncriteria W3C WebAuthn Spec - AuthenticatorSelectionCriteria}
  */
 export function mergeCredentialCreationOptions(
   baseOptions: PublicKeyCredentialCreationOptionsFuture,
-  overrides?: PublicKeyCredentialCreationOptionsFuture,
+  overrides?: Partial<PublicKeyCredentialCreationOptionsFuture>,
   friendlyName?: string
 ): PublicKeyCredentialCreationOptionsFuture {
   return {
@@ -439,14 +493,17 @@ export function mergeCredentialCreationOptions(
 }
 
 /**
- * Merges WebAuthn credential request options with overrides
- * @param baseOptions - The base options from the server
- * @param overrides - Optional overrides to apply
- * @returns Merged credential request options
+ * Merges WebAuthn credential request options with overrides.
+ * Sets sensible defaults for user verification and hints.
+ *
+ * @param {PublicKeyCredentialRequestOptionsFuture} baseOptions - The base options from the server
+ * @param {PublicKeyCredentialRequestOptionsFuture} overrides - Optional overrides to apply
+ * @returns {PublicKeyCredentialRequestOptionsFuture} Merged credential request options
+ * @see {@link https://w3c.github.io/webauthn/#dictdef-publickeycredentialrequestoptions W3C WebAuthn Spec - PublicKeyCredentialRequestOptions}
  */
 export function mergeCredentialRequestOptions(
   baseOptions: PublicKeyCredentialRequestOptionsFuture,
-  overrides?: PublicKeyCredentialRequestOptionsFuture
+  overrides?: Partial<PublicKeyCredentialRequestOptionsFuture>
 ): PublicKeyCredentialRequestOptionsFuture {
   return {
     ...baseOptions,
@@ -457,6 +514,13 @@ export function mergeCredentialRequestOptions(
   }
 }
 
+/**
+ * WebAuthn API wrapper for Supabase Auth.
+ * Provides methods for enrolling, challenging, verifying, authenticating, and registering WebAuthn credentials.
+ *
+ * @see {@link https://w3c.github.io/webauthn/ W3C WebAuthn Specification}
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API MDN - Web Authentication API}
+ */
 export class WebAuthnApi {
   public enroll: typeof WebAuthnApi.prototype._enroll
   public challenge: typeof WebAuthnApi.prototype._challenge
@@ -474,8 +538,12 @@ export class WebAuthnApi {
   }
 
   /**
-   * Enroll a new WebAuthn factor
-   * @param params - Enrollment parameters (friendlyName required)
+   * Enroll a new WebAuthn factor.
+   * Creates an unverified WebAuthn factor that must be verified with a credential.
+   *
+   * @param {Omit<MFAEnrollWebauthnParams, 'factorType'>} params - Enrollment parameters (friendlyName required)
+   * @returns {Promise<AuthMFAEnrollWebauthnResponse>} Enrolled factor details or error
+   * @see {@link https://w3c.github.io/webauthn/#sctn-registering-a-new-credential W3C WebAuthn Spec - Registering a New Credential}
    */
   public async _enroll(
     params: Omit<MFAEnrollWebauthnParams, 'factorType'>
@@ -484,15 +552,17 @@ export class WebAuthnApi {
   }
 
   /**
-   * Challenge for WebAuthn credential creation or authentication
-   * Combines server challenge with browser credential operations
-   * @param params - Challenge parameters including factorId
-   */
-  /**
-   * Challenge for WebAuthn credential creation or authentication
-   * Combines server challenge with browser credential operations
-   * @param params - Challenge parameters including factorId
-   * @param overrides - Allows you to override the parameters passed to navigator.credentials.{get|create} {@see PublicKeyCredentialCreationOptionsFuture} {@see PublicKeyCredentialRequestOptionsFuture}
+   * Challenge for WebAuthn credential creation or authentication.
+   * Combines server challenge with browser credential operations.
+   * Handles both registration (create) and authentication (request) flows.
+   *
+   * @param {MFAChallengeWebauthnParams & { friendlyName?: string; signal?: AbortSignal }} params - Challenge parameters including factorId
+   * @param {Object} overrides - Allows you to override the parameters passed to navigator.credentials
+   * @param {PublicKeyCredentialCreationOptionsFuture} overrides.create - Override options for credential creation
+   * @param {PublicKeyCredentialRequestOptionsFuture} overrides.request - Override options for credential request
+   * @returns {Promise<RequestResult>} Challenge response with credential or error
+   * @see {@link https://w3c.github.io/webauthn/#sctn-credential-creation W3C WebAuthn Spec - Credential Creation}
+   * @see {@link https://w3c.github.io/webauthn/#sctn-verifying-assertion W3C WebAuthn Spec - Verifying Assertion}
    */
   public async _challenge(
     {
@@ -503,12 +573,12 @@ export class WebAuthnApi {
     }: MFAChallengeWebauthnParams & { friendlyName?: string; signal?: AbortSignal },
     overrides?:
       | {
-          create?: PublicKeyCredentialCreationOptionsFuture
+          create?: Partial<PublicKeyCredentialCreationOptionsFuture>
           request?: never
         }
       | {
           create?: never
-          request?: PublicKeyCredentialRequestOptionsFuture
+          request?: Partial<PublicKeyCredentialRequestOptionsFuture>
         }
   ): Promise<
     RequestResult<
@@ -603,8 +673,15 @@ export class WebAuthnApi {
   }
 
   /**
-   * Verify a WebAuthn credential with the server
-   * @param params - Verification parameters including credential
+   * Verify a WebAuthn credential with the server.
+   * Completes the WebAuthn ceremony by sending the credential to the server for verification.
+   *
+   * @param {Object} params - Verification parameters
+   * @param {string} params.challengeId - ID of the challenge being verified
+   * @param {string} params.factorId - ID of the WebAuthn factor
+   * @param {MFAVerifyWebauthnParams<T>['webauthn']} params.webauthn - WebAuthn credential response
+   * @returns {Promise<AuthMFAVerifyResponse>} Verification result with session or error
+   * @see {@link https://w3c.github.io/webauthn/#sctn-verifying-assertion W3C WebAuthn Spec - Verifying an Authentication Assertion}
    */
   public async _verify<T extends 'create' | 'request'>({
     challengeId,
@@ -623,9 +700,19 @@ export class WebAuthnApi {
   }
 
   /**
-   * Complete WebAuthn authentication flow
-   * @param params - Authentication parameters including factorId
-   * @param overrides - Allows you to override the parameters passed to navigator.credentials.get {@see PublicKeyCredentialRequestOptionsFuture}
+   * Complete WebAuthn authentication flow.
+   * Performs challenge and verification in a single operation for existing credentials.
+   *
+   * @param {Object} params - Authentication parameters
+   * @param {string} params.factorId - ID of the WebAuthn factor to authenticate with
+   * @param {Object} params.webauthn - WebAuthn configuration
+   * @param {string} params.webauthn.rpId - Relying Party ID (defaults to current hostname)
+   * @param {string[]} params.webauthn.rpOrigins - Allowed origins (defaults to current origin)
+   * @param {AbortSignal} params.webauthn.signal - Optional abort signal
+   * @param {PublicKeyCredentialRequestOptionsFuture} overrides - Override options for navigator.credentials.get
+   * @returns {Promise<RequestResult<AuthMFAVerifyResponseData, WebAuthnError | AuthError>>} Authentication result
+   * @see {@link https://w3c.github.io/webauthn/#sctn-authentication W3C WebAuthn Spec - Authentication Ceremony}
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredentialRequestOptions MDN - PublicKeyCredentialRequestOptions}
    */
   public async _authenticate(
     {
@@ -698,8 +785,18 @@ export class WebAuthnApi {
   }
 
   /**
-   * Complete WebAuthn registration flow
-   * @param overrides - Allows you to override the parameters passed to navigator.credentials.create {@see PublicKeyCredentialCreationOptionsFuture}
+   * Complete WebAuthn registration flow.
+   * Performs enrollment, challenge, and verification in a single operation for new credentials.
+   *
+   * @param {Object} params - Registration parameters
+   * @param {string} params.friendlyName - User-friendly name for the credential
+   * @param {string} params.rpId - Relying Party ID (defaults to current hostname)
+   * @param {string[]} params.rpOrigins - Allowed origins (defaults to current origin)
+   * @param {AbortSignal} params.signal - Optional abort signal
+   * @param {PublicKeyCredentialCreationOptionsFuture} overrides - Override options for navigator.credentials.create
+   * @returns {Promise<RequestResult<AuthMFAVerifyResponseData, WebAuthnError | AuthError>>} Registration result
+   * @see {@link https://w3c.github.io/webauthn/#sctn-registering-a-new-credential W3C WebAuthn Spec - Registration Ceremony}
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredentialCreationOptions MDN - PublicKeyCredentialCreationOptions}
    */
   public async _register(
     {
@@ -713,7 +810,7 @@ export class WebAuthnApi {
       rpOrigins?: string[]
       signal?: AbortSignal
     },
-    overrides?: PublicKeyCredentialCreationOptionsFuture
+    overrides?: Partial<PublicKeyCredentialCreationOptionsFuture>
   ): Promise<RequestResult<AuthMFAVerifyResponseData, WebAuthnError | AuthError>> {
     if (!rpId) {
       return {
