@@ -480,36 +480,38 @@ function deepMerge<T>(...sources: Partial<T>[]): T {
   const isObject = (val: unknown): val is Record<string, unknown> =>
     val !== null && typeof val === 'object' && !Array.isArray(val)
 
-  const result: any = {}
+  const isArrayBufferLike = (val: unknown): val is ArrayBuffer | ArrayBufferView =>
+    val instanceof ArrayBuffer || ArrayBuffer.isView(val)
+
+  const result: Partial<T> = {}
 
   for (const source of sources) {
     if (!source) continue
 
-    for (const key of Object.keys(source)) {
-      const value = (source as any)[key]
-
+    for (const key in source) {
+      const value = source[key]
       if (value === undefined) continue
 
       if (Array.isArray(value)) {
-        result[key] = value // keep original reference
-      } else if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
-        result[key] = value // replace, don’t merge
+        // preserve array reference, including unions like AuthenticatorTransport[]
+        result[key] = value as T[typeof key]
+      } else if (isArrayBufferLike(value)) {
+        result[key] = value as T[typeof key]
       } else if (isObject(value)) {
-        if (!isObject(result[key])) {
-          result[key] = {}
+        const existing = result[key]
+        if (isObject(existing)) {
+          result[key] = deepMerge(existing, value) as unknown as T[typeof key]
+        } else {
+          result[key] = deepMerge(value) as unknown as T[typeof key]
         }
-        result[key] = deepMerge(result[key], value)
       } else {
-        result[key] = value
+        result[key] = value as T[typeof key]
       }
     }
   }
 
-  return result
+  return result as T
 }
-
-
-
 
 /**
  * Merges WebAuthn credential creation options with overrides.
