@@ -458,6 +458,51 @@ export async function getCredential(
   }
 }
 
+export const DEFAULT_CREATION_OPTIONS: Partial<PublicKeyCredentialCreationOptionsFuture> = {
+  hints: ['security-key'],
+  authenticatorSelection: {
+    authenticatorAttachment: 'cross-platform',
+    requireResidentKey: false,
+    /** set to preferred because older yubikeys don't have PIN/Biometric */
+    userVerification: 'preferred',
+    residentKey: 'discouraged',
+  },
+  attestation: 'none',
+}
+
+export const DEFAULT_REQUEST_OPTIONS: Partial<PublicKeyCredentialRequestOptionsFuture> = {
+  /** set to preferred because older yubikeys don't have PIN/Biometric */
+  userVerification: 'preferred',
+  hints: ['security-key'],
+}
+
+function deepMerge<T>(...objects: Partial<T>[]): T {
+  if (objects.length === 0) return {} as T
+  if (objects.length === 1) return objects[0] as T
+
+  const [first, second, ...rest] = objects
+  const merged: any = { ...first }
+
+  for (const key in second) {
+    const val = second[key]
+    if (val !== undefined) {
+      if (
+        typeof val === 'object' &&
+        val !== null &&
+        !Array.isArray(val) &&
+        !ArrayBuffer.isView(val) &&
+        !(val instanceof ArrayBuffer)
+      ) {
+        merged[key] = deepMerge(merged[key] || {}, val as Partial<any>)
+      } else {
+        merged[key] = val
+      }
+    }
+  }
+
+  return rest.length > 0 ? deepMerge(merged, ...rest) : merged
+}
+
 /**
  * Merges WebAuthn credential creation options with overrides.
  * Sets sensible defaults for authenticator selection and extensions.
@@ -470,29 +515,9 @@ export async function getCredential(
  */
 export function mergeCredentialCreationOptions(
   baseOptions: PublicKeyCredentialCreationOptionsFuture,
-  overrides?: Partial<PublicKeyCredentialCreationOptionsFuture>,
-  friendlyName?: string
+  overrides?: Partial<PublicKeyCredentialCreationOptionsFuture>
 ): PublicKeyCredentialCreationOptionsFuture {
-  return {
-    ...baseOptions,
-    authenticatorSelection: {
-      authenticatorAttachment: 'cross-platform',
-      requireResidentKey: false,
-      userVerification: 'required',
-      ...overrides?.authenticatorSelection,
-    },
-    user: {
-      ...baseOptions.user,
-      name: baseOptions.user.name || friendlyName || 'user',
-      ...overrides?.user,
-    },
-    hints: overrides?.hints ?? ['security-key'],
-    extensions: {
-      credProps: true,
-      ...overrides?.extensions,
-    },
-    ...overrides,
-  }
+  return deepMerge(DEFAULT_CREATION_OPTIONS, baseOptions, overrides || {})
 }
 
 /**
@@ -508,13 +533,7 @@ export function mergeCredentialRequestOptions(
   baseOptions: PublicKeyCredentialRequestOptionsFuture,
   overrides?: Partial<PublicKeyCredentialRequestOptionsFuture>
 ): PublicKeyCredentialRequestOptionsFuture {
-  return {
-    ...baseOptions,
-    allowCredentials: baseOptions.allowCredentials,
-    userVerification: overrides?.userVerification ?? 'required',
-    hints: overrides?.hints ?? ['security-key'],
-    ...overrides,
-  }
+  return deepMerge(DEFAULT_REQUEST_OPTIONS, baseOptions, overrides || {})
 }
 
 /**
@@ -610,12 +629,22 @@ export class WebAuthnApi {
 
       const abortSignal = signal ?? webAuthnAbortService.createNewAbortSignal()
 
+      /** webauthn will fail if either of the name/displayname are blank */
+      if (challengeResponse.webauthn.type === 'create') {
+        const { user } = challengeResponse.webauthn.credential_options.publicKey
+        if (!user.name) {
+          user.name = `${user.id}:${friendlyName}`
+        }
+        if (!user.displayName) {
+          user.displayName = user.name
+        }
+      }
+
       switch (challengeResponse.webauthn.type) {
         case 'create': {
           const options = mergeCredentialCreationOptions(
             challengeResponse.webauthn.credential_options.publicKey,
-            overrides?.create,
-            friendlyName
+            overrides?.create
           )
 
           const { data, error } = await createCredential({
@@ -689,7 +718,7 @@ export class WebAuthnApi {
    * @param {MFAVerifyWebauthnParams<T>['webauthn']} params.webauthn - WebAuthn credential response
    * @returns {Promise<AuthMFAVerifyResponse>} Verification result with session or error
    * @see {@link https://w3c.github.io/webauthn/#sctn-verifying-assertion W3C WebAuthn Spec - Verifying an Authentication Assertion}
-   */
+   * */
   public async _verify<T extends 'create' | 'request'>({
     challengeId,
     factorId,
