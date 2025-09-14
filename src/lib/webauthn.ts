@@ -476,32 +476,40 @@ export const DEFAULT_REQUEST_OPTIONS: Partial<PublicKeyCredentialRequestOptionsF
   hints: ['security-key'],
 }
 
-function deepMerge<T>(...objects: Partial<T>[]): T {
-  if (objects.length === 0) return {} as T
-  if (objects.length === 1) return objects[0] as T
+function deepMerge<T>(...sources: Partial<T>[]): T {
+  const isObject = (val: unknown): val is Record<string, unknown> =>
+    val !== null && typeof val === 'object' && !Array.isArray(val)
 
-  const [first, second, ...rest] = objects
-  const merged: any = { ...first }
+  const result: any = {}
 
-  for (const key in second) {
-    const val = second[key]
-    if (val !== undefined) {
-      if (
-        typeof val === 'object' &&
-        val !== null &&
-        !Array.isArray(val) &&
-        !ArrayBuffer.isView(val) &&
-        !(val instanceof ArrayBuffer)
-      ) {
-        merged[key] = deepMerge(merged[key] || {}, val as Partial<any>)
+  for (const source of sources) {
+    if (!source) continue
+
+    for (const key of Object.keys(source)) {
+      const value = (source as any)[key]
+
+      if (value === undefined) continue
+
+      if (Array.isArray(value)) {
+        result[key] = value // keep original reference
+      } else if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+        result[key] = value // replace, don’t merge
+      } else if (isObject(value)) {
+        if (!isObject(result[key])) {
+          result[key] = {}
+        }
+        result[key] = deepMerge(result[key], value)
       } else {
-        merged[key] = val
+        result[key] = value
       }
     }
   }
 
-  return rest.length > 0 ? deepMerge(merged, ...rest) : merged
+  return result
 }
+
+
+
 
 /**
  * Merges WebAuthn credential creation options with overrides.
