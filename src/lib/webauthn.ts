@@ -12,6 +12,7 @@ import {
   RequestResult,
   StrictOmit,
 } from './types'
+import { isBrowser } from './helpers'
 import type {
   AuthenticationCredential,
   AuthenticationResponseJSON,
@@ -357,19 +358,13 @@ export function isValidDomain(hostname: string): boolean {
  */
 function browserSupportsWebAuthn(): boolean {
   return !!(
-    typeof window !== 'undefined' &&
+    isBrowser() &&
+    'PublicKeyCredential' in window &&
     window.PublicKeyCredential &&
+    'credentials' in navigator &&
     typeof navigator?.credentials?.create === 'function' &&
     typeof navigator?.credentials?.get === 'function'
   )
-}
-
-/**
- * Make it possible to stub the return value during testing
- * @ignore Don't include this in docs output
- */
-export const _browserSupportsWebAuthnInternals = {
-  stubThis: (value: boolean) => value,
 }
 
 /**
