@@ -301,6 +301,7 @@ export interface UserIdentity {
 }
 
 const FactorTypes = ['totp', 'phone', 'webauthn'] as const
+
 /**
  * Type of factor. `totp` and `phone` supported with this version
  */
@@ -658,10 +659,10 @@ export type EthereumWeb3Credentials =
   | {
       chain: 'ethereum'
 
-      /** Wallet interface to use. If not specified will default to `window.solana`. */
+      /** Wallet interface to use. If not specified will default to `window.ethereum`. */
       wallet?: EthereumWallet
 
-      /** Optional statement to include in the Sign in with Solana message. Must not include new line characters. Most wallets like Phantom **require specifying a statement!** */
+      /** Optional statement to include in the Sign in with Ethereum message. Must not include new line characters. Most wallets like Phantom **require specifying a statement!** */
       statement?: string
 
       options?: {
@@ -682,7 +683,7 @@ export type EthereumWeb3Credentials =
       /** Sign in with Ethereum compatible message. Must include `Issued At`, `URI` and `Version`. */
       message: string
 
-      /** Ed25519 signature of the message. */
+      /** Ethereum curve (secp256k1) signature of the message. */
       signature: Hex
 
       options?: {
@@ -931,6 +932,7 @@ export type MFAVerifyWebauthnParams<T extends 'create' | 'request' = 'create' | 
 
 export type MFAVerifyParams = MFAVerifyTOTPParams | MFAVerifyPhoneParams | MFAVerifyWebauthnParams
 
+
 type MFAChallengeParamsBase = {
   /** ID of the factor to be challenged. Returned in enroll(). */
   factorId: string
@@ -973,6 +975,7 @@ export type MFAChallengeParams =
   | MFAChallengeTOTPParams
   | MFAChallengePhoneParams
   | MFAChallengeWebauthnParams
+
 
 type MFAChallengeAndVerifyParamsBase = Omit<MFAVerifyParamsBase, 'challengeId'>
 
@@ -1168,7 +1171,6 @@ export interface GoTrueMFAApi {
    * Verifies a code against a challenge. The verification code is
    * provided by the user by entering a code seen in their authenticator app.
    */
-
   verify(params: MFAVerifyTOTPParams): Promise<AuthMFAVerifyResponse>
   verify(params: MFAVerifyPhoneParams): Promise<AuthMFAVerifyResponse>
   verify(params: MFAVerifyWebauthnParams): Promise<AuthMFAVerifyResponse>
@@ -1416,6 +1418,7 @@ type AuthMFAEnrollWebauthnFields = {
 export type AuthMFAEnrollWebauthnResponse = RequestResult<
   Prettify<AuthMFAEnrollResponseBase<'webauthn'> & AuthMFAEnrollWebauthnFields>
 >
+
 
 export type JwtHeader = {
   alg: 'RS256' | 'ES256' | 'HS256'
