@@ -932,7 +932,6 @@ export type MFAVerifyWebauthnParams<T extends 'create' | 'request' = 'create' | 
 
 export type MFAVerifyParams = MFAVerifyTOTPParams | MFAVerifyPhoneParams | MFAVerifyWebauthnParams
 
-
 type MFAChallengeParamsBase = {
   /** ID of the factor to be challenged. Returned in enroll(). */
   factorId: string
@@ -975,7 +974,6 @@ export type MFAChallengeParams =
   | MFAChallengeTOTPParams
   | MFAChallengePhoneParams
   | MFAChallengeWebauthnParams
-
 
 type MFAChallengeAndVerifyParamsBase = Omit<MFAVerifyParamsBase, 'challengeId'>
 
@@ -1418,7 +1416,6 @@ type AuthMFAEnrollWebauthnFields = {
 export type AuthMFAEnrollWebauthnResponse = RequestResult<
   Prettify<AuthMFAEnrollResponseBase<'webauthn'> & AuthMFAEnrollWebauthnFields>
 >
-
 
 export type JwtHeader = {
   alg: 'RS256' | 'ES256' | 'HS256'

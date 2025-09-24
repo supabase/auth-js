@@ -129,10 +129,6 @@ import type {
   UserResponse,
   VerifyOtpParams,
   Web3Credentials,
-  EthereumWeb3Credentials,
-  EthereumWallet,
-  FactorType,
-  FactorTypes,
 } from './lib/types'
 import {
   createSiweMessage,
