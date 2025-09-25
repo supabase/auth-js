@@ -21,10 +21,6 @@ import {
   pkceClient,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
-import {
-  createMockAuthenticationCredential,
-  createMockRegistrationCredential,
-} from './webauthn-test-utils'
 
 const TEST_USER_DATA = { info: 'some info' }
 

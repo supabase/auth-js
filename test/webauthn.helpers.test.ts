@@ -1,13 +1,17 @@
 import {
   deserializeCredentialCreationOptions,
-  deserializeCredentialRequestOptions, mergeCredentialCreationOptions,
-  mergeCredentialRequestOptions, serializeCredentialCreationResponse,
-  serializeCredentialRequestResponse
+  deserializeCredentialRequestOptions,
+  mergeCredentialCreationOptions,
+  mergeCredentialRequestOptions,
+  serializeCredentialCreationResponse,
+  serializeCredentialRequestResponse,
 } from '../src/lib/webauthn'
 import type {
   AuthenticationCredential,
-  AuthenticatorTransportFuture, PublicKeyCredentialCreationOptionsFuture,
-  PublicKeyCredentialRequestOptionsFuture, RegistrationCredential
+  AuthenticatorTransportFuture,
+  PublicKeyCredentialCreationOptionsFuture,
+  PublicKeyCredentialRequestOptionsFuture,
+  RegistrationCredential,
 } from '../src/lib/webauthn.dom'
 
 describe('WebAuthn Serialization/Deserialization', () => {
@@ -23,13 +27,13 @@ describe('WebAuthn Serialization/Deserialization', () => {
 
   describe('deserializeCredentialCreationOptions', () => {
     const validServerOptions = {
-      challenge: 'SGVsbG8gV2ViQXV0aG4h', 
+      challenge: 'SGVsbG8gV2ViQXV0aG4h',
       rp: {
         name: 'Test RP',
         id: 'example.com',
       },
       user: {
-        id: 'dXNlci0xMjM0NTY', 
+        id: 'dXNlci0xMjM0NTY',
         name: 'test@example.com',
         displayName: 'Test User',
       },
@@ -41,7 +45,7 @@ describe('WebAuthn Serialization/Deserialization', () => {
       attestation: 'direct' as const,
       excludeCredentials: [
         {
-          id: 'Y3JlZGVudGlhbC1hYmMteHl6', 
+          id: 'Y3JlZGVudGlhbC1hYmMteHl6',
           type: 'public-key' as const,
           transports: ['usb', 'nfc'] as AuthenticatorTransportFuture[],
         },
@@ -49,32 +53,31 @@ describe('WebAuthn Serialization/Deserialization', () => {
     }
 
     it('should convert base64url strings to ArrayBuffers using polyfill', () => {
-      
       delete (global as any).PublicKeyCredential
 
       const result = deserializeCredentialCreationOptions(validServerOptions)
 
-      
       expect(result.challenge).toBeInstanceOf(ArrayBuffer)
       const challengeBytes = new Uint8Array(result.challenge)
-      
+
       expect(challengeBytes).toEqual(
         new Uint8Array([72, 101, 108, 108, 111, 32, 87, 101, 98, 65, 117, 116, 104, 110, 33])
       )
 
-      
       expect(result.user.id).toBeInstanceOf(ArrayBuffer)
       const userIdBytes = new Uint8Array(result.user.id)
-      
+
       expect(userIdBytes).toEqual(new Uint8Array([117, 115, 101, 114, 45, 49, 50, 51, 52, 53, 54]))
 
-      
       expect(result.excludeCredentials![0].id).toBeInstanceOf(ArrayBuffer)
       const credIdBytes = new Uint8Array(result.excludeCredentials![0].id as ArrayBuffer)
-      
-      expect(credIdBytes).toEqual(new Uint8Array([99, 114, 101, 100, 101, 110, 116, 105, 97, 108, 45, 97, 98, 99, 45, 120, 121, 122]))
 
-      
+      expect(credIdBytes).toEqual(
+        new Uint8Array([
+          99, 114, 101, 100, 101, 110, 116, 105, 97, 108, 45, 97, 98, 99, 45, 120, 121, 122,
+        ])
+      )
+
       expect(result.rp).toEqual(validServerOptions.rp)
       expect(result.pubKeyCredParams).toEqual(validServerOptions.pubKeyCredParams)
       expect(result.timeout).toBe(60000)
@@ -102,10 +105,10 @@ describe('WebAuthn Serialization/Deserialization', () => {
 
     it('should handle missing optional fields correctly', () => {
       const minimalOptions = {
-        challenge: 'SGVsbG8gV2ViQXV0aG4h', 
+        challenge: 'SGVsbG8gV2ViQXV0aG4h',
         rp: { name: 'Test RP' },
         user: {
-          id: 'dXNlci0xMjM0NTY', 
+          id: 'dXNlci0xMjM0NTY',
           name: 'test@example.com',
           displayName: 'Test User',
         },
@@ -133,13 +136,13 @@ describe('WebAuthn Serialization/Deserialization', () => {
 
   describe('deserializeCredentialRequestOptions', () => {
     const validServerOptions = {
-      challenge: 'QXV0aGVudGljYXRlTWU', 
+      challenge: 'QXV0aGVudGljYXRlTWU',
       timeout: 60000,
       rpId: 'example.com',
       userVerification: 'preferred' as const,
       allowCredentials: [
         {
-          id: 'YWxsb3dlZC1jcmVkLTEyMw', 
+          id: 'YWxsb3dlZC1jcmVkLTEyMw',
           type: 'public-key' as const,
           transports: ['usb', 'nfc'] as AuthenticatorTransportFuture[],
         },
@@ -151,21 +154,20 @@ describe('WebAuthn Serialization/Deserialization', () => {
 
       const result = deserializeCredentialRequestOptions(validServerOptions)
 
-      
       expect(result.challenge).toBeInstanceOf(ArrayBuffer)
       const challengeBytes = new Uint8Array(result.challenge)
-      
+
       expect(challengeBytes).toEqual(
         new Uint8Array([65, 117, 116, 104, 101, 110, 116, 105, 99, 97, 116, 101, 77, 101])
       )
 
-      
       expect(result.allowCredentials![0].id).toBeInstanceOf(ArrayBuffer)
       const credIdBytes = new Uint8Array(result.allowCredentials![0].id as ArrayBuffer)
-      
-      expect(credIdBytes).toEqual(new Uint8Array([97, 108, 108, 111, 119, 101, 100, 45, 99, 114, 101, 100, 45, 49, 50, 51]))
 
-      
+      expect(credIdBytes).toEqual(
+        new Uint8Array([97, 108, 108, 111, 119, 101, 100, 45, 99, 114, 101, 100, 45, 49, 50, 51])
+      )
+
       expect(result.rpId).toBe('example.com')
       expect(result.userVerification).toBe('preferred')
       expect(result.timeout).toBe(60000)
@@ -197,7 +199,7 @@ describe('WebAuthn Serialization/Deserialization', () => {
       }
 
       const result = deserializeCredentialRequestOptions(optionsWithEmptyArray)
-      
+
       expect(result.allowCredentials).toBeUndefined()
     })
 
@@ -205,7 +207,7 @@ describe('WebAuthn Serialization/Deserialization', () => {
       delete (global as any).PublicKeyCredential
 
       const optionsWithoutAllow = {
-        challenge: 'QXV0aGVudGljYXRlTWU', 
+        challenge: 'QXV0aGVudGljYXRlTWU',
         rpId: 'example.com',
       }
 
@@ -238,10 +240,9 @@ describe('WebAuthn Serialization/Deserialization', () => {
 
       const result = serializeCredentialCreationResponse(mockCredential)
 
-      
       expect(result.rawId).toBe(mockCredential.id)
-      expect(result.response.attestationObject).toBe('AQIDBAU') 
-      expect(result.response.clientDataJSON).toBe('BgcICQo') 
+      expect(result.response.attestationObject).toBe('AQIDBAU')
+      expect(result.response.clientDataJSON).toBe('BgcICQo')
       expect(result.authenticatorAttachment).toBe('platform')
       expect(result.clientExtensionResults).toEqual({ credProps: { rk: true } })
     })
@@ -325,12 +326,11 @@ describe('WebAuthn Serialization/Deserialization', () => {
 
       const result = serializeCredentialRequestResponse(mockCredential)
 
-      
       expect(result.rawId).toBe(mockCredential.id)
-      expect(result.response.authenticatorData).toBe('AQIDBAU') 
-      expect(result.response.clientDataJSON).toBe('BgcICQo') 
-      expect(result.response.signature).toBe('CwwNDg8') 
-      expect(result.response.userHandle).toBe('EBESExQ') 
+      expect(result.response.authenticatorData).toBe('AQIDBAU')
+      expect(result.response.clientDataJSON).toBe('BgcICQo')
+      expect(result.response.signature).toBe('CwwNDg8')
+      expect(result.response.userHandle).toBe('EBESExQ')
     })
 
     it('should handle null userHandle correctly', () => {
@@ -391,10 +391,10 @@ describe('WebAuthn Serialization/Deserialization', () => {
 
   describe('mergeCredentialCreationOptions', () => {
     const baseOptions: PublicKeyCredentialCreationOptionsFuture = {
-      challenge: new Uint8Array([67, 104, 97, 108, 108, 101, 110, 103, 101, 49, 50, 51]).buffer, 
+      challenge: new Uint8Array([67, 104, 97, 108, 108, 101, 110, 103, 101, 49, 50, 51]).buffer,
       rp: { name: 'Test RP', id: 'example.com' },
       user: {
-        id: new Uint8Array([85, 115, 101, 114, 49, 50, 51]).buffer, 
+        id: new Uint8Array([85, 115, 101, 114, 49, 50, 51]).buffer,
         name: 'user@example.com',
         displayName: 'Test User',
       },
@@ -404,7 +404,6 @@ describe('WebAuthn Serialization/Deserialization', () => {
     it('should apply DEFAULT_CREATION_OPTIONS correctly', () => {
       const result = mergeCredentialCreationOptions(baseOptions)
 
-      
       expect(result.authenticatorSelection).toEqual({
         authenticatorAttachment: 'cross-platform',
         requireResidentKey: false,
@@ -414,7 +413,6 @@ describe('WebAuthn Serialization/Deserialization', () => {
       expect(result.hints).toEqual(['security-key'])
       expect(result.attestation).toBe('direct')
 
-      
       expect(result.challenge).toBe(baseOptions.challenge)
       expect(result.rp).toEqual(baseOptions.rp)
       expect(result.user).toEqual(baseOptions.user)
@@ -427,12 +425,11 @@ describe('WebAuthn Serialization/Deserialization', () => {
         },
       })
 
-      
       expect(result.authenticatorSelection).toEqual({
         authenticatorAttachment: 'cross-platform',
         requireResidentKey: false,
         residentKey: 'discouraged',
-        userVerification: 'required', 
+        userVerification: 'required',
       })
     })
 
@@ -459,7 +456,7 @@ describe('WebAuthn Serialization/Deserialization', () => {
     })
 
     it('should not modify ArrayBuffer fields during merge', () => {
-      const customChallenge = new Uint8Array([78, 101, 119, 67, 104, 97, 108, 108]).buffer 
+      const customChallenge = new Uint8Array([78, 101, 119, 67, 104, 97, 108, 108]).buffer
       const result = mergeCredentialCreationOptions(baseOptions, {
         challenge: customChallenge,
       })
@@ -471,11 +468,11 @@ describe('WebAuthn Serialization/Deserialization', () => {
 
   describe('mergeCredentialRequestOptions', () => {
     const baseOptions: PublicKeyCredentialRequestOptionsFuture = {
-      challenge: new Uint8Array([82, 101, 113, 117, 101, 115, 116]).buffer, 
+      challenge: new Uint8Array([82, 101, 113, 117, 101, 115, 116]).buffer,
       rpId: 'example.com',
       allowCredentials: [
         {
-          id: new Uint8Array([67, 114, 101, 100, 49, 50, 51]).buffer, 
+          id: new Uint8Array([67, 114, 101, 100, 49, 50, 51]).buffer,
           type: 'public-key',
           transports: ['usb'],
         },
@@ -488,7 +485,6 @@ describe('WebAuthn Serialization/Deserialization', () => {
       expect(result.userVerification).toBe('preferred')
       expect(result.hints).toEqual(['security-key'])
 
-      
       expect(result.challenge).toBe(baseOptions.challenge)
       expect(result.allowCredentials).toBe(baseOptions.allowCredentials)
     })
@@ -508,7 +504,7 @@ describe('WebAuthn Serialization/Deserialization', () => {
     it('should preserve allowCredentials ArrayBuffers', () => {
       const newCreds = [
         {
-          id: new Uint8Array([78, 101, 119, 67, 114, 101, 100]).buffer, 
+          id: new Uint8Array([78, 101, 119, 67, 114, 101, 100]).buffer,
           type: 'public-key' as const,
           transports: ['nfc'] as AuthenticatorTransportFuture[],
         },
