@@ -1694,6 +1694,35 @@ describe('GoTrueClient with storageisServer = true', () => {
     expect(warnings.length).toEqual(0)
   })
 
+  test('getSession emits no warnings when suppressGetSessionWarning is set to true', async () => {
+    const storage = memoryLocalStorageAdapter({
+      [STORAGE_KEY]: JSON.stringify({
+        access_token: 'jwt.accesstoken.signature',
+        refresh_token: 'refresh-token',
+        token_type: 'bearer',
+        expires_in: 1000,
+        expires_at: Date.now() / 1000 + 1000,
+        user: {
+          id: 'random-user-id',
+        },
+      }),
+    })
+    storage.isServer = true
+
+    const client = new GoTrueClient({
+      storage,
+      suppressGetSessionWarning: true,
+    })
+
+    const {
+      data: { session },
+    } = await client.getSession()
+
+    const user = session?.user // accessing the user object from getSession shouldn't emit a warning
+    expect(user).not.toBeNull()
+    expect(warnings.length).toEqual(0)
+  })
+
   test('saveSession should overwrite the existing session', async () => {
     const store = memoryLocalStorageAdapter()
     const client = new GoTrueClient({
