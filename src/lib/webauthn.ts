@@ -469,6 +469,7 @@ export const DEFAULT_REQUEST_OPTIONS: Partial<PublicKeyCredentialRequestOptionsF
   /** set to preferred because older yubikeys don't have PIN/Biometric */
   userVerification: 'preferred',
   hints: ['security-key'],
+  attestation: 'direct',
 }
 
 function deepMerge<T>(...sources: Partial<T>[]): T {
