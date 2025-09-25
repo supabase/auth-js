@@ -58,14 +58,14 @@ describe('WebAuthn Serialization/Deserialization', () => {
       const result = deserializeCredentialCreationOptions(validServerOptions)
 
       expect(result.challenge).toBeInstanceOf(ArrayBuffer)
-      const challengeBytes = new Uint8Array(result.challenge)
+      const challengeBytes = new Uint8Array(result.challenge as ArrayBuffer)
 
       expect(challengeBytes).toEqual(
         new Uint8Array([72, 101, 108, 108, 111, 32, 87, 101, 98, 65, 117, 116, 104, 110, 33])
       )
 
       expect(result.user.id).toBeInstanceOf(ArrayBuffer)
-      const userIdBytes = new Uint8Array(result.user.id)
+      const userIdBytes = new Uint8Array(result.user.id as ArrayBuffer)
 
       expect(userIdBytes).toEqual(new Uint8Array([117, 115, 101, 114, 45, 49, 50, 51, 52, 53, 54]))
 
@@ -155,7 +155,7 @@ describe('WebAuthn Serialization/Deserialization', () => {
       const result = deserializeCredentialRequestOptions(validServerOptions)
 
       expect(result.challenge).toBeInstanceOf(ArrayBuffer)
-      const challengeBytes = new Uint8Array(result.challenge)
+      const challengeBytes = new Uint8Array(result.challenge as ArrayBuffer)
 
       expect(challengeBytes).toEqual(
         new Uint8Array([65, 117, 116, 104, 101, 110, 116, 105, 99, 97, 116, 101, 77, 101])
