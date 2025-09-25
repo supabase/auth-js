@@ -95,6 +95,11 @@ export type GoTrueClientOptions = {
    * @experimental
    */
   hasCustomAuthorizationHeader?: boolean
+  /**
+   * Set to "true" if you want to suppress the warning when getting a session in server side environments.
+   * @experimental
+   */
+  suppressGetSessionWarning?: boolean
 }
 
 export type WeakPasswordReasons = 'length' | 'characters' | 'pwned' | (string & {})

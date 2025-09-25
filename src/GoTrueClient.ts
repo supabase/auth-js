@@ -128,6 +128,7 @@ const DEFAULT_OPTIONS: Omit<
   flowType: 'implicit',
   debug: false,
   hasCustomAuthorizationHeader: false,
+  suppressGetSessionWarning: false,
 }
 
 async function lockNoOp<R>(name: string, acquireTimeout: number, fn: () => Promise<R>): Promise<R> {
@@ -234,6 +235,7 @@ export default class GoTrueClient {
     this.detectSessionInUrl = settings.detectSessionInUrl
     this.flowType = settings.flowType
     this.hasCustomAuthorizationHeader = settings.hasCustomAuthorizationHeader
+    this.suppressGetSessionWarning = settings.suppressGetSessionWarning
 
     if (settings.lock) {
       this.lock = settings.lock
