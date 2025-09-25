@@ -462,7 +462,7 @@ export const DEFAULT_CREATION_OPTIONS: Partial<PublicKeyCredentialCreationOption
     userVerification: 'preferred',
     residentKey: 'discouraged',
   },
-  attestation: 'none',
+  attestation: 'direct',
 }
 
 export const DEFAULT_REQUEST_OPTIONS: Partial<PublicKeyCredentialRequestOptionsFuture> = {
