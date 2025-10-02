@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.73.0](https://github.com/supabase/auth-js/compare/v2.72.0...v2.73.0) (2025-10-02)
+
+
+### Features
+
+* implement `linkIdentity` for oidc / native sign-in ([#1096](https://github.com/supabase/auth-js/issues/1096)) ([1b661dc](https://github.com/supabase/auth-js/commit/1b661dc581e0e7320ff66782e934c9bc8ae9a8e4))
+* mfa with webauthn support ([#1118](https://github.com/supabase/auth-js/issues/1118)) ([1cbd43e](https://github.com/supabase/auth-js/commit/1cbd43ec638a26ac59ae3908219927885be55ecb))
+
+
+### Bug Fixes
+
+* add missing jest-environment-jsdom dependency ([#1111](https://github.com/supabase/auth-js/issues/1111)) ([b0e7f5e](https://github.com/supabase/auth-js/commit/b0e7f5eff836a8685f816edf82e65f9b85fd33bf))
+* prettify types and improved typesafety for MFA methods ([#1116](https://github.com/supabase/auth-js/issues/1116)) ([209003c](https://github.com/supabase/auth-js/commit/209003c52149005be85477583724ca986a2af02e))
+
 ## [2.72.0](https://github.com/supabase/auth-js/compare/v2.71.1...v2.72.0) (2025-09-11)
 
 
