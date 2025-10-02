@@ -179,6 +179,9 @@ export default class GoTrueAdminApi {
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
    * @param params An object which supports `page` and `perPage` as numbers, to alter the paginated results,
    * and `filter` string to search for users by email address.
+   *
+   * @warning The filter parameter is provided for convenience but may have performance implications on large databases.
+   * Consider using pagination without filters for projects with many users.
    */
   async listUsers(
     params?: PageParams & { filter?: string }
@@ -187,6 +190,10 @@ export default class GoTrueAdminApi {
     | { data: { users: [] }; error: AuthError }
   > {
     try {
+      if (params?.filter && params.filter.trim().length < 3) {
+        throw new AuthApiError('Filter must be at least 3 characters', 400);
+      }
+      
       const pagination: Pagination = { nextPage: null, lastPage: 0, total: 0 }
       const response = await _request(this.fetch, 'GET', `${this.url}/admin/users`, {
         headers: this.headers,
