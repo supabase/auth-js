@@ -5,7 +5,7 @@ import {
   _request,
   _userResponse,
 } from './lib/fetch'
-import { resolveFetch } from './lib/helpers'
+import { resolveFetch, validateUUID } from './lib/helpers'
 import {
   AdminUserAttributes,
   GenerateLinkParams,
@@ -19,6 +19,8 @@ import {
   AuthMFAAdminListFactorsParams,
   AuthMFAAdminListFactorsResponse,
   PageParams,
+  SIGN_OUT_SCOPES,
+  SignOutScope,
 } from './lib/types'
 import { AuthError, isAuthError } from './lib/errors'
 
@@ -59,8 +61,14 @@ export default class GoTrueAdminApi {
    */
   async signOut(
     jwt: string,
-    scope: 'global' | 'local' | 'others' = 'global'
+    scope: SignOutScope = SIGN_OUT_SCOPES[0]
   ): Promise<{ data: null; error: AuthError | null }> {
+    if (SIGN_OUT_SCOPES.indexOf(scope) < 0) {
+      throw new Error(
+        `@supabase/auth-js: Parameter scope must be one of ${SIGN_OUT_SCOPES.join(', ')}`
+      )
+    }
+
     try {
       await _request(this.fetch, 'POST', `${this.url}/logout?scope=${scope}`, {
         headers: this.headers,
@@ -226,6 +234,8 @@ export default class GoTrueAdminApi {
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
    */
   async getUserById(uid: string): Promise<UserResponse> {
+    validateUUID(uid)
+
     try {
       return await _request(this.fetch, 'GET', `${this.url}/admin/users/${uid}`, {
         headers: this.headers,
@@ -248,6 +258,8 @@ export default class GoTrueAdminApi {
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
    */
   async updateUserById(uid: string, attributes: AdminUserAttributes): Promise<UserResponse> {
+    validateUUID(uid)
+
     try {
       return await _request(this.fetch, 'PUT', `${this.url}/admin/users/${uid}`, {
         body: attributes,
@@ -267,12 +279,14 @@ export default class GoTrueAdminApi {
    * Delete a user. Requires a `service_role` key.
    *
    * @param id The user id you want to remove.
-   * @param shouldSoftDelete If true, then the user will be soft-deleted (setting `deleted_at` to the current timestamp and disabling their account while preserving their data) from the auth schema.
+   * @param shouldSoftDelete If true, then the user will be soft-deleted from the auth schema. Soft deletion allows user identification from the hashed user ID but is not reversible.
    * Defaults to false for backward compatibility.
    *
    * This function should only be called on a server. Never expose your `service_role` key in the browser.
    */
   async deleteUser(id: string, shouldSoftDelete = false): Promise<UserResponse> {
+    validateUUID(id)
+
     try {
       return await _request(this.fetch, 'DELETE', `${this.url}/admin/users/${id}`, {
         headers: this.headers,
@@ -293,6 +307,8 @@ export default class GoTrueAdminApi {
   private async _listFactors(
     params: AuthMFAAdminListFactorsParams
   ): Promise<AuthMFAAdminListFactorsResponse> {
+    validateUUID(params.userId)
+
     try {
       const { data, error } = await _request(
         this.fetch,
@@ -318,6 +334,9 @@ export default class GoTrueAdminApi {
   private async _deleteFactor(
     params: AuthMFAAdminDeleteFactorParams
   ): Promise<AuthMFAAdminDeleteFactorResponse> {
+    validateUUID(params.userId)
+    validateUUID(params.id)
+
     try {
       const data = await _request(
         this.fetch,

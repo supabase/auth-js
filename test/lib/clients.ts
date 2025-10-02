@@ -1,13 +1,16 @@
 import jwt from 'jsonwebtoken'
 import { GoTrueAdminApi, GoTrueClient } from '../../src/index'
+import { SupportedStorage } from '../../src/lib/types'
 
 export const SIGNUP_ENABLED_AUTO_CONFIRM_OFF_PORT = 9999
 
 export const SIGNUP_ENABLED_AUTO_CONFIRM_ON_PORT = 9998
 export const SIGNUP_DISABLED_AUTO_CONFIRM_OFF_PORT = 9997
+export const SIGNUP_ENABLED_ASYMMETRIC_AUTO_CONFIRM_ON_PORT = 9996
 
 export const GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_OFF = `http://localhost:${SIGNUP_ENABLED_AUTO_CONFIRM_OFF_PORT}`
 export const GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON = `http://localhost:${SIGNUP_ENABLED_AUTO_CONFIRM_ON_PORT}`
+export const GOTRUE_URL_SIGNUP_ENABLED_ASYMMETRIC_AUTO_CONFIRM_ON = `http://localhost:${SIGNUP_ENABLED_ASYMMETRIC_AUTO_CONFIRM_ON_PORT}`
 export const GOTRUE_URL_SIGNUP_DISABLED_AUTO_CONFIRM_OFF = `http://localhost:${SIGNUP_DISABLED_AUTO_CONFIRM_OFF_PORT}`
 
 export const GOTRUE_JWT_SECRET = '37c304f8-51aa-419a-a1af-06154e63707a'
@@ -50,6 +53,13 @@ export const authClientWithSession = new GoTrueClient({
   storage: new MemoryStorage(),
 })
 
+export const authClientWithAsymmetricSession = new GoTrueClient({
+  url: GOTRUE_URL_SIGNUP_ENABLED_ASYMMETRIC_AUTO_CONFIRM_ON,
+  autoRefreshToken: false,
+  persistSession: true,
+  storage: new MemoryStorage(),
+})
+
 export const authSubscriptionClient = new GoTrueClient({
   url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
   autoRefreshToken: false,
@@ -78,6 +88,20 @@ export const clientApiAutoConfirmDisabledClient = new GoTrueClient({
   storage: new MemoryStorage(),
 })
 
+export const pkceClient = new GoTrueClient({
+  url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+  autoRefreshToken: false,
+  persistSession: true,
+  storage: new MemoryStorage(),
+  flowType: 'pkce',
+})
+
+export const autoRefreshClient = new GoTrueClient({
+  url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+  autoRefreshToken: true,
+  persistSession: true,
+})
+
 export const authAdminApiAutoConfirmEnabledClient = new GoTrueAdminApi({
   url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
   headers: {
@@ -95,6 +119,9 @@ export const authAdminApiAutoConfirmDisabledClient = new GoTrueAdminApi({
 const SERVICE_ROLE_JWT = jwt.sign(
   {
     role: 'service_role',
+    // Set issued at to 1 minute ago to fix flacky tests because of
+    // invalid JWT: unable to parse or verify signature, Token used before issued
+    iat: Math.floor(Date.now() / 1000) - 60,
   },
   GOTRUE_JWT_SECRET
 )
@@ -119,3 +146,13 @@ export const serviceRoleApiClientNoSms = new GoTrueAdminApi({
     Authorization: `Bearer ${SERVICE_ROLE_JWT}`,
   },
 })
+
+export function getClientWithSpecificStorage(storage: SupportedStorage) {
+  return new GoTrueClient({
+    url: GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+    storageKey: 'test-specific-storage',
+    autoRefreshToken: false,
+    persistSession: true,
+    storage,
+  })
+}

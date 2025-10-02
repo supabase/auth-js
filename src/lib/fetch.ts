@@ -1,4 +1,5 @@
-import { expiresAt, looksLikeFetchResponse } from './helpers'
+import { API_VERSIONS, API_VERSION_HEADER_NAME } from './constants'
+import { expiresAt, looksLikeFetchResponse, parseResponseAPIVersion } from './helpers'
 import {
   AuthResponse,
   AuthResponsePassword,
@@ -13,6 +14,7 @@ import {
   AuthRetryableFetchError,
   AuthWeakPasswordError,
   AuthUnknownError,
+  AuthSessionMissingError,
 } from './errors'
 
 export type Fetch = typeof fetch
@@ -35,7 +37,7 @@ const _getErrorMessage = (err: any): string =>
 
 const NETWORK_ERROR_CODES = [502, 503, 504]
 
-async function handleError(error: unknown) {
+export async function handleError(error: unknown) {
   if (!looksLikeFetchResponse(error)) {
     throw new AuthRetryableFetchError(_getErrorMessage(error), 0)
   }
@@ -52,23 +54,52 @@ async function handleError(error: unknown) {
     throw new AuthUnknownError(_getErrorMessage(e), e)
   }
 
+  let errorCode: string | undefined = undefined
+
+  const responseAPIVersion = parseResponseAPIVersion(error)
   if (
+    responseAPIVersion &&
+    responseAPIVersion.getTime() >= API_VERSIONS['2024-01-01'].timestamp &&
     typeof data === 'object' &&
     data &&
-    typeof data.weak_password === 'object' &&
-    data.weak_password &&
-    Array.isArray(data.weak_password.reasons) &&
-    data.weak_password.reasons.length &&
-    data.weak_password.reasons.reduce((a: boolean, i: any) => a && typeof i === 'string', true)
+    typeof data.code === 'string'
   ) {
+    errorCode = data.code
+  } else if (typeof data === 'object' && data && typeof data.error_code === 'string') {
+    errorCode = data.error_code
+  }
+
+  if (!errorCode) {
+    // Legacy support for weak password errors, when there were no error codes
+    if (
+      typeof data === 'object' &&
+      data &&
+      typeof data.weak_password === 'object' &&
+      data.weak_password &&
+      Array.isArray(data.weak_password.reasons) &&
+      data.weak_password.reasons.length &&
+      data.weak_password.reasons.reduce((a: boolean, i: any) => a && typeof i === 'string', true)
+    ) {
+      throw new AuthWeakPasswordError(
+        _getErrorMessage(data),
+        error.status,
+        data.weak_password.reasons
+      )
+    }
+  } else if (errorCode === 'weak_password') {
     throw new AuthWeakPasswordError(
       _getErrorMessage(data),
       error.status,
-      data.weak_password.reasons
+      data.weak_password?.reasons || []
     )
+  } else if (errorCode === 'session_not_found') {
+    // The `session_id` inside the JWT does not correspond to a row in the
+    // `sessions` table. This usually means the user has signed out, has been
+    // deleted, or their session has somehow been terminated.
+    throw new AuthSessionMissingError()
   }
 
-  throw new AuthApiError(_getErrorMessage(data), error.status || 500)
+  throw new AuthApiError(_getErrorMessage(data), error.status || 500, errorCode)
 }
 
 const _getRequestParams = (
@@ -105,14 +136,23 @@ export async function _request(
   url: string,
   options?: GotrueRequestOptions
 ) {
-  const headers = { ...options?.headers }
+  const headers = {
+    ...options?.headers,
+  }
+
+  if (!headers[API_VERSION_HEADER_NAME]) {
+    headers[API_VERSION_HEADER_NAME] = API_VERSIONS['2024-01-01'].name
+  }
+
   if (options?.jwt) {
     headers['Authorization'] = `Bearer ${options.jwt}`
   }
+
   const qs = options?.query ?? {}
   if (options?.redirectTo) {
     qs['redirect_to'] = options.redirectTo
   }
+
   const queryString = Object.keys(qs).length ? '?' + new URLSearchParams(qs).toString() : ''
   const data = await _handleRequest(
     fetcher,
@@ -143,9 +183,6 @@ async function _handleRequest(
   try {
     result = await fetcher(url, {
       ...requestParams,
-      // UNDER NO CIRCUMSTANCE SHOULD THIS OPTION BE REMOVED, YOU MAY BE OPENING UP A SECURITY HOLE IN NEXT.JS APPS
-      // https://nextjs.org/docs/app/building-your-application/caching#opting-out-1
-      cache: 'no-store',
     })
   } catch (e) {
     console.error(e)

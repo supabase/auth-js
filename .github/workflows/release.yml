@@ -10,6 +10,7 @@ jobs:
   release_please:
     runs-on: ubuntu-latest
     permissions:
+      id-token: write
       contents: write
       pull-requests: write
     steps:
@@ -48,7 +49,7 @@ jobs:
             # Use git describe tags to identify the number of commits the branch
             # is ahead of the most recent non-release-candidate tag, which is
             # part of the rc.<commits> value.
-            RELEASE_VERSION=$MAIN_RELEASE_VERSION-rc.$(node -e "console.log('$(git describe --tags --exclude *rc*)'.split('-')[1])")
+            RELEASE_VERSION=$MAIN_RELEASE_VERSION-rc.$(node -e "console.log('$(git describe --tags --exclude rc*)'.split('-')[1])")
 
             # release-please only ignores releases that have a form like [A-Z0-9]<version>, so prefixing with rc<version>
             RELEASE_NAME="rc$RELEASE_VERSION"
@@ -94,7 +95,7 @@ jobs:
           if [ "$RELEASE_CANDIDATE" == "true" ]
           then
             DIST_TAG=rc
-          elif [ "$GITHUB_REF" == "refs/heads/main" ] && [ "$GITHUB_REF" == "refs/heads/master" ]
+          elif [ "$GITHUB_REF" == "refs/heads/main" ] || [ "$GITHUB_REF" == "refs/heads/master" ]
           then
             # This is the main branch and it's not a prerelease, so the dist-tag should be `latest`.
             DIST_TAG=latest
@@ -102,16 +103,17 @@ jobs:
 
           echo "Publishing auth-js now..."
 
-          npm publish --tag "$DIST_TAG"
+          npm publish --provenance --tag "$DIST_TAG"
 
           echo "Publishing gotrue-js now..."
 
           for f in package.json package-lock.json
           do
-            sed -i 's|\(["/]\)auth-js|\1gotrue-js|g' "$f"
+            # only replace name not repository, homepage, etc.
+            sed -i 's|\("name":[[:space:]]*"@supabase/\)auth-js|\1gotrue-js|g' "$f"
           done
 
-          npm publish --tag "$DIST_TAG"
+          npm publish --provenance --tag "$DIST_TAG"
 
       - name: Create GitHub release and branches
         if: ${{ steps.release.outputs.release_created == 'true' || steps.release.outputs.prs_created == 'true' }}
