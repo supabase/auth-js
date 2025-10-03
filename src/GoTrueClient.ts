@@ -2085,6 +2085,14 @@ export default class GoTrueClient {
   ): {
     data: { subscription: Subscription }
   } {
+    if (callback.constructor.name === 'AsyncFunction') {
+      console.warn(
+        'Calling onAuthStateChange with an async function may cause a deadlock.'
+        + '  For a solution please see the docs: ' +
+        'https://supabase.com/docs/reference/javascript/auth-onauthstatechange'
+      )
+    }
+
     const id: string = uuid()
     const subscription: Subscription = {
       id,
