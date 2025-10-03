@@ -400,7 +400,7 @@ export default class GoTrueClient {
    */
   private async _initialize(): Promise<InitializeResult> {
     try {
-      const params = parseParametersFromURL(window.location.href)
+      const params = isBrowser() ? parseParametersFromURL(window.location.href) : {}
       let callbackUrlType = 'none'
       if (this._isImplicitGrantCallback(params)) {
         callbackUrlType = 'implicit'
@@ -2393,7 +2393,7 @@ export default class GoTrueClient {
       maybeSession !== null &&
       'access_token' in maybeSession &&
       'refresh_token' in maybeSession &&
-      'expires_at' in maybeSession
+      'expires_in' in maybeSession
 
     return isValidSession
   }
