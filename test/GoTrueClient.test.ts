@@ -1,26 +1,40 @@
 import { JWK, Session } from '../src'
 import GoTrueClient from '../src/GoTrueClient'
+import { base64UrlToUint8Array } from '../src/lib/base64url'
 import { STORAGE_KEY } from '../src/lib/constants'
 import { AuthError } from '../src/lib/errors'
 import { setItemAsync } from '../src/lib/helpers'
 import { memoryLocalStorageAdapter } from '../src/lib/local-storage'
 import {
-  authAdminApiAutoConfirmEnabledClient,
+  deserializeCredentialCreationOptions,
+  deserializeCredentialRequestOptions,
+  serializeCredentialCreationResponse,
+  serializeCredentialRequestResponse,
+} from '../src/lib/webauthn'
+import type { PublicKeyCredentialFuture, PublicKeyCredentialJSON } from '../src/lib/webauthn.dom'
+import {
   authClient as auth,
+  authAdminApiAutoConfirmEnabledClient,
   authClient,
+  authSubscriptionClient,
   authClientWithAsymmetricSession as authWithAsymmetricSession,
   authClientWithSession as authWithSession,
-  authSubscriptionClient,
   autoRefreshClient,
-  clientApiAutoConfirmDisabledClient as signUpDisabledClient,
-  clientApiAutoConfirmEnabledClient as signUpEnabledClient,
-  clientApiAutoConfirmOffSignupsEnabledClient as phoneClient,
   getClientWithSpecificStorage,
   GOTRUE_URL_SIGNUP_ENABLED_ASYMMETRIC_AUTO_CONFIRM_ON,
   GOTRUE_URL_SIGNUP_ENABLED_AUTO_CONFIRM_ON,
+  clientApiAutoConfirmOffSignupsEnabledClient as phoneClient,
   pkceClient,
+  clientApiAutoConfirmDisabledClient as signUpDisabledClient,
+  clientApiAutoConfirmEnabledClient as signUpEnabledClient,
 } from './lib/clients'
 import { mockUserCredentials } from './lib/utils'
+import {
+  webauthnAssertionCredentialResponse,
+  webauthnAssertionMockCredential,
+  webauthnCreationCredentialResponse,
+  webauthnCreationMockCredential,
+} from './webauthn.fixtures'
 
 const TEST_USER_DATA = { info: 'some info' }
 
@@ -1569,7 +1583,7 @@ describe('MFA', () => {
   test('should handle MFA verify without session', async () => {
     const { data, error } = await auth.mfa.verify({
       factorId: 'test-factor-id',
-      challengeId: 'test-challenge-id',
+      challengeId: 'f7850041-ba10-4eb3-851c-8ceb7ff8463d',
       code: '123456',
     })
 
@@ -1588,6 +1602,71 @@ describe('MFA', () => {
 })
 
 describe('WebAuthn MFA', () => {
+  beforeEach(() => {
+    // Setup navigator.credentials mock
+    if (!global.navigator) {
+      global.navigator = {} as Navigator
+    }
+
+    // Mock navigator.credentials using Object.defineProperty since it's read-only
+    Object.defineProperty(global.navigator, 'credentials', {
+      value: {
+        create: jest.fn(),
+        get: jest.fn(),
+        store: jest.fn(),
+        preventSilentAccess: jest.fn(),
+      },
+      writable: false,
+      configurable: true,
+    })
+
+    // Mock PublicKeyCredential as a proper class so instanceof checks work
+    class PublicKeyCredentialMock implements Partial<PublicKeyCredentialFuture> {
+      readonly id: string
+      readonly rawId: ArrayBuffer
+      readonly type: PublicKeyCredentialType = 'public-key'
+      readonly response: AuthenticatorResponse
+      readonly authenticatorAttachment: AuthenticatorAttachment | null
+
+      constructor(data: {
+        id: string
+        rawId: string | ArrayBuffer
+        type: PublicKeyCredentialType
+        response: AuthenticatorResponse
+        authenticatorAttachment?: AuthenticatorAttachment | null
+      }) {
+        this.id = data.id
+        this.rawId =
+          typeof data.rawId === 'string' ? base64UrlToUint8Array(data.rawId).buffer : data.rawId
+        this.response = data.response
+        this.authenticatorAttachment = data.authenticatorAttachment ?? null
+      }
+
+      getClientExtensionResults(): AuthenticationExtensionsClientOutputs {
+        return {}
+      }
+
+      toJSON(): PublicKeyCredentialJSON {
+        // Use the proper serialization functions based on response type
+        if ('attestationObject' in this.response) {
+          // Registration response
+          return serializeCredentialCreationResponse(this as any)
+        } else if ('signature' in this.response) {
+          // Authentication response
+          return serializeCredentialRequestResponse(this as any)
+        }
+        throw new Error('Unknown Credential Type')
+      }
+
+      static isUserVerifyingPlatformAuthenticatorAvailable = jest.fn().mockResolvedValue(true)
+      static isConditionalMediationAvailable = jest.fn().mockResolvedValue(true)
+      static parseCreationOptionsFromJSON = deserializeCredentialCreationOptions
+      static parseRequestOptionsFromJSON = deserializeCredentialRequestOptions
+    }
+
+    ;(global as any).PublicKeyCredential = PublicKeyCredentialMock
+  })
+
   afterAll(() => {
     // @ts-ignore
     delete global.navigator
@@ -1683,22 +1762,13 @@ describe('WebAuthn MFA', () => {
   test('verify WebAuthn should fail without session', async () => {
     await authWithSession.signOut()
     const { data, error } = await authWithSession.mfa.webauthn.verify({
-      factorId: 'test-factor-id',
-      challengeId: 'test-challenge-id',
+      factorId: webauthnCreationCredentialResponse.factorId,
+      challengeId: webauthnCreationCredentialResponse.challengeId,
       webauthn: {
         type: 'create',
-        rpId: 'localhost',
-        rpOrigins: ['http://localhost:9999'],
-        credential_response: {
-          id: 'test-credential-id',
-          rawId: new ArrayBuffer(8),
-          response: {
-            attestationObject: new ArrayBuffer(8),
-            clientDataJSON: new ArrayBuffer(8),
-          },
-          type: 'public-key',
-          getClientExtensionResults: () => ({}),
-        } as any,
+        rpId: webauthnCreationCredentialResponse.rpId,
+        rpOrigins: [webauthnCreationCredentialResponse.origin],
+        credential_response: webauthnCreationMockCredential,
       },
     })
 
@@ -1733,32 +1803,18 @@ describe('WebAuthn MFA', () => {
     expect(webauthnFactors).toHaveLength(0)
   })
 
-  test('listFactors should include WebAuthn factors', async () => {
-    // Mock getUser to include WebAuthn factors
-    authWithSession.getUser = jest.fn().mockResolvedValue({
-      data: {
-        user: {
-          id: 'test-user',
-          factors: [
-            { id: '1', factor_type: 'webauthn', status: 'verified', friendly_name: 'YubiKey 5' },
-            { id: '2', factor_type: 'webauthn', status: 'unverified', friendly_name: 'Touch ID' },
-            { id: '3', factor_type: 'totp', status: 'verified' },
-          ],
-        },
-      },
-      error: null,
+  test('should enroll WebAuthn factor', async () => {
+    await setupUserWithWebAuthn()
+
+    const { data: enrollData, error: enrollError } = await authWithSession.mfa.webauthn.enroll({
+      friendlyName: 'Test Yubikey',
     })
 
-    const { data, error } = await authWithSession.mfa.listFactors()
-
-    expect(error).toBeNull()
-    expect(data).not.toBeNull()
-    if (data) {
-      expect(data.all).toHaveLength(3)
-      const webauthnFactors = data.all.filter((f) => f.factor_type === 'webauthn')
-      expect(webauthnFactors).toHaveLength(2)
-      expect(webauthnFactors.filter((f) => f.status === 'verified')).toHaveLength(1)
-    }
+    expect(enrollError).toBeNull()
+    expect(enrollData).not.toBeNull()
+    expect(enrollData?.type).toBe('webauthn')
+    expect(enrollData?.id).toBeDefined()
+    expect(enrollData?.friendly_name).toBe('Test Yubikey')
   })
 })
 
