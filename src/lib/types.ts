@@ -1,6 +1,18 @@
 import { AuthError } from './errors'
 import { Fetch } from './fetch'
-import type { SolanaSignInInput, SolanaSignInOutput } from '@solana/wallet-standard-features'
+import { EIP1193Provider, EthereumSignInInput, Hex } from './web3/ethereum'
+import type { SolanaSignInInput, SolanaSignInOutput } from './web3/solana'
+import {
+  ServerCredentialCreationOptions,
+  ServerCredentialRequestOptions,
+  WebAuthnApi,
+} from './webauthn'
+import {
+  AuthenticationCredential,
+  PublicKeyCredentialCreationOptionsFuture,
+  PublicKeyCredentialRequestOptionsFuture,
+  RegistrationCredential,
+} from './webauthn.dom'
 
 /** One of the providers supported by GoTrue. */
 export type Provider =
@@ -70,6 +82,14 @@ export type GoTrueClientOptions = {
   persistSession?: boolean
   /* Provide your own local storage implementation to use instead of the browser's local storage. */
   storage?: SupportedStorage
+  /**
+   * Stores the user object in a separate storage location from the rest of the session data. When non-null, `storage` will only store a JSON object containing the access and refresh token and some adjacent metadata, while `userStorage` will only contain the user object under the key `storageKey + '-user'`.
+   *
+   * When this option is set and cookie storage is used, `getSession()` and other functions that load a session from the cookie store might not return back a user. It's very important to always use `getUser()` to fetch a user object in those scenarios.
+   *
+   * @experimental
+   */
+  userStorage?: SupportedStorage
   /* A custom fetch implementation. */
   fetch?: Fetch
   /* If set to 'pkce' PKCE flow. Defaults to the 'implicit' flow otherwise */
@@ -89,93 +109,83 @@ export type GoTrueClientOptions = {
   hasCustomAuthorizationHeader?: boolean
 }
 
-export type WeakPasswordReasons = 'length' | 'characters' | 'pwned' | (string & {})
+const WeakPasswordReasons = ['length', 'characters', 'pwned'] as const
+
+export type WeakPasswordReasons = typeof WeakPasswordReasons[number]
 export type WeakPassword = {
   reasons: WeakPasswordReasons[]
   message: string
 }
 
-export type AuthResponse =
+/**
+ * Resolve mapped types and show the derived keys and their types when hovering in
+ * VS Code, instead of just showing the names those mapped types are defined with.
+ */
+export type Prettify<T> = T extends Function ? T : { [K in keyof T]: T[K] }
+
+/**
+ * A stricter version of TypeScript's Omit that only allows omitting keys that actually exist.
+ * This prevents typos and ensures type safety at compile time.
+ * Unlike regular Omit, this will error if you try to omit a non-existent key.
+ */
+export type StrictOmit<T, K extends keyof T> = Omit<T, K>
+
+/**
+ * a shared result type that encapsulates errors instead of throwing them, allows you to optionally specify the ErrorType
+ */
+export type RequestResult<T, ErrorType extends Error = AuthError> =
   | {
-      data: {
-        user: User | null
-        session: Session | null
-      }
+      data: T
       error: null
     }
   | {
-      data: {
-        user: null
-        session: null
-      }
+      data: null
+      error: Error extends AuthError ? AuthError : ErrorType
+    }
+
+/**
+ * similar to RequestResult except it allows you to destructure the possible shape of the success response
+ *  {@see RequestResult}
+ */
+export type RequestResultSafeDestructure<T> =
+  | { data: T; error: null }
+  | {
+      data: T extends object ? { [K in keyof T]: null } : null
       error: AuthError
     }
 
-export type AuthResponsePassword =
-  | {
-      data: {
-        user: User | null
-        session: Session | null
-        weak_password?: WeakPassword | null
-      }
-      error: null
-    }
-  | {
-      data: {
-        user: null
-        session: null
-      }
-      error: AuthError
-    }
+export type AuthResponse = RequestResultSafeDestructure<{
+  user: User | null
+  session: Session | null
+}>
+
+export type AuthResponsePassword = RequestResultSafeDestructure<{
+  user: User | null
+  session: Session | null
+  weak_password?: WeakPassword | null
+}>
 
 /**
  * AuthOtpResponse is returned when OTP is used.
  *
  * {@see AuthResponse}
  */
-export type AuthOtpResponse =
-  | {
-      data: { user: null; session: null; messageId?: string | null }
-      error: null
-    }
-  | {
-      data: { user: null; session: null; messageId?: string | null }
-      error: AuthError
-    }
+export type AuthOtpResponse = RequestResultSafeDestructure<{
+  user: null
+  session: null
+  messageId?: string | null
+}>
 
-export type AuthTokenResponse =
-  | {
-      data: {
-        user: User
-        session: Session
-      }
-      error: null
-    }
-  | {
-      data: {
-        user: null
-        session: null
-      }
-      error: AuthError
-    }
+export type AuthTokenResponse = RequestResultSafeDestructure<{
+  user: User
+  session: Session
+}>
 
-export type AuthTokenResponsePassword =
-  | {
-      data: {
-        user: User
-        session: Session
-        weakPassword?: WeakPassword
-      }
-      error: null
-    }
-  | {
-      data: {
-        user: null
-        session: null
-        weakPassword?: null
-      }
-      error: AuthError
-    }
+export type AuthTokenResponsePassword = RequestResultSafeDestructure<{
+  user: User
+  session: Session
+  weakPassword?: WeakPassword
+}>
 
 export type OAuthResponse =
   | {
@@ -193,38 +203,20 @@ export type OAuthResponse =
       error: AuthError
     }
 
-export type SSOResponse =
-  | {
-      data: {
-        /**
-         * URL to open in a browser which will complete the sign-in flow by
-         * taking the user to the identity provider's authentication flow.
-         *
-         * On browsers you can set the URL to `window.location.href` to take
-         * the user to the authentication flow.
-         */
-        url: string
-      }
-      error: null
-    }
-  | {
-      data: null
-      error: AuthError
-    }
+export type SSOResponse = RequestResult<{
+  /**
+   * URL to open in a browser which will complete the sign-in flow by
+   * taking the user to the identity provider's authentication flow.
+   *
+   * On browsers you can set the URL to `window.location.href` to take
+   * the user to the authentication flow.
+   */
+  url: string
+}>
 
-export type UserResponse =
-  | {
-      data: {
-        user: User
-      }
-      error: null
-    }
-  | {
-      data: {
-        user: null
-      }
-      error: AuthError
-    }
+export type UserResponse = RequestResultSafeDestructure<{
+  user: User
+}>
 
 export interface Session {
   /**
@@ -252,9 +244,29 @@ export interface Session {
    * A timestamp of when the token will expire. Returned when a login is confirmed.
    */
   expires_at?: number
-  token_type: string
+  token_type: 'bearer'
+
+  /**
+   * When using a separate user storage, accessing properties of this object will throw an error.
+   */
   user: User
 }
+
+const AMRMethods = [
+  'password',
+  'otp',
+  'oauth',
+  'totp',
+  'mfa/totp',
+  'mfa/phone',
+  'mfa/webauthn',
+  'anonymous',
+  'sso/saml',
+  'magiclink',
+  'web3',
+] as const
+
+export type AMRMethod = typeof AMRMethods[number] | (string & {})
 
 /**
  * An authentication methord reference (AMR) entry.
@@ -266,7 +278,7 @@ export interface Session {
  */
 export interface AMREntry {
   /** Authentication method name. */
-  method: 'password' | 'otp' | 'oauth' | 'mfa/totp' | (string & {})
+  method: AMRMethod
 
   /**
    * Timestamp when the method was successfully used. Represents number of
@@ -288,6 +300,20 @@ export interface UserIdentity {
   updated_at?: string
 }
 
+const FactorTypes = ['totp', 'phone', 'webauthn'] as const
+
+/**
+ * Type of factor. `totp` and `phone` supported with this version
+ */
+export type FactorType = typeof FactorTypes[number]
+
+const FactorVerificationStatuses = ['verified', 'unverified'] as const
+
+/**
+ * The verification status of the factor, default is `unverified` after `.enroll()`, then `verified` after the user verifies it with `.verify()`
+ */
+type FactorVerificationStatus = typeof FactorVerificationStatuses[number]
+
 /**
  * A MFA factor.
  *
@@ -295,7 +321,10 @@ export interface UserIdentity {
  * @see {@link GoTrueMFAApi#listFactors}
  * @see {@link GoTrueMFAAdminApi#listFactors}
  */
-export interface Factor {
+export type Factor<
+  Type extends FactorType = FactorType,
+  Status extends FactorVerificationStatus = typeof FactorVerificationStatuses[number]
+> = {
   /** ID of the factor. */
   id: string
 
@@ -305,10 +334,12 @@ export interface Factor {
   /**
    * Type of factor. `totp` and `phone` supported with this version
    */
-  factor_type: 'totp' | 'phone' | (string & {})
+  factor_type: Type
 
-  /** Factor's status. */
-  status: 'verified' | 'unverified'
+  /**
+   * The verification status of the factor, default is `unverified` after `.enroll()`, then `verified` after the user verifies it with `.verify()`
+   */
+  status: Status
 
   created_at: string
   updated_at: string
@@ -347,7 +378,7 @@ export interface User {
   identities?: UserIdentity[]
   is_anonymous?: boolean
   is_sso_user?: boolean
-  factors?: Factor[]
+  factors?: (Factor<FactorType, 'verified'> | Factor<FactorType, 'unverified'>)[]
   deleted_at?: string
 }
 
@@ -486,65 +517,26 @@ export type SignInAnonymouslyCredentials = {
   }
 }
 
-export type SignUpWithPasswordCredentials =
-  | {
-      /** The user's email address. */
-      email: string
-      /** The user's password. */
-      password: string
-      options?: {
-        /** The redirect url embedded in the email link */
-        emailRedirectTo?: string
-        /**
-         * A custom data object to store the user's metadata. This maps to the `auth.users.raw_user_meta_data` column.
-         *
-         * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
-         */
-        data?: object
-        /** Verification token received when the user completes the captcha on the site. */
-        captchaToken?: string
-      }
+export type SignUpWithPasswordCredentials = Prettify<
+  PasswordCredentialsBase & {
+    options?: {
+      emailRedirectTo?: string // only for email
+      data?: object
+      captchaToken?: string
+      channel?: 'sms' | 'whatsapp' // only for phone
     }
-  | {
-      /** The user's phone number. */
-      phone: string
-      /** The user's password. */
-      password: string
-      options?: {
-        /**
-         * A custom data object to store the user's metadata. This maps to the `auth.users.raw_user_meta_data` column.
-         *
-         * The `data` should be a JSON object that includes user-specific info, such as their first and last name.
-         */
-        data?: object
-        /** Verification token received when the user completes the captcha on the site. Requires a configured WhatsApp sender on Twilio */
-        captchaToken?: string
-        /** Messaging channel to use (e.g. whatsapp or sms) */
-        channel?: 'sms' | 'whatsapp'
-      }
-    }
+  }
+>
 
-export type SignInWithPasswordCredentials =
-  | {
-      /** The user's email address. */
-      email: string
-      /** The user's password. */
-      password: string
-      options?: {
-        /** Verification token received when the user completes the captcha on the site. */
-        captchaToken?: string
-      }
-    }
-  | {
-      /** The user's phone number. */
-      phone: string
-      /** The user's password. */
-      password: string
-      options?: {
-        /** Verification token received when the user completes the captcha on the site. */
-        captchaToken?: string
-      }
-    }
+type PasswordCredentialsBase =
+  | { email: string; password: string }
+  | { phone: string; password: string }
+
+export type SignInWithPasswordCredentials = PasswordCredentialsBase & {
+  options?: {
+    captchaToken?: string
+  }
+}
 
 export type SignInWithPasswordlessCredentials =
   | {
@@ -661,7 +653,46 @@ export type SolanaWeb3Credentials =
       }
     }
 
-export type Web3Credentials = SolanaWeb3Credentials
+export type EthereumWallet = EIP1193Provider
+
+export type EthereumWeb3Credentials =
+  | {
+      chain: 'ethereum'
+
+      /** Wallet interface to use. If not specified will default to `window.ethereum`. */
+      wallet?: EthereumWallet
+
+      /** Optional statement to include in the Sign in with Ethereum message. Must not include new line characters. Most wallets like Phantom **require specifying a statement!** */
+      statement?: string
+
+      options?: {
+        /** URL to use with the wallet interface. Some wallets do not allow signing a message for URLs different from the current page. */
+        url?: string
+
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+
+        signInWithEthereum?: Partial<
+          Omit<EthereumSignInInput, 'version' | 'domain' | 'uri' | 'statement'>
+        >
+      }
+    }
+  | {
+      chain: 'ethereum'
+
+      /** Sign in with Ethereum compatible message. Must include `Issued At`, `URI` and `Version`. */
+      message: string
+
+      /** Ethereum curve (secp256k1) signature of the message. */
+      signature: Hex
+
+      options?: {
+        /** Verification token received when the user completes the captcha on the site. */
+        captchaToken?: string
+      }
+    }
+
+export type Web3Credentials = SolanaWeb3Credentials | EthereumWeb3Credentials
 
 export type VerifyOtpParams = VerifyMobileOtpParams | VerifyEmailOtpParams | VerifyTokenHashParams
 export interface VerifyMobileOtpParams {
@@ -806,21 +837,10 @@ export type GenerateLinkParams =
   | GenerateRecoveryLinkParams
   | GenerateEmailChangeLinkParams
 
-export type GenerateLinkResponse =
-  | {
-      data: {
-        properties: GenerateLinkProperties
-        user: User
-      }
-      error: null
-    }
-  | {
-      data: {
-        properties: null
-        user: null
-      }
-      error: AuthError
-    }
+export type GenerateLinkResponse = RequestResultSafeDestructure<{
+  properties: GenerateLinkProperties
+  user: User
+}>
 
 /** The properties related to the email link generated  */
 export type GenerateLinkProperties = {
@@ -852,132 +872,270 @@ export type GenerateLinkType =
   | 'email_change_current'
   | 'email_change_new'
 
-export type MFAEnrollParams = MFAEnrollTOTPParams | MFAEnrollPhoneParams
+export type MFAEnrollParams = MFAEnrollTOTPParams | MFAEnrollPhoneParams | MFAEnrollWebauthnParams
 
 export type MFAUnenrollParams = {
   /** ID of the factor being unenrolled. */
   factorId: string
 }
 
-export type MFAVerifyParams = {
+type MFAVerifyParamsBase = {
   /** ID of the factor being verified. Returned in enroll(). */
   factorId: string
-
   /** ID of the challenge being verified. Returned in challenge(). */
   challengeId: string
+}
 
+type MFAVerifyTOTPParamFields = {
   /** Verification code provided by the user. */
   code: string
 }
 
-export type MFAChallengeParams = {
+export type MFAVerifyTOTPParams = Prettify<MFAVerifyParamsBase & MFAVerifyTOTPParamFields>
+
+type MFAVerifyPhoneParamFields = MFAVerifyTOTPParamFields
+
+export type MFAVerifyPhoneParams = Prettify<MFAVerifyParamsBase & MFAVerifyPhoneParamFields>
+
+type MFAVerifyWebauthnParamFieldsBase = {
+  /** Relying party ID */
+  rpId: string
+  /** Relying party origins */
+  rpOrigins?: string[]
+}
+
+type MFAVerifyWebauthnCredentialParamFields<T extends 'create' | 'request' = 'create' | 'request'> =
+  {
+    /** Operation type */
+    type: T
+    /** Creation response from the authenticator (for enrollment/unverified factors) */
+    credential_response: T extends 'create' ? RegistrationCredential : AuthenticationCredential
+  }
+
+/**
+ * WebAuthn-specific fields for MFA verification.
+ * Supports both credential creation (registration) and request (authentication) flows.
+ * @template T - Type of WebAuthn operation: 'create' for registration, 'request' for authentication
+ */
+export type MFAVerifyWebauthnParamFields<T extends 'create' | 'request' = 'create' | 'request'> = {
+  webauthn: MFAVerifyWebauthnParamFieldsBase & MFAVerifyWebauthnCredentialParamFields<T>
+}
+
+/**
+ * Parameters for WebAuthn MFA verification.
+ * Used to verify WebAuthn credentials after challenge.
+ * @template T - Type of WebAuthn operation: 'create' for registration, 'request' for authentication
+ * @see {@link https://w3c.github.io/webauthn/#sctn-verifying-assertion W3C WebAuthn Spec - Verifying an Authentication Assertion}
+ */
+export type MFAVerifyWebauthnParams<T extends 'create' | 'request' = 'create' | 'request'> =
+  Prettify<MFAVerifyParamsBase & MFAVerifyWebauthnParamFields<T>>
+
+export type MFAVerifyParams = MFAVerifyTOTPParams | MFAVerifyPhoneParams | MFAVerifyWebauthnParams
+
+type MFAChallengeParamsBase = {
   /** ID of the factor to be challenged. Returned in enroll(). */
   factorId: string
+}
+
+const MFATOTPChannels = ['sms', 'whatsapp'] as const
+export type MFATOTPChannel = typeof MFATOTPChannels[number]
+
+export type MFAChallengeTOTPParams = Prettify<MFAChallengeParamsBase>
+
+type MFAChallengePhoneParamFields<Channel extends MFATOTPChannel = MFATOTPChannel> = {
   /** Messaging channel to use (e.g. whatsapp or sms). Only relevant for phone factors */
-  channel?: 'sms' | 'whatsapp'
+  channel: Channel
 }
 
-export type MFAChallengeAndVerifyParams = {
-  /** ID of the factor being verified. Returned in enroll(). */
-  factorId: string
-  /** Verification code provided by the user. */
-  code: string
+export type MFAChallengePhoneParams = Prettify<
+  MFAChallengeParamsBase & MFAChallengePhoneParamFields
+>
+
+/** WebAuthn parameters for WebAuthn factor challenge */
+type MFAChallengeWebauthnParamFields = {
+  webauthn: {
+    /** Relying party ID */
+    rpId: string
+    /** Relying party origins*/
+    rpOrigins?: string[]
+  }
 }
 
-export type AuthMFAVerifyResponse =
-  | {
-      data: {
-        /** New access token (JWT) after successful verification. */
-        access_token: string
+/**
+ * Parameters for initiating a WebAuthn MFA challenge.
+ * Includes Relying Party information needed for WebAuthn ceremonies.
+ * @see {@link https://w3c.github.io/webauthn/#sctn-rp-operations W3C WebAuthn Spec - Relying Party Operations}
+ */
+export type MFAChallengeWebauthnParams = Prettify<
+  MFAChallengeParamsBase & MFAChallengeWebauthnParamFields
+>
 
-        /** Type of token, typically `Bearer`. */
-        token_type: string
+export type MFAChallengeParams =
+  | MFAChallengeTOTPParams
+  | MFAChallengePhoneParams
+  | MFAChallengeWebauthnParams
 
-        /** Number of seconds in which the access token will expire. */
-        expires_in: number
+type MFAChallengeAndVerifyParamsBase = Omit<MFAVerifyParamsBase, 'challengeId'>
 
-        /** Refresh token you can use to obtain new access tokens when expired. */
-        refresh_token: string
+type MFAChallengeAndVerifyTOTPParamFields = MFAVerifyTOTPParamFields
 
-        /** Updated user profile. */
-        user: User
+type MFAChallengeAndVerifyTOTPParams = Prettify<
+  MFAChallengeAndVerifyParamsBase & MFAChallengeAndVerifyTOTPParamFields
+>
+
+export type MFAChallengeAndVerifyParams = MFAChallengeAndVerifyTOTPParams
+
+/**
+ * Data returned after successful MFA verification.
+ * Contains new session tokens and updated user information.
+ */
+export type AuthMFAVerifyResponseData = {
+  /** New access token (JWT) after successful verification. */
+  access_token: string
+
+  /** Type of token, always `bearer`. */
+  token_type: 'bearer'
+
+  /** Number of seconds in which the access token will expire. */
+  expires_in: number
+
+  /** Refresh token you can use to obtain new access tokens when expired. */
+  refresh_token: string
+
+  /** Updated user profile. */
+  user: User
+}
+
+/**
+ * Response type for MFA verification operations.
+ * Returns session tokens on successful verification.
+ */
+export type AuthMFAVerifyResponse = RequestResult<AuthMFAVerifyResponseData>
+
+export type AuthMFAEnrollResponse =
+  | AuthMFAEnrollTOTPResponse
+  | AuthMFAEnrollPhoneResponse
+  | AuthMFAEnrollWebauthnResponse
+
+export type AuthMFAUnenrollResponse = RequestResult<{
+  /** ID of the factor that was successfully unenrolled. */
+  id: string
+}>
+
+type AuthMFAChallengeResponseBase<T extends FactorType> = {
+  /** ID of the newly created challenge. */
+  id: string
+
+  /** Factor Type which generated the challenge */
+  type: T
+
+  /** Timestamp in UNIX seconds when this challenge will no longer be usable. */
+  expires_at: number
+}
+
+type AuthMFAChallengeTOTPResponseFields = {
+  /** no extra fields for now, kept for consistency and for possible future changes  */
+}
+
+export type AuthMFAChallengeTOTPResponse = RequestResult<
+  Prettify<AuthMFAChallengeResponseBase<'totp'> & AuthMFAChallengeTOTPResponseFields>
+>
+
+type AuthMFAChallengePhoneResponseFields = {
+  /** no extra fields for now, kept for consistency and for possible future changes  */
+}
+
+export type AuthMFAChallengePhoneResponse = RequestResult<
+  Prettify<AuthMFAChallengeResponseBase<'phone'> & AuthMFAChallengePhoneResponseFields>
+>
+
+type AuthMFAChallengeWebauthnResponseFields = {
+  webauthn:
+    | {
+        type: 'create'
+        credential_options: { publicKey: PublicKeyCredentialCreationOptionsFuture }
       }
-      error: null
-    }
-  | {
-      data: null
-      error: AuthError
-    }
-
-export type AuthMFAEnrollResponse = AuthMFAEnrollTOTPResponse | AuthMFAEnrollPhoneResponse
-
-export type AuthMFAUnenrollResponse =
-  | {
-      data: {
-        /** ID of the factor that was successfully unenrolled. */
-        id: string
+    | {
+        type: 'request'
+        credential_options: { publicKey: PublicKeyCredentialRequestOptionsFuture }
       }
-      error: null
-    }
-  | { data: null; error: AuthError }
+}
+
+/**
+ * Response type for WebAuthn MFA challenge.
+ * Contains credential creation or request options from the server.
+ * @see {@link https://w3c.github.io/webauthn/#sctn-credential-creation W3C WebAuthn Spec - Credential Creation}
+ */
+export type AuthMFAChallengeWebauthnResponse = RequestResult<
+  Prettify<AuthMFAChallengeResponseBase<'webauthn'> & AuthMFAChallengeWebauthnResponseFields>
+>
+
+type AuthMFAChallengeWebauthnResponseFieldsJSON = {
+  webauthn:
+    | {
+        type: 'create'
+        credential_options: { publicKey: ServerCredentialCreationOptions }
+      }
+    | {
+        type: 'request'
+        credential_options: { publicKey: ServerCredentialRequestOptions }
+      }
+}
+
+/**
+ * JSON-serializable version of WebAuthn challenge response.
+ * Used for server communication with base64url-encoded binary fields.
+ */
+export type AuthMFAChallengeWebauthnResponseDataJSON = Prettify<
+  AuthMFAChallengeResponseBase<'webauthn'> & AuthMFAChallengeWebauthnResponseFieldsJSON
+>
+
+/**
+ * Server response type for WebAuthn MFA challenge.
+ * Contains JSON-formatted WebAuthn options ready for browser API.
+ */
+export type AuthMFAChallengeWebauthnServerResponse =
+  RequestResult<AuthMFAChallengeWebauthnResponseDataJSON>
 
 export type AuthMFAChallengeResponse =
-  | {
-      data: {
-        /** ID of the newly created challenge. */
-        id: string
+  | AuthMFAChallengeTOTPResponse
+  | AuthMFAChallengePhoneResponse
+  | AuthMFAChallengeWebauthnResponse
 
-        /** Factor Type which generated the challenge */
-        type: 'totp' | 'phone'
+/** response of ListFactors, which should contain all the types of factors that are available, this ensures we always include all */
+export type AuthMFAListFactorsResponse<T extends typeof FactorTypes = typeof FactorTypes> =
+  RequestResult<
+    {
+      /** All available factors (verified and unverified). */
+      all: Prettify<Factor>[]
 
-        /** Timestamp in UNIX seconds when this challenge will no longer be usable. */
-        expires_at: number
-      }
-      error: null
+      // Dynamically create a property for each factor type with only verified factors
+    } & {
+      [K in T[number]]: Prettify<Factor<K, 'verified'>>[]
     }
-  | { data: null; error: AuthError }
-
-export type AuthMFAListFactorsResponse =
-  | {
-      data: {
-        /** All available factors (verified and unverified). */
-        all: Factor[]
-
-        /** Only verified TOTP factors. (A subset of `all`.) */
-        totp: Factor[]
-        /** Only verified Phone factors. (A subset of `all`.) */
-        phone: Factor[]
-      }
-      error: null
-    }
-  | { data: null; error: AuthError }
+  >
 
 export type AuthenticatorAssuranceLevels = 'aal1' | 'aal2'
 
-export type AuthMFAGetAuthenticatorAssuranceLevelResponse =
-  | {
-      data: {
-        /** Current AAL level of the session. */
-        currentLevel: AuthenticatorAssuranceLevels | null
+export type AuthMFAGetAuthenticatorAssuranceLevelResponse = RequestResult<{
+  /** Current AAL level of the session. */
+  currentLevel: AuthenticatorAssuranceLevels | null
 
-        /**
-         * Next possible AAL level for the session. If the next level is higher
-         * than the current one, the user should go through MFA.
-         *
-         * @see {@link GoTrueMFAApi#challenge}
-         */
-        nextLevel: AuthenticatorAssuranceLevels | null
+  /**
+   * Next possible AAL level for the session. If the next level is higher
+   * than the current one, the user should go through MFA.
+   *
+   * @see {@link GoTrueMFAApi#challenge}
+   */
+  nextLevel: AuthenticatorAssuranceLevels | null
 
-        /**
-         * A list of all authentication methods attached to this session. Use
-         * the information here to detect the last time a user verified a
-         * factor, for example if implementing a step-up scenario.
-         */
-        currentAuthenticationMethods: AMREntry[]
-      }
-      error: null
-    }
-  | { data: null; error: AuthError }
+  /**
+   * A list of all authentication methods attached to this session. Use
+   * the information here to detect the last time a user verified a
+   * factor, for example if implementing a step-up scenario.
+   */
+  currentAuthenticationMethods: AMREntry[]
+}>
 
 /**
  * Contains the full multi-factor authentication API.
@@ -992,22 +1150,28 @@ export interface GoTrueMFAApi {
    * The user has to enter the code from their authenticator app to verify it.
    *
    * Upon verifying a factor, all other sessions are logged out and the current session's authenticator level is promoted to `aal2`.
-   *
    */
   enroll(params: MFAEnrollTOTPParams): Promise<AuthMFAEnrollTOTPResponse>
   enroll(params: MFAEnrollPhoneParams): Promise<AuthMFAEnrollPhoneResponse>
+  enroll(params: MFAEnrollWebauthnParams): Promise<AuthMFAEnrollWebauthnResponse>
   enroll(params: MFAEnrollParams): Promise<AuthMFAEnrollResponse>
 
   /**
    * Prepares a challenge used to verify that a user has access to a MFA
    * factor.
    */
+  challenge(params: MFAChallengeTOTPParams): Promise<Prettify<AuthMFAChallengeTOTPResponse>>
+  challenge(params: MFAChallengePhoneParams): Promise<Prettify<AuthMFAChallengePhoneResponse>>
+  challenge(params: MFAChallengeWebauthnParams): Promise<Prettify<AuthMFAChallengeWebauthnResponse>>
   challenge(params: MFAChallengeParams): Promise<AuthMFAChallengeResponse>
 
   /**
    * Verifies a code against a challenge. The verification code is
    * provided by the user by entering a code seen in their authenticator app.
    */
+  verify(params: MFAVerifyTOTPParams): Promise<AuthMFAVerifyResponse>
+  verify(params: MFAVerifyPhoneParams): Promise<AuthMFAVerifyResponse>
+  verify(params: MFAVerifyWebauthnParams): Promise<AuthMFAVerifyResponse>
   verify(params: MFAVerifyParams): Promise<AuthMFAVerifyResponse>
 
   /**
@@ -1046,21 +1210,18 @@ export interface GoTrueMFAApi {
    *
    */
   getAuthenticatorAssuranceLevel(): Promise<AuthMFAGetAuthenticatorAssuranceLevelResponse>
+
+  // namespace for the webauthn methods
+  webauthn: WebAuthnApi
 }
 
 /**
  * @expermental
  */
-export type AuthMFAAdminDeleteFactorResponse =
-  | {
-      data: {
-        /** ID of the factor that was successfully deleted. */
-        id: string
-      }
-      error: null
-    }
-  | { data: null; error: AuthError }
-
+export type AuthMFAAdminDeleteFactorResponse = RequestResult<{
+  /** ID of the factor that was successfully deleted. */
+  id: string
+}>
 /**
  * @expermental
  */
@@ -1075,15 +1236,10 @@ export type AuthMFAAdminDeleteFactorParams = {
 /**
  * @expermental
  */
-export type AuthMFAAdminListFactorsResponse =
-  | {
-      data: {
-        /** All factors attached to the user. */
-        factors: Factor[]
-      }
-      error: null
-    }
-  | { data: null; error: AuthError }
+export type AuthMFAAdminListFactorsResponse = RequestResult<{
+  /** All factors attached to the user. */
+  factors: Factor[]
+}>
 
 /**
  * @expermental
@@ -1140,15 +1296,7 @@ export type SupportedStorage = PromisifyMethods<
 
 export type InitializeResult = { error: AuthError | null }
 
-export type CallRefreshTokenResult =
-  | {
-      session: Session
-      error: null
-    }
-  | {
-      session: null
-      error: AuthError
-    }
+export type CallRefreshTokenResult = RequestResult<Session>
 
 export type Pagination = {
   [key: string]: any
@@ -1178,79 +1326,96 @@ export type SignOut = {
   scope?: 'global' | 'local' | 'others'
 }
 
-export type MFAEnrollTOTPParams = {
+type MFAEnrollParamsBase<T extends FactorType> = {
   /** The type of factor being enrolled. */
-  factorType: 'totp'
-  /** Domain which the user is enrolled with. */
-  issuer?: string
+  factorType: T
   /** Human readable name assigned to the factor. */
   friendlyName?: string
 }
-export type MFAEnrollPhoneParams = {
-  /** The type of factor being enrolled. */
-  factorType: 'phone'
-  /** Human readable name assigned to the factor. */
-  friendlyName?: string
+
+type MFAEnrollTOTPParamFields = {
+  /** Domain which the user is enrolled with. */
+  issuer?: string
+}
+
+export type MFAEnrollTOTPParams = Prettify<MFAEnrollParamsBase<'totp'> & MFAEnrollTOTPParamFields>
+
+type MFAEnrollPhoneParamFields = {
   /** Phone number associated with a factor. Number should conform to E.164 format */
   phone: string
 }
+export type MFAEnrollPhoneParams = Prettify<
+  MFAEnrollParamsBase<'phone'> & MFAEnrollPhoneParamFields
+>
 
-export type AuthMFAEnrollTOTPResponse =
-  | {
-      data: {
-        /** ID of the factor that was just enrolled (in an unverified state). */
-        id: string
+type MFAEnrollWebauthnFields = {
+  /** no extra fields for now, kept for consistency and for possible future changes  */
+}
 
-        /** Type of MFA factor.*/
-        type: 'totp'
+/**
+ * Parameters for enrolling a WebAuthn factor.
+ * Creates an unverified WebAuthn factor that must be verified with a credential.
+ * @see {@link https://w3c.github.io/webauthn/#sctn-registering-a-new-credential W3C WebAuthn Spec - Registering a New Credential}
+ */
+export type MFAEnrollWebauthnParams = Prettify<
+  MFAEnrollParamsBase<'webauthn'> & MFAEnrollWebauthnFields
+>
 
-        /** TOTP enrollment information. */
-        totp: {
-          /** Contains a QR code encoding the authenticator URI. You can
-           * convert it to a URL by prepending `data:image/svg+xml;utf-8,` to
-           * the value. Avoid logging this value to the console. */
-          qr_code: string
+type AuthMFAEnrollResponseBase<T extends FactorType> = {
+  /** ID of the factor that was just enrolled (in an unverified state). */
+  id: string
 
-          /** The TOTP secret (also encoded in the QR code). Show this secret
-           * in a password-style field to the user, in case they are unable to
-           * scan the QR code. Avoid logging this value to the console. */
-          secret: string
+  /** Type of MFA factor.*/
+  type: T
 
-          /** The authenticator URI encoded within the QR code, should you need
-           * to use it. Avoid loggin this value to the console. */
-          uri: string
-        }
-        /** Friendly name of the factor, useful for distinguishing between factors **/
-        friendly_name?: string
-      }
-      error: null
-    }
-  | {
-      data: null
-      error: AuthError
-    }
+  /** Friendly name of the factor, useful for distinguishing between factors **/
+  friendly_name?: string
+}
 
-export type AuthMFAEnrollPhoneResponse =
-  | {
-      data: {
-        /** ID of the factor that was just enrolled (in an unverified state). */
-        id: string
+type AuthMFAEnrollTOTPResponseFields = {
+  /** TOTP enrollment information. */
+  totp: {
+    /** Contains a QR code encoding the authenticator URI. You can
+     * convert it to a URL by prepending `data:image/svg+xml;utf-8,` to
+     * the value. Avoid logging this value to the console. */
+    qr_code: string
 
-        /** Type of MFA factor. */
-        type: 'phone'
+    /** The TOTP secret (also encoded in the QR code). Show this secret
+     * in a password-style field to the user, in case they are unable to
+     * scan the QR code. Avoid logging this value to the console. */
+    secret: string
 
-        /** Friendly name of the factor, useful for distinguishing between factors **/
-        friendly_name?: string
+    /** The authenticator URI encoded within the QR code, should you need
+     * to use it. Avoid loggin this value to the console. */
+    uri: string
+  }
+}
 
-        /** Phone number of the MFA factor in E.164 format. Used to send messages  */
-        phone: string
-      }
-      error: null
-    }
-  | {
-      data: null
-      error: AuthError
-    }
+export type AuthMFAEnrollTOTPResponse = RequestResult<
+  Prettify<AuthMFAEnrollResponseBase<'totp'> & AuthMFAEnrollTOTPResponseFields>
+>
+
+type AuthMFAEnrollPhoneResponseFields = {
+  /** Phone number of the MFA factor in E.164 format. Used to send messages  */
+  phone: string
+}
+
+export type AuthMFAEnrollPhoneResponse = RequestResult<
+  Prettify<AuthMFAEnrollResponseBase<'phone'> & AuthMFAEnrollPhoneResponseFields>
+>
+
+type AuthMFAEnrollWebauthnFields = {
+  /** no extra fields for now, kept for consistency and for possible future changes  */
+}
+
+/**
+ * Response type for WebAuthn factor enrollment.
+ * Returns the enrolled factor ID and metadata.
+ * @see {@link https://w3c.github.io/webauthn/#sctn-registering-a-new-credential W3C WebAuthn Spec - Registering a New Credential}
+ */
+export type AuthMFAEnrollWebauthnResponse = RequestResult<
+  Prettify<AuthMFAEnrollResponseBase<'webauthn'> & AuthMFAEnrollWebauthnFields>
+>
 
 export type JwtHeader = {
   alg: 'RS256' | 'ES256' | 'HS256'

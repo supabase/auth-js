@@ -6,31 +6,37 @@ describe('navigatorLock', () => {
     Object.defineProperty(globalThis, 'navigator', {
       value: {
         locks: {
-          request: jest.fn().mockImplementation((_, __, callback) => Promise.resolve(callback(null))),
-          query: jest.fn().mockResolvedValue({ held: [] })
-        }
+          request: jest
+            .fn()
+            .mockImplementation((_, __, callback) => Promise.resolve(callback(null))),
+          query: jest.fn().mockResolvedValue({ held: [] }),
+        },
       },
-      configurable: true
+      configurable: true,
     })
   })
 
   it('should acquire and release lock successfully', async () => {
     const mockLock = { name: 'test-lock' }
-    ;(globalThis.navigator.locks.request as jest.Mock).mockImplementation((_, __, callback) => 
+    ;(globalThis.navigator.locks.request as jest.Mock).mockImplementation((_, __, callback) =>
       Promise.resolve(callback(mockLock))
     )
-    
+
     const result = await navigatorLock('test', -1, async () => 'success')
     expect(result).toBe('success')
     expect(globalThis.navigator.locks.request).toHaveBeenCalled()
   })
 
   it('should handle immediate acquisition failure', async () => {
-    ;(globalThis.navigator.locks.request as jest.Mock).mockImplementation((_, __, callback) => 
+    ;(globalThis.navigator.locks.request as jest.Mock).mockImplementation((_, __, callback) =>
       Promise.resolve(callback(null))
     )
-    
+
     await expect(navigatorLock('test', 0, async () => 'success')).rejects.toThrow()
+  })
+
+  it('should not throw if browser is not following the Navigator LockManager spec', async () => {
+    await expect(navigatorLock('test-lock', 1, async () => 'success')).resolves.toBe('success')
   })
 })
 
@@ -97,13 +103,13 @@ describe('processLock', () => {
 
   it('should handle timeout correctly', async () => {
     const operation1 = processLock('timeout-test', -1, async () => {
-      await new Promise(resolve => setTimeout(resolve, 200))
+      await new Promise((resolve) => setTimeout(resolve, 200))
       return 'success'
     })
 
     // Try to acquire same lock with timeout
     const operation2 = processLock('timeout-test', 100, async () => 'should timeout')
-    
+
     await expect(operation2).rejects.toThrow()
     await expect(operation1).resolves.toBe('success')
   })
@@ -116,8 +122,6 @@ describe('processLock', () => {
       })
     ).rejects.toThrow(errorMessage)
 
-    await expect(
-      processLock('error-test', -1, async () => 'success')
-    ).resolves.toBe('success')
+    await expect(processLock('error-test', -1, async () => 'success')).resolves.toBe('success')
   })
 })

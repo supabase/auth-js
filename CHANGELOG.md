@@ -1,5 +1,41 @@
 # Changelog
 
+## [2.72.0](https://github.com/supabase/auth-js/compare/v2.71.1...v2.72.0) (2025-09-11)
+
+
+### Features
+
+* add sign in with ethereum to `signInWithWeb3` ([#1082](https://github.com/supabase/auth-js/issues/1082)) ([483e24b](https://github.com/supabase/auth-js/commit/483e24be190f537eabdb85f8be2eee2b16797872))
+
+
+### Bug Fixes
+
+* correct typo in GoTrueClient initializePromise comment ([#1093](https://github.com/supabase/auth-js/issues/1093)) ([3a147b5](https://github.com/supabase/auth-js/commit/3a147b56e99565efde461cfe8463178dcd65ba43))
+* docs for ethereum ([#1117](https://github.com/supabase/auth-js/issues/1117)) ([aadf02e](https://github.com/supabase/auth-js/commit/aadf02e63179746a06451f4247a370dfd05740ea))
+* update typedoc to 0.23 ([#1113](https://github.com/supabase/auth-js/issues/1113)) ([91474d6](https://github.com/supabase/auth-js/commit/91474d642e077c9db41eb7c5d2387c9a4d3687cf))
+
+## [2.71.1](https://github.com/supabase/auth-js/compare/v2.71.0...v2.71.1) (2025-07-17)
+
+
+### Bug Fixes
+
+* use JSON-based deep clone instead of structuredClone ([#1084](https://github.com/supabase/auth-js/issues/1084)) ([9a6edb9](https://github.com/supabase/auth-js/commit/9a6edb9d0e4d80c79c79b2f643dbaaf57f3d5ebe))
+
+## [2.71.0](https://github.com/supabase/auth-js/compare/v2.70.0...v2.71.0) (2025-07-10)
+
+
+### Features
+
+* fallback to `getUser()` if the `kid` of the JWT is not found ([#1080](https://github.com/supabase/auth-js/issues/1080)) ([9721f60](https://github.com/supabase/auth-js/commit/9721f605d3fdd046b5453befa1abfcb755cf7235))
+* introduce experimental split user and session storage ([#1023](https://github.com/supabase/auth-js/issues/1023)) ([e7b2f21](https://github.com/supabase/auth-js/commit/e7b2f2169cbbf2cd1e56526c488fc7c169335eac))
+* make `getClaims()` non experimental, add global cache ([#1078](https://github.com/supabase/auth-js/issues/1078)) ([ffe13d7](https://github.com/supabase/auth-js/commit/ffe13d7e833f3e53129e152ad3084fb042f9f7c9))
+* remove solana dependency by inlining types ([#1079](https://github.com/supabase/auth-js/issues/1079)) ([7665f94](https://github.com/supabase/auth-js/commit/7665f941bbf1f1f420f56b98df01da304f1b2e1d))
+
+
+### Bug Fixes
+
+* handle null current session with split session storage ([#1071](https://github.com/supabase/auth-js/issues/1071)) ([bc6192a](https://github.com/supabase/auth-js/commit/bc6192afd17e2995ca63acb7fbd4e7ee0b435687))
+
 ## [2.70.0](https://github.com/supabase/auth-js/compare/v2.69.1...v2.70.0) (2025-05-16)
 
 
